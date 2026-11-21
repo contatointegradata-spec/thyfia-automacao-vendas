@@ -277,6 +277,14 @@ class TestTenant(Base):
         self.assertEqual((a["whatsapp"], a["telegram"]), ("5534999991111", "@canal_um"))
         self.assertEqual((b["whatsapp"], b["telegram"]), ("5511988882222", ""))
 
+    def test_cancelamento_apos_reembolso_nao_desfaz_o_reembolso(self):
+        planos.conceder(self.u["email"], "pro", origem="kiwify", valido_ate="2099-01-01T00:00:00")
+        planos.marcar(self.u["email"], "pro", "reembolsada")
+        planos.marcar(self.u["email"], "pro", "cancelada")
+        s = planos.situacao(self.u)
+        self.assertFalse(s["ativo"])
+        self.assertEqual(s["status"], "reembolsada")
+
     def test_dono_sem_numero_mantem_o_envio_como_antes(self):
         dono = novo_usuario(email=f"dono{self.n}@t.test", papel="admin")
         self.assertTrue(tenant.automacao_pronta(dono["id"]))   # usa o destino padrão do n8n

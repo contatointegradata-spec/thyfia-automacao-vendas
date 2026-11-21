@@ -160,6 +160,8 @@ def marcar(email: str, plano: str | None, status: str) -> int:
     extra = ", valido_ate=?" if status == "reembolsada" else ""
     args = [status] + ([agora_iso()] if extra else []) + [email]
     sql = f"UPDATE assinaturas SET status=?{extra}, atualizado=datetime('now','localtime') WHERE email=?"
+    if status == "cancelada":  # a Kiwify manda "cancelada" logo depois de um reembolso: não desfaz o reembolso
+        sql += " AND status!='reembolsada'"
     if plano:
         sql += " AND plano=?"
         args.append(plano)
