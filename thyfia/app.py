@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import secrets
 import threading
 import time
@@ -88,7 +89,8 @@ def usuario_atual(request: Request):
 
 
 def _set_cookie(resp: Response, token: str) -> None:
-    resp.set_cookie(COOKIE, token, httponly=True, samesite="lax", max_age=7 * 24 * 3600)
+    resp.set_cookie(COOKIE, token, httponly=True, samesite="lax", max_age=7 * 24 * 3600,
+                    secure=os.environ.get("THYFIA_COOKIE_SECURE") == "1")  # 1 = atrás de HTTPS (produção)
 
 
 def _job_dict(r) -> dict:

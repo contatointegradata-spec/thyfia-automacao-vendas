@@ -1,0 +1,27 @@
+# Copiado para /opt/thyfia/ na VPS a cada deploy. O .env fica só na VPS (nunca no git).
+services:
+  thyfia:
+    image: ghcr.io/contatointegradata-spec/thyfia-automacao-vendas:latest
+    container_name: thyfia
+    restart: unless-stopped
+    env_file: .env
+    shm_size: "1gb"            # o Chrome precisa de memória compartilhada
+    mem_limit: 1536m
+    cpus: 1.5                  # evita travar os outros projetos da VPS
+    volumes:
+      - ./dados:/app/dados
+    networks:
+      - proxy
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=${PROXY_NETWORK}
+      - traefik.http.routers.thyfia.rule=Host(`${THYFIA_DOMINIO}`)
+      - traefik.http.routers.thyfia.entrypoints=websecure
+      - traefik.http.routers.thyfia.tls=true
+      - traefik.http.routers.thyfia.tls.certresolver=${TRAEFIK_CERTRESOLVER}
+      - traefik.http.services.thyfia.loadbalancer.server.port=8000
+
+networks:
+  proxy:
+    name: ${PROXY_NETWORK}
+    external: true
