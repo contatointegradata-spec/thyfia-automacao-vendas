@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+import os
 import unittest
 from datetime import datetime, timedelta
 from unittest import mock
@@ -455,6 +456,32 @@ class TestAdmin(Base):
         with mock.patch.dict("os.environ", {"THYFIA_ADMIN_EMAIL": self.u["email"]}):
             auth.garantir_admin()
         self.assertEqual(c.execute("SELECT papel FROM usuarios WHERE id=?", (self.u["id"],)).fetchone()[0], "admin")
+
+
+class TestAdminPorEnv(Base):
+    def test_senha_do_env_cria_e_redefine_o_admin_so_na_subida(self):
+        email = f"dono-env{self.n}@t.test"
+        env = {"THYFIA_ADMIN_EMAIL": email, "THYFIA_ADMIN_SENHA": "SenhaForte#1"}
+        with mock.patch.dict("os.environ", env):
+            auth.garantir_admin(inicial=True)            # cria a conta
+            u = auth.autenticar(email, "SenhaForte#1")
+            self.assertIsNotNone(u)
+            self.assertEqual(u["papel"], "admin")
+            db.conn().execute("UPDATE usuarios SET ativo=0 WHERE email=?", (email,))
+            db.conn().commit()
+            auth.garantir_admin()                         # cadastro comum não mexe na senha/ativo
+            self.assertEqual(db.conn().execute("SELECT ativo FROM usuarios WHERE email=?", (email,)).fetchone()[0], 0)
+            os.environ["THYFIA_ADMIN_SENHA"] = "OutraSenha#2"
+            auth.garantir_admin(inicial=True)             # redefine e reativa
+            self.assertIsNone(auth.autenticar(email, "SenhaForte#1"))
+            u = auth.autenticar(email, "OutraSenha#2")
+            self.assertEqual((u["ativo"], u["papel"]), (1, "admin"))
+
+    def test_senha_curta_no_env_e_ignorada(self):
+        email = f"dono-curto{self.n}@t.test"
+        with mock.patch.dict("os.environ", {"THYFIA_ADMIN_EMAIL": email, "THYFIA_ADMIN_SENHA": "123"}):
+            auth.garantir_admin(inicial=True)
+        self.assertIsNone(db.conn().execute("SELECT 1 FROM usuarios WHERE email=?", (email,)).fetchone())
 
 
 class TestPerfilEPlanos(Base):

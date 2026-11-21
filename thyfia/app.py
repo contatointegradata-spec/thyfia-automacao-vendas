@@ -33,7 +33,7 @@ COOKIE = "thyfia_sessao"
 ATIVOS = ("iniciando", "coletando", "gerando")
 
 db.init()
-auth.garantir_admin()
+auth.garantir_admin(inicial=True)
 # jobs que estavam rodando quando o servidor caiu/reiniciou nunca vão terminar: libera o usuário
 _c = db.conn()
 _c.execute(
