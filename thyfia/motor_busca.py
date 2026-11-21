@@ -181,6 +181,22 @@ def buscar(page: Page, termo: str, limite: int) -> list[dict]:
                     "Abra o Mercado Livre no seu Chrome, faça uma busca qualquer e tente de novo."
                 )
             html = fr.content()
+            # página pequena e sem cards = ainda carregando/redirecionando (ex.: etapa intermediária do
+            # site): dá até 15 s para os resultados aparecerem antes de desistir
+            for _ in range(15):
+                if "polycard" in html or any(b in fr.url for b in BLOQUEIOS):
+                    break
+                page.wait_for_timeout(1000)
+                try:
+                    fr = page.frame(name=NOME_FRAME) or fr
+                    html = fr.content()
+                except Exception:
+                    pass
+            if any(b in fr.url for b in BLOQUEIOS) and not produtos:
+                raise BuscaBloqueada(
+                    "O Mercado Livre pediu uma verificação de segurança na busca. "
+                    "Abra o Mercado Livre no seu Chrome, faça uma busca qualquer e tente de novo."
+                )
             novos = extrair_produtos(html)
             if not novos:  # fallback: lê os cards renderizados
                 try:
@@ -197,9 +213,10 @@ def buscar(page: Page, termo: str, limite: int) -> list[dict]:
                 except Exception:
                     titulo = "?"
                 baixo = html.lower()
+                trecho = re.sub(r"\s+", " ", re.sub(r"<script.*?</script>|<style.*?</style>|<[^>]+>", " ", html, flags=re.S)).strip()[:300]
                 _log.warning("Busca '%s' pág.%s sem produtos: url=%s título=%r html=%d bytes polycard=%s "
-                             "captcha=%s login=%s", termo, pagina, fr.url[:120], titulo[:80], len(html),
-                             "polycard" in baixo, "captcha" in baixo, "login" in baixo[:3000])
+                             "captcha=%s login=%s texto=%r", termo, pagina, fr.url[:120], titulo[:80], len(html),
+                             "polycard" in baixo, "captcha" in baixo, "login" in baixo[:3000], trecho)
             antes = len(produtos)
             for p in novos:
                 if p["url"] not in vistos:
