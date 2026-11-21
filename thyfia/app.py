@@ -62,6 +62,18 @@ for _nome in ("thyfia.publicacao", "thyfia.instagram", "thyfia.imagem"):
 agente_publicacao.iniciar_agendador()
 
 app = FastAPI(title="ThyfIA", docs_url=None, redoc_url=None)
+
+
+@app.middleware("http")
+async def sem_cache_do_front(request: Request, call_next):
+    """A página e os arquivos do front sempre revalidam (304 quando iguais): depois de um deploy
+    ninguém fica com HTML novo + JS/CSS antigo em cache (tela de login "travada")."""
+    resp = await call_next(request)
+    if request.url.path == "/" or request.url.path.startswith("/static/"):
+        resp.headers["Cache-Control"] = "no-cache"
+    return resp
+
+
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
 # fotos enviadas para posts (nomes aleatórios) — o Instagram precisa buscá-las por URL pública
 app.mount("/midia", StaticFiles(directory=db.MIDIA), name="midia")
