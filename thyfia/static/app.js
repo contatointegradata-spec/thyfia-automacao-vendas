@@ -64,21 +64,28 @@ function carregando(btn, sim) { btn.classList.toggle("carregando", sim); btn.dis
 /* ------------------------------------------------------------------ partículas de fundo */
 (function particulas() {
   const cv = $("#particulas"), ctx = cv.getContext("2d");
-  let pts = [], w, h;
+  const DPR = Math.min(devicePixelRatio || 1, 1.5);  // tela retina não precisa de 2x aqui
+  let pts = [], w, h, ultimo = 0;
   const redim = () => {
-    w = cv.width = innerWidth * devicePixelRatio; h = cv.height = innerHeight * devicePixelRatio;
+    w = cv.width = innerWidth * DPR; h = cv.height = innerHeight * DPR;
     cv.style.width = innerWidth + "px"; cv.style.height = innerHeight + "px";
     const n = Math.min(70, Math.floor(innerWidth / 22));
     pts = Array.from({ length: n }, () => ({
       x: Math.random() * w, y: Math.random() * h,
-      vx: (Math.random() - .5) * .25 * devicePixelRatio, vy: (Math.random() - .5) * .25 * devicePixelRatio,
-      r: (Math.random() * 1.4 + .4) * devicePixelRatio,
+      vx: (Math.random() - .5) * .25 * DPR, vy: (Math.random() - .5) * .25 * DPR,
+      r: (Math.random() * 1.4 + .4) * DPR,
     }));
   };
-  redim(); addEventListener("resize", redim);
-  const passo = () => {
+  let parado = false;
+  redim(); addEventListener("resize", () => { redim(); parado = false; });  // dentro do app as partículas ficam paradas (1 quadro); no login animam a ~30 fps
+  const passo = (t = 0) => {
+    if (!REDUZIR) requestAnimationFrame(passo);
+    const noApp = !$("#tela-app").hidden;
+    if (noApp && parado) return;
+    if (document.hidden || (!noApp && t - ultimo < 33)) return;
+    parado = noApp; ultimo = t;
     ctx.clearRect(0, 0, w, h);
-    const lim = 120 * devicePixelRatio;
+    const lim = 120 * DPR;
     for (const p of pts) {
       p.x += p.vx; p.y += p.vy;
       if (p.x < 0 || p.x > w) p.vx *= -1;
@@ -90,11 +97,10 @@ function carregando(btn, sim) { btn.classList.toggle("carregando", sim); btn.dis
       const a = pts[i], b = pts[j], d = Math.hypot(a.x - b.x, a.y - b.y);
       if (d < lim) {
         ctx.strokeStyle = `rgba(34,211,238,${(1 - d / lim) * .14})`;
-        ctx.lineWidth = devicePixelRatio * .6;
+        ctx.lineWidth = DPR * .6;
         ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
       }
     }
-    if (!REDUZIR) requestAnimationFrame(passo);
   };
   passo();
 })();

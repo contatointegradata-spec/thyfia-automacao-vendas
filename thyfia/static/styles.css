@@ -47,12 +47,12 @@ button { cursor: pointer; background: none; border: 0; }
 .aurora { position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
 .blob {
   position: absolute; width: 46vmax; height: 46vmax; border-radius: 50%;
-  filter: blur(90px); opacity: .35; mix-blend-mode: screen;
-  animation: flutuar 22s var(--ease) infinite alternate;
+  opacity: .4; will-change: transform;  /* degradê radial no lugar de blur(90px)+blend: bem mais leve de pintar */
+  animation: flutuar 22s ease-in-out infinite alternate;
 }
-.b1 { background: #6d28d9; top: -18vmax; left: -10vmax; }
-.b2 { background: #0891b2; bottom: -22vmax; right: -12vmax; animation-delay: -7s; animation-duration: 26s; }
-.b3 { background: #c026d3; top: 30%; left: 45%; width: 30vmax; height: 30vmax; opacity: .18; animation-delay: -13s; }
+.b1 { background: radial-gradient(circle, #6d28d9 0%, transparent 68%); top: -18vmax; left: -10vmax; }
+.b2 { background: radial-gradient(circle, #0891b2 0%, transparent 68%); bottom: -22vmax; right: -12vmax; animation-delay: -7s; animation-duration: 26s; }
+.b3 { background: radial-gradient(circle, #c026d3 0%, transparent 68%); top: 30%; left: 45%; width: 30vmax; height: 30vmax; opacity: .22; animation-delay: -13s; }
 @keyframes flutuar {
   0% { transform: translate(0, 0) scale(1); }
   50% { transform: translate(6vmax, 4vmax) scale(1.12); }
@@ -198,7 +198,7 @@ button { cursor: pointer; background: none; border: 0; }
 #tela-app { display: grid; grid-template-columns: 264px minmax(0, 1fr); }
 .sidebar {
   position: relative; display: flex; flex-direction: column; padding: 26px 18px; gap: 34px;
-  border-right: 1px solid var(--borda); background: rgba(7,7,15,.55); backdrop-filter: blur(20px);
+  border-right: 1px solid var(--borda); background: rgba(9,8,20,.88);
 }
 .sidebar .marca { padding: 0 10px; }
 .menu { position: relative; display: flex; flex-direction: column; gap: 4px; }
@@ -248,7 +248,7 @@ button { cursor: pointer; background: none; border: 0; }
 .busca-card {
   position: relative; padding: 28px; border-radius: var(--raio-g);
   background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.02));
-  box-shadow: var(--sombra); backdrop-filter: blur(20px);
+  box-shadow: var(--sombra);
 }
 .view.entrando .busca-card { opacity: 0; animation: sobe .7s .15s var(--ease) forwards; }
 .plataforma-chip { display: inline-flex; align-items: center; gap: 10px; padding: 6px 12px 6px 6px; border-radius: 99px; background: var(--superficie); border: 1px solid var(--borda); font-weight: 600; font-size: 14px; margin-bottom: 18px; }
@@ -268,7 +268,7 @@ button { cursor: pointer; background: none; border: 0; }
 
 .sugestoes {
   position: absolute; z-index: 20; top: calc(100% + 10px); left: 0; right: 0; list-style: none; padding: 8px;
-  border-radius: 18px; background: rgba(18,17,34,.96); backdrop-filter: blur(20px); box-shadow: var(--sombra);
+  border-radius: 18px; background: rgba(18,17,34,.97); box-shadow: var(--sombra);
   opacity: 0; transform: translateY(-8px) scale(.98); pointer-events: none; transition: all .25s var(--ease);
 }
 .sugestoes.aberta { opacity: 1; transform: none; pointer-events: auto; }
