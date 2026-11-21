@@ -352,6 +352,13 @@ function estadoModal(qual) {
 
 /* ---- extensão ThyfIA Conector (login no próprio navegador) ---- */
 const temExtensao = () => !!document.documentElement.dataset.thyfiaExt;
+// versão da extensão instalada (a página lê do atributo que a extensão coloca); "1.2.0" → [1,2,0]
+const versaoExtensao = () => (document.documentElement.dataset.thyfiaExt || "0").split(".").map((n) => parseInt(n, 10) || 0);
+const extensaoAtende = (minima) => {
+  const v = versaoExtensao(), m = minima.split(".").map(Number);
+  for (let i = 0; i < 3; i++) { if ((v[i] || 0) !== (m[i] || 0)) return (v[i] || 0) > (m[i] || 0); }
+  return true;
+};
 
 function falarComExtensao(acao, tempo = 6 * 60 * 1000, dados) {
   return new Promise((resolve, reject) => {
@@ -556,9 +563,12 @@ $("#form-busca").addEventListener("submit", async (e) => {
     await sincronizarSessao(); // usa a sessão mais recente do ML deste navegador
     // a busca de produtos roda neste navegador (o ML recusa a busca vinda do IP do servidor)
     let trechos = null;
-    if (temExtensao()) {
-      try { trechos = (await falarComExtensao("buscar", 60000, { termo, limite: estado.limite })).trechos || null; }
-      catch { /* sem extensão atualizada/sem resultado: o servidor tenta sozinho */ }
+    if (temExtensao() && !extensaoAtende("1.2.0")) {
+      // extensão antiga não sabe buscar (e nem responde ao pedido): não espera à toa
+      toast("Atualize a extensão ThyfIA Conector (Ajuda → baixar de novo) para a busca funcionar.", "info");
+    } else if (temExtensao()) {
+      try { trechos = (await falarComExtensao("buscar", 30000, { termo, limite: estado.limite })).trechos || null; }
+      catch (e) { if (e.message) toast(e.message, "info"); /* o servidor ainda tenta sozinho */ }
     }
     const { id } = await api("/api/jobs", { body: { termo, limite: estado.limite, trechos } });
     estado.job = id;
