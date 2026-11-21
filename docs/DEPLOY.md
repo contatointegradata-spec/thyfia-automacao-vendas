@@ -11,7 +11,7 @@ Domínio: `https://thyfia.integradata.app.br` (registro A → 2.25.185.223).
 3. **GitHub → Settings → Secrets and variables → Actions:** `VPS_HOST` (2.25.185.223), `VPS_USER` (`deploy`), `VPS_SSH_KEY` (chave privada do passo 1), `VPS_PORT` (opcional, padrão 22).
 4. **Extensão ThyfIA Conector:** recarregar em `chrome://extensions` (o manifesto agora aceita o domínio de produção).
 
-5. **nginx da VPS:** rodar `deploy/add-nginx-thyfia.sh` (acrescenta os blocos de `deploy/nginx-thyfia.conf` ao nginx.conf com backup/rollback) e conferir se o certificado cobre `thyfia.integradata.app.br`.
+5. **nginx da VPS:** rodar `deploy/add-nginx-thyfia.sh` (acrescenta os blocos de `deploy/nginx-thyfia.conf` ao nginx.conf com backup/rollback) e emitir um certificado próprio: `certbot certonly --webroot -w /var/www/certbot --cert-name thyfia.integradata.app.br -d thyfia.integradata.app.br`.
 
 ## Observações
 - No servidor não existe janela do Chrome: o login do Mercado Livre é feito pela extensão (botão conectar/sincronizar), que envia a sessão para `/api/ml/sessao`.
