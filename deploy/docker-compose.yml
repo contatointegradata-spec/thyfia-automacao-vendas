@@ -9,7 +9,7 @@ services:
     env_file: .env
     shm_size: "1gb"            # o Chrome precisa de memória compartilhada
     mem_limit: 1536m
-    cpus: 1.5                  # evita travar os outros projetos da VPS
+    cpus: 0.8                  # a VPS tem 1 CPU; deixa folga para n8n, Evolution e ClinicMedia
     volumes:
       - ./dados:/app/dados
     networks:
