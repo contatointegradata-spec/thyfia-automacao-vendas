@@ -1,4 +1,6 @@
 # Copiado para /opt/thyfia/ na VPS a cada deploy. O .env fica só na VPS (nunca no git).
+# O nginx da VPS encaminha https://thyfia.integradata.app.br -> http://thyfia:8000
+# (ele precisa estar na mesma rede Docker: PROXY_NETWORK).
 services:
   thyfia:
     image: ghcr.io/contatointegradata-spec/thyfia-automacao-vendas:latest
@@ -12,14 +14,6 @@ services:
       - ./dados:/app/dados
     networks:
       - proxy
-    labels:
-      - traefik.enable=true
-      - traefik.docker.network=${PROXY_NETWORK}
-      - traefik.http.routers.thyfia.rule=Host(`${THYFIA_DOMINIO}`)
-      - traefik.http.routers.thyfia.entrypoints=websecure
-      - traefik.http.routers.thyfia.tls=true
-      - traefik.http.routers.thyfia.tls.certresolver=${TRAEFIK_CERTRESOLVER}
-      - traefik.http.services.thyfia.loadbalancer.server.port=8000
 
 networks:
   proxy:
