@@ -283,6 +283,7 @@ async function irPara(view, imediato = false) {
   if (view === "historico") carregarHistorico();
   if (view === "cerebro") carregarCerebro();
   if (view === "publicacao") abrirPublicacao();
+  if (view === "ajuda") carregarAjuda();
   if (view === "gerar") setTimeout(() => !$("#busca-card").classList.contains("liberado") || $("#input-termo").focus({ preventScroll: true }), 500);
 }
 $$(".menu-item").forEach((m) => m.addEventListener("click", () => irPara(m.dataset.view)));
@@ -1035,3 +1036,48 @@ async function carregarCerebro() {
 }
 
 iniciar();
+
+
+/* ------------------------------------------------------------------ AJUDA */
+const ajuda = { carregada: false, secoes: [], spy: null };
+const semAcento = (t) => String(t).normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+
+async function carregarAjuda() {
+  if (ajuda.carregada) return;
+  const box = $("#aj-conteudo"), toc = $("#aj-toc");
+  try {
+    const r = await fetch("/api/ajuda", { credentials: "same-origin" });
+    if (!r.ok) throw new Error("Não foi possível carregar o guia agora.");
+    box.innerHTML = await r.text();
+  } catch (e) {
+    box.innerHTML = '<p class="muted">Não foi possível carregar o guia. Tente de novo em instantes.</p>';
+    return toast(e.message, "erro");
+  }
+  ajuda.secoes = $$(".aj-sec", box).map((el) => ({ el, id: el.id, titulo: el.dataset.titulo, texto: semAcento(el.textContent) }));
+  toc.innerHTML = "";
+  ajuda.secoes.forEach((s, k) => {
+    const a = document.createElement("a");
+    a.href = "#" + s.id; a.textContent = s.titulo; a.dataset.alvo = s.id;
+    a.addEventListener("click", (e) => { e.preventDefault(); s.el.scrollIntoView({ behavior: REDUZIR ? "auto" : "smooth", block: "start" }); });
+    toc.appendChild(a); s.link = a;
+  });
+  // destaca no índice a seção que está na tela
+  ajuda.spy?.disconnect();
+  ajuda.spy = new IntersectionObserver((ents) => {
+    ents.forEach((en) => { if (en.isIntersecting) ajuda.secoes.forEach((s) => s.link.classList.toggle("ativo", s.el === en.target)); });
+  }, { root: $(".conteudo"), rootMargin: "-10% 0px -70% 0px" });
+  ajuda.secoes.forEach((s) => ajuda.spy.observe(s.el));
+  ajuda.carregada = true;
+}
+
+$("#aj-busca").addEventListener("input", (e) => {
+  const q = semAcento(e.target.value.trim());
+  let achou = 0;
+  ajuda.secoes.forEach((s) => {
+    const bate = !q || s.texto.includes(q);
+    s.el.hidden = !bate; s.link.hidden = !bate;
+    if (bate) achou++;
+    $$("details", s.el).forEach((d) => { d.open = !!q && semAcento(d.textContent).includes(q); });
+  });
+  $("#aj-contagem").textContent = q ? (achou ? `${achou} seç${achou === 1 ? "ão" : "ões"}` : "Nada encontrado") : "";
+});

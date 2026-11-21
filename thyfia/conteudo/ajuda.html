@@ -1,0 +1,254 @@
+<section class="aj-sec" id="visao-geral" data-titulo="Visão geral">
+  <h2>Visão geral</h2>
+  <p>A ThyfIA transforma uma <b>palavra-chave</b> (ex.: “capinha iphone”) em dezenas de <b>links de afiliado do Mercado Livre</b> prontos para divulgar, e ajuda a levar esses links até os seus canais.</p>
+  <p>O caminho completo, do começo ao fim:</p>
+  <ol class="aj-fluxo">
+    <li><b>Conectar</b> o Mercado Livre (uma vez só)</li>
+    <li><b>Gerar links</b> com uma palavra-chave</li>
+    <li><b>Enviar para a automação</b> (n8n), que guarda os links numa fila</li>
+    <li>A automação <b>publica uma oferta por vez</b> no WhatsApp e no Telegram, sorteando entre as categorias</li>
+    <li>O <b>Agente de Publicação</b> escolhe o melhor item e agenda o post no Instagram</li>
+  </ol>
+  <div class="aj-dica"><b>Dica:</b> você não precisa usar tudo. Só gerar links e baixar a planilha já resolve. As outras etapas são para automatizar a divulgação.</div>
+  <div class="aj-menu-mapa">
+    <h3>O que tem em cada menu</h3>
+    <table class="aj-tabela">
+      <tr><th>Menu</th><th>Para que serve</th></tr>
+      <tr><td><b>Gerar links</b></td><td>Digita a palavra-chave e a ThyfIA gera os links.</td></tr>
+      <tr><td><b>Integrações</b></td><td>Conecta (ou desconecta) a sua conta do Mercado Livre.</td></tr>
+      <tr><td><b>Agente de Publicação</b></td><td>Escolhe o melhor item, monta o post e agenda no Instagram.</td></tr>
+      <tr><td><b>Histórico</b></td><td>Lista todas as gerações, baixa as planilhas e controla o envio para a automação.</td></tr>
+      <tr><td><b>Cérebro</b></td><td>Mostra o que a ThyfIA já aprendeu com as buscas.</td></tr>
+      <tr><td><b>Ajuda</b></td><td>Este guia.</td></tr>
+    </table>
+  </div>
+</section>
+
+<section class="aj-sec" id="primeiros-passos" data-titulo="Primeiros passos">
+  <h2>Primeiros passos</h2>
+
+  <h3>1. Criar sua conta e entrar</h3>
+  <ol class="aj-passos">
+    <li>Na tela inicial, abra a aba <b>Criar conta</b>.</li>
+    <li>Preencha <b>nome</b>, <b>e-mail</b> e <b>senha</b> (mínimo de 6 caracteres) e clique em <b>Criar conta</b>.</li>
+    <li>Nas próximas vezes, use a aba <b>Entrar</b>. A sessão fica ativa por 7 dias neste navegador.</li>
+    <li>Para sair, clique em <b>Sair</b> no rodapé do menu. Não dá para sair enquanto uma geração de links está rodando.</li>
+  </ol>
+
+  <h3>2. Instalar a extensão “ThyfIA Conector” (uma vez)</h3>
+  <p>A extensão usa o login do Mercado Livre que <b>você já tem no seu navegador</b> e entrega a sessão para a ThyfIA. Sua senha nunca passa pela ThyfIA.</p>
+  <ol class="aj-passos">
+    <li>Clique em <a class="aj-botao" href="/api/extensao/download" download>⬇ Baixar a extensão</a> e <b>descompacte</b> o arquivo <code>.zip</code> numa pasta que você não vá apagar.</li>
+    <li>No Chrome, abra <code>chrome://extensions</code>.</li>
+    <li>Ative o <b>Modo do desenvolvedor</b> (canto superior direito).</li>
+    <li>Clique em <b>Carregar sem compactação</b> e escolha a pasta que você descompactou.</li>
+    <li>Volte à ThyfIA e <b>recarregue a página</b> (F5 / Cmd+R).</li>
+  </ol>
+  <div class="aj-aviso"><b>Já tinha instalado antes?</b> Baixe de novo, substitua a pasta e clique no ícone de recarregar da extensão em <code>chrome://extensions</code>. Isso faz ela reconhecer o endereço atual da ThyfIA.</div>
+
+  <h3>3. Conectar o Mercado Livre</h3>
+  <ol class="aj-passos">
+    <li>Abra <b>Integrações</b> e clique em <b>Conectar Mercado Livre</b>.</li>
+    <li>Uma janelinha do Mercado Livre abre neste navegador. Se você já estiver logado, a conexão é automática. Se não, entre na sua conta lá.</li>
+    <li>Quando aparecer <b>“Conta conectada!”</b>, está pronto. O ponto ao lado de “Integrações” fica verde.</li>
+  </ol>
+  <p>A conta do Mercado Livre precisa estar no <b>Programa de Afiliados</b>. Sem isso os links não são gerados.</p>
+  <p><button class="aj-botao" data-ir="integracoes">Ir para Integrações</button></p>
+</section>
+
+<section class="aj-sec" id="gerar-links" data-titulo="Gerar links">
+  <h2>Gerar links</h2>
+  <ol class="aj-passos">
+    <li>Abra <b>Gerar links</b>. Se aparecer “Conecte seu Mercado Livre”, volte ao passo de conexão.</li>
+    <li><b>Digite a palavra-chave</b> do produto. Quanto mais específica, melhores os resultados: “fone bluetooth jbl” é melhor do que “fone”.</li>
+    <li>Use as <b>sugestões</b> que aparecem abaixo do campo (navegue com ↑ ↓ e Enter) ou os <b>chips de buscas relacionadas</b>. Elas vêm do que mais deu certo nas buscas anteriores.</li>
+    <li>Escolha <b>quantos produtos</b>: 10, 20, 30 ou 50. Quanto maior, mais demora.</li>
+    <li>(Opcional) Marque <b>“Enviar automaticamente para a automação ao terminar”</b>. A escolha fica salva para as próximas gerações.</li>
+    <li>Clique em <b>Gerar links ✨</b> e aguarde. A tela mostra a fase atual (preparando, procurando produtos, gerando links) e uma barra de progresso.</li>
+    <li>Ao terminar você vê quantos links foram gerados e quantos produtos foram analisados.</li>
+  </ol>
+
+  <h3>O que fazer com o resultado</h3>
+  <ul class="aj-lista">
+    <li><b>⬇ Baixar planilha</b>: arquivo Excel com as colunas <i>Data/Hora, Busca, Título, Preço (R$), URL do Produto e Link de Afiliado</i>.</li>
+    <li><b>➜ Enviar para automação</b>: manda os links para o n8n (veja a seção “Enviar para a automação”).</li>
+    <li><b>Nova busca</b>: volta para o campo de busca.</li>
+  </ul>
+
+  <h3>Boas práticas</h3>
+  <ul class="aj-lista">
+    <li>Há <b>menos links do que produtos analisados</b>. É normal: produtos que não participam do programa de afiliados ficam de fora, e a ThyfIA aprende a evitá-los.</li>
+    <li>Só uma geração roda por vez por conta. Se tentar iniciar outra, a ThyfIA avisa.</li>
+    <li>Você pode fazer <b>várias buscas de categorias diferentes</b> (carregador, celular, capinha…) e enviar todas. A automação sorteia entre as categorias na hora de publicar, então não importa a ordem em que você gerou.</li>
+  </ul>
+  <p><button class="aj-botao" data-ir="gerar">Ir para Gerar links</button></p>
+</section>
+
+<section class="aj-sec" id="enviar-automacao" data-titulo="Enviar para a automação">
+  <h2>Enviar para a automação (n8n)</h2>
+  <p>A automação guarda os links numa fila (planilha) e publica <b>uma oferta de cada vez</b>, no ritmo certo, sem você precisar copiar e colar.</p>
+
+  <h3>Como enviar</h3>
+  <ul class="aj-lista">
+    <li><b>Automático:</b> marque “Enviar automaticamente…” na tela de Gerar links. Quando a geração termina, o envio acontece sozinho.</li>
+    <li><b>Manual:</b> clique em <b>➜ Enviar para automação</b> na tela de resultado ou, depois, no <b>Histórico</b>.</li>
+  </ul>
+  <p>Se a opção estiver desativada (“Automação não configurada”), falta configurar o endereço e a chave do n8n no servidor. Veja “Solução de problemas”.</p>
+
+  <h3>O que acontece depois do envio</h3>
+  <ol class="aj-passos">
+    <li>O n8n recebe os links, <b>descarta repetidos</b> (mesmo link ou mesmo título) e grava os novos como <b>Pendente</b>, junto com título, preço e a categoria da busca.</li>
+    <li>A cada <b>30 minutos, entre 08h e 21h</b>, o fluxo escolhe uma oferta pendente. Ele <b>sorteia primeiro a categoria</b> e depois um link dela: assim, 20 carregadores + 20 celulares + 20 capinhas saem misturados, não em blocos.</li>
+    <li>A oferta é enviada com foto, título e preço para o WhatsApp (a conversa com você mesmo) e publicada no canal do Telegram. O item vira <b>Enviado</b>.</li>
+    <li>Você encaminha a mensagem do WhatsApp para o canal ou grupo.</li>
+  </ol>
+  <div class="aj-dica"><b>Reenviar é seguro.</b> Como o n8n ignora links repetidos, apertar “Reenviar” não duplica as ofertas na fila.</div>
+
+  <h3>Status do envio</h3>
+  <table class="aj-tabela">
+    <tr><th>Status</th><th>Significado</th></tr>
+    <tr><td><span class="selo nao_enviado">não enviado</span></td><td>A geração ainda não foi enviada.</td></tr>
+    <tr><td><span class="selo enviando">enviando…</span></td><td>O envio está em andamento.</td></tr>
+    <tr><td><span class="selo enviado">enviado</span></td><td>O n8n recebeu. O resumo mostra quantos links eram novos e quantos duplicados.</td></tr>
+    <tr><td><span class="selo erro">erro no envio</span></td><td>Algo falhou. Use <b>↻ Tentar de novo</b> e veja “Solução de problemas”.</td></tr>
+  </table>
+</section>
+
+<section class="aj-sec" id="historico" data-titulo="Histórico">
+  <h2>Histórico</h2>
+  <p>Mostra as suas últimas 50 gerações, da mais recente para a mais antiga.</p>
+  <ul class="aj-lista">
+    <li>Cada linha traz a <b>palavra-chave</b>, a <b>data e hora</b> e quantos links foram gerados (<i>ex.: 17/20</i>).</li>
+    <li>O ícone <b>✅</b> indica geração concluída, <b>⚠️</b> indica erro (a mensagem aparece ao lado) e <b>⏳</b> indica que ainda está rodando.</li>
+    <li>O botão <b>⬇</b> baixa a planilha daquela geração a qualquer momento.</li>
+    <li>À direita fica o <b>status do envio</b> para a automação, com os botões <b>Enviar</b>, <b>Reenviar</b> ou <b>Tentar de novo</b>.</li>
+  </ul>
+  <p><button class="aj-botao" data-ir="historico">Ir para o Histórico</button></p>
+</section>
+
+<section class="aj-sec" id="agente-publicacao" data-titulo="Agente de Publicação (Instagram)">
+  <h2>Agente de Publicação (Instagram)</h2>
+  <p>O agente <b>sugere</b> o melhor item e prepara o post. <b>Nada é publicado sem o seu clique.</b></p>
+
+  <h3>Antes de começar</h3>
+  <ul class="aj-lista">
+    <li>No topo da tela deve aparecer o <b>@ da conta do Instagram</b> e quantas publicações ainda cabem hoje. O botão <b>↻</b> verifica de novo.</li>
+    <li>Se aparecer <b>“Instagram não configurado”</b>, o servidor ainda não tem o token da conta. Veja “Solução de problemas”.</li>
+    <li>A conta precisa ser <b>profissional</b> (comercial ou criador de conteúdo).</li>
+  </ul>
+
+  <h3>Passo a passo: publicar o melhor item</h3>
+  <ol class="aj-passos">
+    <li>Em <b>Palavra-chave</b>, escolha uma busca (ou deixe <b>Mais recente</b>) e defina quantos <b>candidatos</b> quer ver (1 a 20).</li>
+    <li>Clique em <b>✦ Sugerir melhor item</b>. O agente lista os candidatos, o primeiro com a etiqueta <b>★ melhor escolha</b>. Cada card mostra o <b>motivo</b> do ranking (por exemplo, “menor preço entre 12 itens”).</li>
+    <li>Clique em <b>Escolher</b> no card que quiser. Abre o editor com a <b>prévia do post</b>.</li>
+    <li><b>Foto:</b> o post usa a foto do produto quando existe. Você pode usar <b>⬆ Enviar foto</b> para trocar (JPG, PNG ou WebP; ela é convertida para JPEG).</li>
+    <li><b>Legenda:</b> já vem pronta (gancho, título, preço, chamada para o link na bio e hashtags). Edite como quiser. O limite é de 2.200 caracteres e 30 hashtags.</li>
+    <li>Escolha a <b>data e a hora</b> e clique em <b>📅 Agendar publicação no Instagram</b>, ou em <b>Publicar agora</b> (pede uma confirmação).</li>
+  </ol>
+  <div class="aj-aviso"><b>Sobre links:</b> no Instagram, links dentro da legenda <b>não são clicáveis</b>. Por isso o link de afiliado não vai na legenda. A chamada do post aponta para o link da bio e para os canais do Telegram e do WhatsApp.</div>
+
+  <h3>Como o agente escolhe</h3>
+  <ul class="aj-lista">
+    <li>Só entram itens com <b>título, preço e link de afiliado</b>.</li>
+    <li>Itens já <b>agendados ou publicados</b> não voltam a ser sugeridos (nem o mesmo produto vindo de outra busca).</li>
+    <li>A regra atual é <b>menor preço primeiro</b>; em caso de empate, o mais recente.</li>
+  </ul>
+
+  <h3>Post manual</h3>
+  <p>O botão <b>＋ Post manual com foto</b> abre o editor vazio: você envia uma foto e escreve a legenda que quiser, sem usar nenhum item da lista.</p>
+
+  <h3>Acompanhar, editar e cancelar</h3>
+  <p>A lista <b>Publicações</b>, no fim da tela, mostra todos os posts e o status de cada um:</p>
+  <table class="aj-tabela">
+    <tr><th>Status</th><th>Significado</th></tr>
+    <tr><td><span class="selo agendado">agendado</span></td><td>Na fila. Aparecem os botões <b>Editar</b> (legenda, foto, horário) e <b>Cancelar</b>.</td></tr>
+    <tr><td><span class="selo publicando">publicando…</span></td><td>Enviando ao Instagram (pode levar até 1 minuto).</td></tr>
+    <tr><td><span class="selo publicado">publicado</span></td><td>Está no ar.</td></tr>
+    <tr><td><span class="selo erro">erro</span></td><td>Falhou; a mensagem do motivo aparece ao lado.</td></tr>
+    <tr><td><span class="selo cancelado">cancelado</span></td><td>Foi cancelado por você.</td></tr>
+  </table>
+
+  <h3>Como o agendamento funciona</h3>
+  <ul class="aj-lista">
+    <li>O Instagram não agenda posts por conta própria. A ThyfIA confere a fila <b>a cada minuto</b> e publica o que venceu, então ela precisa estar no ar no horário (no servidor, ela roda 24 horas).</li>
+    <li>O Instagram limita o número de publicações por dia. Se o limite for atingido, o post fica na fila e a ThyfIA tenta de novo mais tarde.</li>
+  </ul>
+  <p><button class="aj-botao" data-ir="publicacao">Ir para o Agente de Publicação</button></p>
+</section>
+
+<section class="aj-sec" id="cerebro" data-titulo="Cérebro">
+  <h2>Cérebro</h2>
+  <p>É o painel do que a ThyfIA já aprendeu. Quanto mais buscas, mais certeiras ficam as sugestões.</p>
+  <ul class="aj-lista">
+    <li><b>Produtos conhecidos / elegíveis:</b> quantos produtos ela já viu e quantos aceitam link de afiliado.</li>
+    <li><b>Termos aprendidos:</b> palavras-chave que já foram buscadas.</li>
+    <li><b>Links gerados:</b> total de links criados com sucesso.</li>
+    <li><b>Buscas em alta:</b> as palavras-chave que mais funcionaram.</li>
+    <li><b>Taxa de sucesso:</b> porcentagem de produtos que viraram link.</li>
+  </ul>
+  <p><button class="aj-botao" data-ir="cerebro">Ir para o Cérebro</button></p>
+</section>
+
+<section class="aj-sec" id="rotina" data-titulo="Rotina recomendada">
+  <h2>Rotina recomendada</h2>
+  <ol class="aj-passos">
+    <li><b>Gere</b> 20 links de 3 a 5 categorias diferentes (ex.: carregador, celular, capinha, fone).</li>
+    <li><b>Envie</b> todas para a automação (ligue o envio automático para não esquecer).</li>
+    <li>Deixe a automação <b>sortear e publicar</b> uma oferta a cada 30 minutos, entre 08h e 21h.</li>
+    <li>Uma vez por dia, abra o <b>Agente de Publicação</b>, gere os candidatos e <b>agende</b> 1 ou 2 posts no Instagram em horários de movimento (almoço e fim da tarde).</li>
+    <li>De vez em quando, olhe o <b>Histórico</b> para ver se algum envio ficou com erro e o <b>Cérebro</b> para saber quais buscas funcionam melhor.</li>
+  </ol>
+</section>
+
+<section class="aj-sec" id="problemas" data-titulo="Solução de problemas">
+  <h2>Solução de problemas</h2>
+
+  <details><summary>Aparece “Conecte seu Mercado Livre” ou a conexão cai</summary>
+    <p>A sessão do Mercado Livre expira de tempos em tempos. Abra <b>Integrações</b> e clique em <b>Conectar Mercado Livre</b> de novo. Se a janelinha não abrir, confira se a extensão ThyfIA Conector está instalada e ativa em <code>chrome://extensions</code>.</p>
+  </details>
+  <details><summary>A tela pede para instalar a extensão, mesmo eu já tendo instalado</summary>
+    <p>Recarregue a página (F5). Se continuar, baixe a extensão de novo, substitua a pasta e recarregue a extensão em <code>chrome://extensions</code>. Versões antigas não reconhecem o endereço atual da ThyfIA.</p>
+  </details>
+  <details><summary>A geração terminou com poucos links ou nenhum</summary>
+    <p>Tente uma palavra-chave mais específica ou use as sugestões. Alguns produtos não participam do programa de afiliados e são descartados. Se der erro de sessão, reconecte o Mercado Livre.</p>
+  </details>
+  <details><summary>“Você já tem uma geração em andamento”</summary>
+    <p>Só uma geração roda por vez. Espere terminar (ou veja o andamento no Histórico) e tente de novo.</p>
+  </details>
+  <details><summary>O envio para a automação deu erro</summary>
+    <p>A mensagem indica a causa:</p>
+    <ul class="aj-lista">
+      <li><b>Erro 404:</b> o fluxo de recebimento no n8n não está <b>publicado/ativo</b>.</li>
+      <li><b>Token ou chave inválida (401):</b> a chave configurada na ThyfIA não é a mesma do n8n.</li>
+      <li><b>Falha de rede:</b> o endereço do n8n está errado ou o n8n está fora do ar.</li>
+      <li><b>Automação não configurada:</b> falta definir o endereço e a chave do n8n no servidor.</li>
+    </ul>
+    <p>Depois de corrigir, use <b>↻ Tentar de novo</b> no Histórico. É seguro: links repetidos são ignorados.</p>
+  </details>
+  <details><summary>As ofertas não estão saindo no WhatsApp/Telegram</summary>
+    <p>A automação só publica entre 08h e 21h, uma oferta a cada 30 minutos, e só se houver itens <b>Pendente</b> na fila. Confira se o envio mostra “enviado” no Histórico e se o fluxo do n8n está ativo.</p>
+  </details>
+  <details><summary>“Instagram não configurado”</summary>
+    <p>O servidor precisa ter o token e o ID da conta do Instagram nas configurações. Isso é feito pelo administrador, uma vez, e depois a tela passa a mostrar o @ da conta.</p>
+  </details>
+  <details><summary>O Instagram recusou a imagem ou deu erro ao publicar</summary>
+    <p>O Instagram exige uma imagem <b>JPEG</b> acessível publicamente. Envie a foto pelo botão <b>⬆ Enviar foto</b> (ela é convertida) ou use a foto do produto. Se a mensagem falar em limite diário, agende para mais tarde.</p>
+  </details>
+  <details><summary>Agendei, mas o post não saiu</summary>
+    <p>Veja o status na lista de <b>Publicações</b>: se estiver com erro, a mensagem explica. Se estiver como “agendado” depois do horário, é porque o limite diário foi atingido ou houve falha temporária. A ThyfIA tenta de novo sozinha.</p>
+  </details>
+  <details><summary>Token do Instagram expirou</summary>
+    <p>O status da conta no topo do Agente mostra o erro. Gere um novo token no painel de desenvolvedores da Meta e atualize a configuração do servidor.</p>
+  </details>
+</section>
+
+<section class="aj-sec" id="seguranca" data-titulo="Segurança e privacidade">
+  <h2>Segurança e privacidade</h2>
+  <ul class="aj-lista">
+    <li>A ThyfIA <b>nunca vê a sua senha</b> do Mercado Livre. O login é feito por você, no seu navegador.</li>
+    <li>Sua senha da ThyfIA é guardada de forma protegida (não dá para ler de volta).</li>
+    <li>Para apagar a sessão do Mercado Livre guardada, clique em <b>Desconectar</b> em Integrações.</li>
+    <li>Nunca compartilhe tokens (Instagram, n8n) por mensagem ou e-mail.</li>
+  </ul>
+</section>

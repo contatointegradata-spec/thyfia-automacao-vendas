@@ -5,12 +5,14 @@ Rodar:  .venv/bin/python -m uvicorn thyfia.app:app --port 8000
 
 from __future__ import annotations
 
+import io
 import json
 import logging
 import os
 import secrets
 import threading
 import time
+import zipfile
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -194,9 +196,34 @@ def ml_sessao(dados: Sessao, u=Depends(usuario_atual)):
     return motor_ml.status_ml(u["id"])
 
 
+EXTENSAO_DIR = Path(__file__).resolve().parent.parent / "extensao_thyfia"
+AJUDA_HTML = Path(__file__).resolve().parent / "conteudo" / "ajuda.html"
+
+
 @app.get("/api/extensao")
 def info_extensao():
-    return {"pasta": str(Path(__file__).resolve().parent.parent / "extensao_thyfia")}
+    return {"pasta": str(EXTENSAO_DIR)}
+
+
+@app.get("/api/extensao/download")
+def baixar_extensao(u=Depends(usuario_atual)):
+    """Extensão ThyfIA Conector em .zip (para quem acessa pelo domínio e não tem a pasta local)."""
+    if not EXTENSAO_DIR.is_dir():
+        raise HTTPException(404, "Extensão indisponível neste servidor.")
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+        for arq in sorted(EXTENSAO_DIR.rglob("*")):
+            if arq.is_file():
+                z.write(arq, Path("extensao_thyfia") / arq.relative_to(EXTENSAO_DIR))
+    return Response(buf.getvalue(), media_type="application/zip",
+                    headers={"Content-Disposition": 'attachment; filename="extensao_thyfia.zip"'})
+
+
+@app.get("/api/ajuda")
+def ajuda(u=Depends(usuario_atual)):
+    """Guia de uso — só para quem está logado (por isso não fica na pasta /static pública)."""
+    return Response(AJUDA_HTML.read_text(encoding="utf-8"), media_type="text/html; charset=utf-8",
+                    headers={"Cache-Control": "no-store"})
 
 
 @app.post("/api/ml/desconectar")

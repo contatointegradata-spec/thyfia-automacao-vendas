@@ -121,6 +121,7 @@
       <button class="menu-item" data-view="publicacao"><span class="mi">◈</span><span>Agente de Publicação</span></button>
       <button class="menu-item" data-view="historico"><span class="mi">◷</span><span>Histórico</span></button>
       <button class="menu-item" data-view="cerebro"><span class="mi">◉</span><span>Cérebro</span></button>
+      <button class="menu-item" data-view="ajuda"><span class="mi">?</span><span>Ajuda</span></button>
     </nav>
     <div class="sidebar-rodape">
       <div class="usuario">
@@ -327,6 +328,23 @@
         </div>
       </div>
     </div>
+
+    <!-- ---------- Ajuda ---------- -->
+    <div class="view" id="view-ajuda" hidden>
+      <header class="view-topo">
+        <h1>Central de <span class="grad">Ajuda</span></h1>
+        <p class="muted">Guia completo, passo a passo, de tudo o que a ThyfIA faz.</p>
+      </header>
+      <div class="aj-busca">
+        <span class="aj-busca-ic">⌕</span>
+        <input id="aj-busca" type="search" placeholder="Buscar no guia (ex.: instagram, planilha, extensão)…" autocomplete="off">
+        <small id="aj-contagem" class="muted"></small>
+      </div>
+      <div class="aj-layout">
+        <nav class="aj-toc" id="aj-toc" aria-label="Índice do guia"></nav>
+        <article class="aj-conteudo" id="aj-conteudo"><div class="skeleton"></div></article>
+      </div>
+    </div>
   </main>
 </section>
 
@@ -399,7 +417,8 @@
       <ol class="passos">
         <li>Abra <code>chrome://extensions</code> numa nova aba <button class="copiar" data-copiar="chrome://extensions">copiar</button></li>
         <li>Ative o <b>Modo do desenvolvedor</b> (canto superior direito)</li>
-        <li>Clique em <b>Carregar sem compactação</b> e escolha a pasta:<br><code id="ext-pasta">extensao_thyfia</code> <button class="copiar" id="copiar-pasta">copiar</button></li>
+        <li><a href="/api/extensao/download" download><b>Baixe a extensão</b></a> e descompacte o .zip numa pasta fixa</li>
+        <li>Clique em <b>Carregar sem compactação</b> e escolha a pasta <code>extensao_thyfia</code> <span hidden><code id="ext-pasta"></code> <button class="copiar" id="copiar-pasta">copiar</button></span></li>
         <li>Volte aqui e <b>recarregue a página</b></li>
       </ol>
       <div class="fim-acoes">
