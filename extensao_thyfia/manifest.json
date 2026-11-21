@@ -1,0 +1,22 @@
+{
+  "manifest_version": 3,
+  "name": "ThyfIA Conector",
+  "version": "1.0.0",
+  "description": "Conecta sua conta do Mercado Livre à ThyfIA usando o login que você já tem neste navegador.",
+  "permissions": ["cookies", "tabs"],
+  "host_permissions": [
+    "https://*.mercadolivre.com.br/*",
+    "https://*.mercadolivre.com/*",
+    "https://*.mercadolibre.com/*",
+    "http://localhost:8000/*",
+    "http://127.0.0.1:8000/*"
+  ],
+  "background": { "service_worker": "background.js" },
+  "content_scripts": [
+    {
+      "matches": ["http://localhost:8000/*", "http://127.0.0.1:8000/*"],
+      "js": ["ponte.js"],
+      "run_at": "document_start"
+    }
+  ]
+}

@@ -1,0 +1,2 @@
+# Cole aqui as URLs dos produtos, uma por linha (linhas com # são ignoradas)
+# https://www.mercadolivre.com.br/exemplo-produto/p/MLB12345678

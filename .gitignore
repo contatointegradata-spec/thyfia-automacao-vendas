@@ -1,0 +1,14 @@
+# segredos
+.env
+.env.*
+!.env.example
+
+# ambiente / cache
+.venv/
+__pycache__/
+*.pyc
+
+# dados locais (banco, sessões do Chrome, planilhas)
+dados/
+perfil_chrome/
+links_afiliado.xlsx

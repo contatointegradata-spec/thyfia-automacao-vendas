@@ -1,0 +1,454 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ThyfIA</title>
+  <meta name="description" content="ThyfIA — gere links de afiliado em segundos.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%238B5CF6'/%3E%3Cstop offset='1' stop-color='%2322D3EE'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='18' fill='url(%23g)'/%3E%3Cpath d='M18 22h28M32 22v24' stroke='white' stroke-width='6' stroke-linecap='round'/%3E%3Ccircle cx='46' cy='44' r='4' fill='white'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+
+<!-- ======================= Fundo animado (aurora) ======================= -->
+<div class="aurora" aria-hidden="true">
+  <span class="blob b1"></span><span class="blob b2"></span><span class="blob b3"></span>
+  <div class="grade"></div>
+</div>
+<canvas id="particulas" aria-hidden="true"></canvas>
+
+<!-- ======================= Splash ======================= -->
+<div id="splash">
+  <div class="splash-logo">
+    <svg viewBox="0 0 64 64" class="logo-mark grande">
+      <defs><linearGradient id="lg-s" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8B5CF6"/><stop offset="1" stop-color="#22D3EE"/></linearGradient></defs>
+      <rect class="lm-bg" width="64" height="64" rx="18" fill="url(#lg-s)"/>
+      <path class="lm-t" d="M18 22h28M32 22v24" stroke="#fff" stroke-width="6" stroke-linecap="round" fill="none"/>
+      <circle class="lm-dot" cx="46" cy="44" r="4" fill="#fff"/>
+    </svg>
+    <div class="splash-nome">Thyf<span class="ia">IA</span></div>
+  </div>
+  <div class="splash-barra"><span></span></div>
+</div>
+
+<!-- ======================= Tela de autenticação ======================= -->
+<section id="tela-auth" class="tela" hidden>
+  <div class="auth-lado">
+    <div class="marca">
+      <svg viewBox="0 0 64 64" class="logo-mark"><use href="#logo-simbolo"/></svg>
+      <span class="marca-nome">Thyf<span class="ia">IA</span></span>
+    </div>
+    <h1 class="auth-titulo">
+      <span class="linha">Links de afiliado</span>
+      <span class="linha">no tempo de <span class="grad">um café.</span></span>
+    </h1>
+    <p class="auth-sub">Digite o produto, a ThyfIA encontra, gera e organiza todos os seus links numa planilha pronta pra divulgar.</p>
+    <ul class="auth-features">
+      <li style="--i:0"><span class="fi">⚡</span> Dezenas de links em minutos</li>
+      <li style="--i:1"><span class="fi">🧠</span> Aprende com cada busca da comunidade</li>
+      <li style="--i:2"><span class="fi">📊</span> Planilha pronta para baixar</li>
+    </ul>
+  </div>
+
+  <div class="auth-card" id="auth-card">
+    <div class="auth-tabs" role="tablist">
+      <button class="auth-tab ativo" data-tab="entrar" role="tab">Entrar</button>
+      <button class="auth-tab" data-tab="criar" role="tab">Criar conta</button>
+      <span class="auth-tab-ind"></span>
+    </div>
+
+    <div class="auth-trilho">
+      <!-- Entrar -->
+      <form id="form-login" class="auth-form" autocomplete="on" novalidate>
+        <h2>Bem-vindo de volta 👋</h2>
+        <p class="muted">Entre para continuar gerando seus links.</p>
+        <label class="campo">
+          <input type="email" name="email" required placeholder=" " autocomplete="email">
+          <span>E-mail</span>
+        </label>
+        <label class="campo">
+          <input type="password" name="senha" required placeholder=" " autocomplete="current-password">
+          <span>Senha</span>
+          <button type="button" class="olho" aria-label="Mostrar senha">👁</button>
+        </label>
+        <p class="erro-form" aria-live="polite"></p>
+        <button class="btn btn-primario btn-grande" type="submit">
+          <span class="btn-txt">Entrar</span><span class="spinner"></span>
+        </button>
+      </form>
+
+      <!-- Criar conta -->
+      <form id="form-cadastro" class="auth-form" autocomplete="on" novalidate>
+        <h2>Crie sua conta ✨</h2>
+        <p class="muted">Leva menos de 30 segundos.</p>
+        <label class="campo">
+          <input type="text" name="nome" required placeholder=" " autocomplete="name">
+          <span>Seu nome</span>
+        </label>
+        <label class="campo">
+          <input type="email" name="email" required placeholder=" " autocomplete="email">
+          <span>E-mail</span>
+        </label>
+        <label class="campo">
+          <input type="password" name="senha" required placeholder=" " autocomplete="new-password" minlength="6">
+          <span>Senha (mín. 6 caracteres)</span>
+          <button type="button" class="olho" aria-label="Mostrar senha">👁</button>
+        </label>
+        <div class="forca"><span></span></div>
+        <p class="erro-form" aria-live="polite"></p>
+        <button class="btn btn-primario btn-grande" type="submit">
+          <span class="btn-txt">Criar conta</span><span class="spinner"></span>
+        </button>
+      </form>
+    </div>
+  </div>
+</section>
+
+<!-- ======================= Aplicação ======================= -->
+<section id="tela-app" class="tela" hidden>
+  <aside class="sidebar">
+    <div class="marca">
+      <svg viewBox="0 0 64 64" class="logo-mark"><use href="#logo-simbolo"/></svg>
+      <span class="marca-nome">Thyf<span class="ia">IA</span></span>
+    </div>
+    <nav class="menu" id="menu">
+      <span class="menu-ind"></span>
+      <button class="menu-item ativo" data-view="gerar"><span class="mi">✦</span><span>Gerar links</span></button>
+      <button class="menu-item" data-view="integracoes"><span class="mi">⌁</span><span>Integrações</span><span class="dot-status" id="dot-ml"></span></button>
+      <button class="menu-item" data-view="publicacao"><span class="mi">◈</span><span>Agente de Publicação</span></button>
+      <button class="menu-item" data-view="historico"><span class="mi">◷</span><span>Histórico</span></button>
+      <button class="menu-item" data-view="cerebro"><span class="mi">◉</span><span>Cérebro</span></button>
+    </nav>
+    <div class="sidebar-rodape">
+      <div class="usuario">
+        <div class="avatar" id="avatar">K</div>
+        <div class="usuario-info"><strong id="usuario-nome">—</strong><small id="usuario-email">—</small></div>
+      </div>
+      <button class="btn btn-fantasma btn-sair" id="btn-sair" title="Sair">⎋ <span>Sair</span></button>
+    </div>
+  </aside>
+
+  <main class="conteudo">
+    <!-- ---------- Gerar links ---------- -->
+    <div class="view" id="view-gerar">
+      <header class="view-topo">
+        <p class="saudacao" id="saudacao">Olá!</p>
+        <h1>O que vamos <span class="grad">divulgar</span> hoje?</h1>
+        <p class="muted">Digite a palavra-chave do produto. A ThyfIA cuida do resto.</p>
+      </header>
+
+      <div class="busca-card" id="busca-card">
+        <div class="bloqueio" id="bloqueio-ml">
+          <div class="bloqueio-icone">🔌</div>
+          <h3>Conecte seu Mercado Livre</h3>
+          <p class="muted">Para gerar links com a sua etiqueta de afiliado, a ThyfIA precisa da sua conta conectada.</p>
+          <button class="btn btn-ml" data-ir="integracoes">Conectar agora</button>
+        </div>
+
+        <form id="form-busca" autocomplete="off">
+          <div class="plataforma-chip"><span class="ml-badge">ML</span> Mercado Livre <span class="ok-pill">conectado</span></div>
+          <div class="busca-wrap">
+            <span class="busca-icone">⌕</span>
+            <input id="input-termo" name="termo" maxlength="80" required placeholder=" ">
+            <span class="busca-ph" id="busca-ph"></span>
+            <button class="btn btn-primario btn-gerar" type="submit">
+              <span class="btn-txt">Gerar links ✨</span><span class="spinner"></span>
+            </button>
+            <ul class="sugestoes" id="sugestoes" role="listbox"></ul>
+          </div>
+          <div class="relacionados" id="relacionados"></div>
+          <div class="limite">
+            <span class="muted">Quantos produtos?</span>
+            <div class="segmentado" id="seg-limite">
+              <span class="seg-thumb"></span>
+              <button type="button" data-v="10">10</button>
+              <button type="button" data-v="20" class="ativo">20</button>
+              <button type="button" data-v="30">30</button>
+              <button type="button" data-v="50">50</button>
+            </div>
+          </div>
+          <label class="auto-envio" title="Envia os links para o n8n (WhatsApp/Telegram) assim que a geração terminar">
+            <input type="checkbox" id="chk-auto-envio">
+            <span class="auto-caixa" aria-hidden="true"></span>
+            <span>Enviar automaticamente para a automação ao terminar a geração</span>
+          </label>
+        </form>
+      </div>
+
+      <div class="dicas">
+        <div class="dica" style="--i:0"><b>Seja específico</b><span>“fone bluetooth jbl” gera produtos mais certeiros que “fone”.</span></div>
+        <div class="dica" style="--i:1"><b>Sugestões inteligentes</b><span>As sugestões vêm do que mais funcionou para a comunidade.</span></div>
+        <div class="dica" style="--i:2"><b>Só produtos elegíveis</b><span>A ThyfIA aprende e evita produtos que não geram link.</span></div>
+      </div>
+    </div>
+
+    <!-- ---------- Integrações ---------- -->
+    <div class="view" id="view-integracoes" hidden>
+      <header class="view-topo">
+        <h1>Integrações</h1>
+        <p class="muted">Conecte suas contas de afiliado. Sua senha nunca passa pela ThyfIA.</p>
+      </header>
+      <div class="integracoes">
+        <article class="int-card" id="card-ml">
+          <div class="int-topo">
+            <div class="int-logo ml">ML</div>
+            <div>
+              <h3>Mercado Livre</h3>
+              <p class="muted">Programa de Afiliados e Criadores</p>
+            </div>
+            <span class="status-pill" id="ml-pill">desconectado</span>
+          </div>
+          <p class="int-desc" id="ml-desc">Conecte sua conta para gerar links com a sua etiqueta de afiliado.</p>
+          <div class="int-acoes">
+            <button class="btn btn-ml" id="btn-conectar-ml">Conectar Mercado Livre</button>
+            <button class="btn btn-fantasma" id="btn-desconectar-ml" hidden>Desconectar</button>
+          </div>
+        </article>
+        <article class="int-card em-breve"><div class="int-topo"><div class="int-logo sh">S</div><div><h3>Shopee</h3><p class="muted">Programa de afiliados</p></div><span class="status-pill">em breve</span></div></article>
+        <article class="int-card em-breve"><div class="int-topo"><div class="int-logo am">a</div><div><h3>Amazon</h3><p class="muted">Associados</p></div><span class="status-pill">em breve</span></div></article>
+      </div>
+    </div>
+
+    <!-- ---------- Agente de Publicação ---------- -->
+    <div class="view" id="view-publicacao" hidden>
+      <header class="view-topo">
+        <h1>Agente de <span class="grad">Publicação</span></h1>
+        <p class="muted">O agente escolhe o melhor item e prepara o post. Você revisa e aprova — nada é publicado sem o seu clique.</p>
+      </header>
+
+      <div class="ig-status" id="ig-status">
+        <div class="ig-logo">IG</div>
+        <div class="ig-info"><strong id="ig-conta">Verificando a conta…</strong><small id="ig-limite"></small></div>
+        <button class="btn btn-fantasma btn-mini" id="btn-ig-atualizar" title="Verificar de novo">↻</button>
+      </div>
+      <p class="pub-aviso">⏰ <span id="pub-aviso-txt">O ThyfIA precisa estar rodando no horário agendado para publicar.</span></p>
+
+      <div class="painel pub-controles">
+        <label class="pub-campo"><span>Palavra-chave</span>
+          <select id="pub-keyword"><option value="">Mais recente</option></select>
+        </label>
+        <label class="pub-campo pub-qtd"><span>Candidatos</span>
+          <input type="number" id="pub-qtd" min="1" max="20" value="5">
+        </label>
+        <button class="btn btn-primario" id="btn-sugerir"><span class="btn-txt">✦ Sugerir melhor item</span><span class="spinner"></span></button>
+        <button class="btn btn-fantasma" id="btn-post-manual" title="Subir uma foto e escrever a legenda que quiser">＋ Post manual com foto</button>
+      </div>
+      <p class="muted pub-info" id="pub-info"></p>
+      <div class="pub-candidatos" id="pub-candidatos"></div>
+
+      <section class="painel pub-editor" id="pub-editor" hidden>
+        <div class="pub-editor-topo">
+          <h3 id="pub-editor-titulo">Revisar post</h3>
+          <button class="btn btn-fantasma btn-mini" id="btn-fechar-editor" title="Fechar">✕</button>
+        </div>
+        <div class="pub-editor-grid">
+          <div class="ig-preview">
+            <div class="ig-preview-topo"><span class="ig-avatar"></span><b id="pv-user">@achei_baratinho_oficial</b></div>
+            <div class="ig-preview-img" id="pv-img-box">
+              <img id="pv-img" alt="Prévia da imagem do post" hidden>
+              <div class="pv-sem-foto" id="pv-sem-foto">Sem foto<br><small>envie uma imagem ao lado</small></div>
+            </div>
+            <p class="ig-preview-legenda"><b id="pv-user2">achei_baratinho_oficial</b> <span id="pv-legenda"></span></p>
+          </div>
+          <div class="pub-form">
+            <div class="pub-foto">
+              <span class="pub-rotulo">Foto do post</span>
+              <div class="pub-foto-acoes">
+                <label class="btn btn-fantasma btn-mini pub-upload">⬆ Enviar foto
+                  <input type="file" id="pub-arquivo" accept="image/jpeg,image/png,image/webp" hidden>
+                </label>
+                <button class="btn btn-fantasma btn-mini" id="btn-foto-produto" hidden>Usar foto do produto</button>
+              </div>
+              <p class="mini" id="pub-foto-msg"></p>
+            </div>
+            <label class="pub-campo"><span>Legenda <small id="pub-contador">0/2200</small></span>
+              <textarea id="pub-legenda" rows="9" maxlength="2200" placeholder="Escreva a legenda do post…"></textarea>
+            </label>
+            <p class="mini">O link de afiliado não vai na legenda (no Instagram ele não é clicável): use a bio e os canais.</p>
+            <label class="pub-campo"><span>Data e hora</span>
+              <input type="datetime-local" id="pub-quando">
+            </label>
+            <div class="pub-acoes">
+              <button class="btn btn-primario" id="btn-agendar"><span class="btn-txt">📅 Agendar publicação no Instagram</span><span class="spinner"></span></button>
+              <button class="btn btn-fantasma" id="btn-publicar-agora"><span class="btn-txt">Publicar agora</span><span class="spinner"></span></button>
+            </div>
+            <p class="envio-msg" id="pub-msg" role="status" aria-live="polite"></p>
+          </div>
+        </div>
+      </section>
+
+      <div class="painel">
+        <h3>Publicações</h3>
+        <div class="pub-lista" id="pub-lista"></div>
+      </div>
+    </div>
+
+    <!-- ---------- Histórico ---------- -->
+    <div class="view" id="view-historico" hidden>
+      <header class="view-topo">
+        <h1>Histórico</h1>
+        <p class="muted">Todas as suas gerações. Baixe as planilhas quando quiser.</p>
+      </header>
+      <div class="historico" id="lista-historico"></div>
+    </div>
+
+    <!-- ---------- Cérebro ---------- -->
+    <div class="view" id="view-cerebro" hidden>
+      <header class="view-topo">
+        <h1>Cérebro da <span class="grad">ThyfIA</span></h1>
+        <p class="muted">Tudo o que a ThyfIA já aprendeu com a comunidade. Quanto mais buscas, mais inteligente ela fica.</p>
+      </header>
+      <div class="stats" id="stats">
+        <div class="stat" style="--i:0"><small>Produtos conhecidos</small><strong data-k="produtos">0</strong></div>
+        <div class="stat" style="--i:1"><small>Produtos elegíveis</small><strong data-k="elegiveis">0</strong></div>
+        <div class="stat" style="--i:2"><small>Termos aprendidos</small><strong data-k="termos">0</strong></div>
+        <div class="stat" style="--i:3"><small>Links gerados</small><strong data-k="links">0</strong></div>
+      </div>
+      <div class="cerebro-grid">
+        <div class="painel">
+          <h3>Buscas em alta</h3>
+          <div id="top-termos" class="top-termos"></div>
+        </div>
+        <div class="painel">
+          <h3>Como ela aprende</h3>
+          <ol class="como">
+            <li><b>Recupera</b> produtos já conhecidos com ranking por relevância (BM25).</li>
+            <li><b>Filtra</b> produtos que já falharam no programa de afiliados.</li>
+            <li><b>Prioriza</b> os produtos que mais geraram link com sucesso.</li>
+            <li><b>Sugere</b> termos e buscas relacionadas aprendidas de todos.</li>
+          </ol>
+          <div class="taxa">
+            <div class="taxa-anel"><svg viewBox="0 0 120 120"><circle cx="60" cy="60" r="52" class="anel-fundo"/><circle cx="60" cy="60" r="52" class="anel-valor" id="anel-taxa"/></svg><strong id="taxa-num">0%</strong></div>
+            <span class="muted">taxa de sucesso<br>dos links</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</section>
+
+<!-- ======================= Overlay: gerando links ======================= -->
+<div id="overlay-gerando" class="overlay" hidden>
+  <div class="gerando-box">
+    <div class="estado estado-progresso">
+      <div class="cafe">
+        <div class="vapor"><span></span><span></span><span></span></div>
+        <div class="xicara">
+          <div class="liquido" id="liquido"><div class="onda"></div></div>
+          <div class="brilho"></div>
+        </div>
+        <div class="alca"></div>
+        <div class="pires"></div>
+      </div>
+      <h2>Aguarde enquanto a <span class="grad">ThyfIA</span> gera seus links…</h2>
+      <p class="cafe-msg">Enquanto isso, que tal um café? ☕</p>
+      <div class="progresso"><div class="progresso-barra" id="prog-barra"></div></div>
+      <div class="progresso-info">
+        <span id="prog-fase">Preparando o ambiente</span>
+        <span id="prog-num"></span>
+      </div>
+      <p class="frase" id="frase-rotativa"></p>
+    </div>
+
+    <div class="estado estado-fim" hidden>
+      <svg class="check" viewBox="0 0 80 80"><circle cx="40" cy="40" r="36"/><path d="M24 41l11 11 22-24"/></svg>
+      <h2>Seus links estão prontos!</h2>
+      <p class="muted" id="fim-resumo"></p>
+      <div class="fim-stats">
+        <div><strong id="fim-ok">0</strong><small>links gerados</small></div>
+        <div><strong id="fim-total">0</strong><small>produtos analisados</small></div>
+      </div>
+      <div class="fim-acoes">
+        <a class="btn btn-primario btn-grande" id="btn-baixar" href="#" download>⬇ Baixar planilha</a>
+        <button class="btn btn-fantasma" id="btn-nova">Nova busca</button>
+      </div>
+      <div class="envio-box" id="fim-envio">
+        <button class="btn btn-fantasma" id="btn-enviar-auto"><span class="btn-txt">➜ Enviar para automação</span><span class="spinner"></span></button>
+        <p class="envio-msg" id="fim-envio-msg" role="status" aria-live="polite"></p>
+      </div>
+    </div>
+
+    <div class="estado estado-erro" hidden>
+      <div class="erro-icone">!</div>
+      <h2>Ops, algo deu errado</h2>
+      <p class="muted" id="erro-msg"></p>
+      <div class="fim-acoes">
+        <button class="btn btn-primario" id="btn-erro-ok">Entendi</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ======================= Modal: conectando ML ======================= -->
+<div id="modal-ml" class="overlay" hidden>
+  <div class="modal">
+    <div class="estado m-aguardando">
+      <div class="radar"><span></span><span></span><span></span><div class="radar-centro ml">ML</div></div>
+      <h2>Conectando ao Mercado Livre</h2>
+      <p class="muted" id="ml-instrucao">Abrimos o Mercado Livre numa janelinha <b>deste navegador</b>. Se você já estiver logado, a conexão é automática — senão, é só entrar na sua conta por lá.</p>
+      <p class="mini" id="ml-msg">Aguardando login…</p>
+      <button class="btn btn-fantasma" id="btn-fechar-modal">Fechar</button>
+    </div>
+    <div class="estado m-extensao" hidden>
+      <div class="ext-icone">🧩</div>
+      <h2>Instale o ThyfIA Conector</h2>
+      <p class="muted">Ele conecta o Mercado Livre usando o login que você <b>já tem neste navegador</b>. É uma vez só:</p>
+      <ol class="passos">
+        <li>Abra <code>chrome://extensions</code> numa nova aba <button class="copiar" data-copiar="chrome://extensions">copiar</button></li>
+        <li>Ative o <b>Modo do desenvolvedor</b> (canto superior direito)</li>
+        <li>Clique em <b>Carregar sem compactação</b> e escolha a pasta:<br><code id="ext-pasta">extensao_thyfia</code> <button class="copiar" id="copiar-pasta">copiar</button></li>
+        <li>Volte aqui e <b>recarregue a página</b></li>
+      </ol>
+      <div class="fim-acoes">
+        <button class="btn btn-primario" id="btn-recarregar">Já instalei, recarregar</button>
+        <button class="btn btn-fantasma" id="btn-janela-separada">Usar janela separada</button>
+      </div>
+    </div>
+    <div class="estado m-ok" hidden>
+      <svg class="check" viewBox="0 0 80 80"><circle cx="40" cy="40" r="36"/><path d="M24 41l11 11 22-24"/></svg>
+      <h2>Conta conectada!</h2>
+      <p class="muted">Tudo pronto para gerar seus links.</p>
+    </div>
+    <div class="estado m-erro" hidden>
+      <div class="erro-icone">!</div>
+      <h2>Não foi possível conectar</h2>
+      <p class="muted" id="ml-erro"></p>
+      <div class="fim-acoes">
+        <button class="btn btn-ml" id="btn-tentar-ml">Tentar novamente</button>
+        <button class="btn btn-fantasma" id="btn-fechar-modal2">Fechar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ======================= Logout ======================= -->
+<div id="overlay-logout" class="overlay" hidden>
+  <div class="logout-box">
+    <div class="aceno">👋</div>
+    <h2 id="logout-txt">Até logo!</h2>
+    <p class="muted">Encerrando sua sessão com segurança…</p>
+  </div>
+</div>
+
+<div id="transicao" aria-hidden="true"></div>
+<canvas id="confete" aria-hidden="true"></canvas>
+<div id="toasts" aria-live="polite"></div>
+
+<!-- símbolo reutilizável do logo -->
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <linearGradient id="lg-m" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8B5CF6"/><stop offset="1" stop-color="#22D3EE"/></linearGradient>
+    <symbol id="logo-simbolo" viewBox="0 0 64 64">
+      <rect width="64" height="64" rx="18" fill="url(#lg-m)"/>
+      <path d="M18 22h28M32 22v24" stroke="#fff" stroke-width="6" stroke-linecap="round" fill="none"/>
+      <circle cx="46" cy="44" r="4" fill="#fff"/>
+    </symbol>
+  </defs>
+</svg>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
