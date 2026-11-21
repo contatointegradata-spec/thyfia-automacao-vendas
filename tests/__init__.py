@@ -19,3 +19,5 @@ os.environ["IG_IMAGE_HOST"] = "ml_direct"
 os.environ["THYFIA_URL_PUBLICA"] = ""
 os.environ["IG_ACCESS_TOKEN"] = "IGTOKEN-SECRETO-DE-TESTE-999"
 os.environ["IG_USER_ID"] = "17841400000000000"
+# testes usam as credenciais acima como se fossem de qualquer cliente (em produção só o admin usa o .env)
+os.environ["THYFIA_IG_ENV_FALLBACK"] = "1"

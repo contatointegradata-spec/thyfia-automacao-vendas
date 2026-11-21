@@ -285,8 +285,19 @@ def _salvar_planilha_local(job_id: str, uid: int, termo: str) -> str | None:
 
 
 def _quer_auto_envio(uid: int) -> bool:
-    r = db.conn().execute("SELECT auto_enviar FROM usuarios WHERE id=?", (uid,)).fetchone()
-    return bool(r and r["auto_enviar"])
+    """Só envia sozinho se o cliente ligou a opção E o plano (Pro+) continua valendo."""
+    r = db.conn().execute("SELECT * FROM usuarios WHERE id=?", (uid,)).fetchone()
+    if not (r and r["auto_enviar"]):
+        return False
+    from . import planos  # import local (evita ciclo)
+    return planos.tem_recurso(r, "automacao")
+
+
+def _cliente_do_job(job_id: str) -> dict | None:
+    """Dados do dono da geração (WhatsApp/Telegram) para o n8n saber para quem divulgar."""
+    from . import tenant  # import local: tenant depende deste módulo
+    r = db.conn().execute("SELECT usuario_id FROM jobs WHERE id=?", (job_id,)).fetchone()
+    return tenant.cliente_payload(r["usuario_id"]) if r else None
 
 
 def enviar_para_automacao(job_id: str, termo: str) -> dict:
@@ -298,7 +309,7 @@ def enviar_para_automacao(job_id: str, termo: str) -> dict:
     _atualizar_job(job_id, envio_status="enviando", envio_erro=None)
     agora = lambda: datetime.now().isoformat(sep=" ", timespec="seconds")
     try:
-        resumo = automacao.enviar_itens(linhas, termo)
+        resumo = automacao.enviar_itens(linhas, termo, cliente=_cliente_do_job(job_id))
     except automacao.ErroAutomacao as e:
         _atualizar_job(job_id, envio_status="erro", envio_erro=str(e), envio_em=agora())
         raise

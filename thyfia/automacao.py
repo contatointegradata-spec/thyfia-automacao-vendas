@@ -19,6 +19,8 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
+from . import configuracoes
+
 TIMEOUT_S = 30
 TAMANHO_LOTE = 50
 
@@ -33,11 +35,12 @@ class ErroAutomacao(Exception):
 
 # --------------------------------------------------------------------------- configuração
 def config() -> tuple[str, str]:
-    url = (os.environ.get("N8N_WEBHOOK_URL") or "").strip()
-    chave = (os.environ.get("N8N_API_KEY") or "").strip()
+    # configurado pelo admin na tela (Admin → Configurações); .env continua valendo como padrão
+    url = configuracoes.obter("n8n_webhook_url")
+    chave = configuracoes.obter("n8n_api_key")
     if not url or not chave:
         raise ErroAutomacao(
-            "Automação não configurada: defina N8N_WEBHOOK_URL e N8N_API_KEY no arquivo .env.",
+            "A automação ainda não foi habilitada na plataforma. Fale com o suporte.",
             "config",
         )
     if not url.startswith(("http://", "https://")):
@@ -101,10 +104,15 @@ def lotes(itens: list, tamanho: int = TAMANHO_LOTE) -> list[list]:
     return [itens[i:i + tamanho] for i in range(0, len(itens), tamanho)]
 
 
-def montar_payloads(keyword: str, linhas: list[dict]) -> list[dict]:
+def montar_payloads(keyword: str, linhas: list[dict], cliente: dict | None = None) -> list[dict]:
     kw = _texto(keyword)
-    # "keyword" no topo continua sendo enviado (compatibilidade); cada link também leva o seu
-    return [{"keyword": kw, "links": lote} for lote in lotes(montar_links(linhas, kw))]
+    # "keyword" no topo continua sendo enviado (compatibilidade); cada link também leva o seu.
+    # "cliente" diz ao n8n PARA QUEM divulgar (multi-tenant); só vai quando informado.
+    ps = [{"keyword": kw, "links": lote} for lote in lotes(montar_links(linhas, kw))]
+    if cliente:
+        for p in ps:
+            p["cliente"] = cliente
+    return ps
 
 
 def ler_planilha(caminho: str | Path) -> list[dict]:
@@ -128,7 +136,7 @@ def _post(url: str, chave: str, payload: dict, timeout: float) -> dict:
             corpo = resp.read().decode("utf-8", "replace")
     except urllib.error.HTTPError as e:
         if e.code == 401:
-            raise ErroAutomacao("Token da automação recusado (401). Confira N8N_API_KEY.", "token")
+            raise ErroAutomacao("A plataforma não foi autorizada pela automação (401). Avise o suporte.", "token")
         raise ErroAutomacao(f"O n8n respondeu com erro {e.code}. Tente de novo em instantes.", "n8n")
     except (TimeoutError, socket.timeout):
         raise ErroAutomacao(f"O n8n não respondeu em {int(timeout)}s. Tente de novo.", "rede")
@@ -159,7 +167,8 @@ def agrupar_por_busca(linhas: list[dict], keyword_padrao: str) -> dict[str, list
     return grupos
 
 
-def enviar_itens(linhas: list[dict], keyword_padrao: str, timeout: float = TIMEOUT_S) -> dict:
+def enviar_itens(linhas: list[dict], keyword_padrao: str, timeout: float = TIMEOUT_S,
+                 cliente: dict | None = None) -> dict:
     """Envia os itens de uma geração: uma série de chamadas (lotes de 50) por palavra-chave.
     Sem nenhum link válido → ErroAutomacao('vazio') e o n8n NÃO é chamado."""
     grupos = {kw: ls for kw, ls in agrupar_por_busca(linhas, keyword_padrao).items()
@@ -170,7 +179,7 @@ def enviar_itens(linhas: list[dict], keyword_padrao: str, timeout: float = TIMEO
              "palavra_chave": "", "enviados": 0, "lotes": 0}
     palavras = []
     for kw, ls in grupos.items():
-        r = enviar(kw, ls, timeout)
+        r = enviar(kw, ls, timeout, cliente)
         for k in ("recebidos", "novos", "duplicados", "invalidos", "enviados", "lotes"):
             total[k] += r[k]
         palavras.append(r["palavra_chave"])
@@ -178,11 +187,11 @@ def enviar_itens(linhas: list[dict], keyword_padrao: str, timeout: float = TIMEO
     return total
 
 
-def enviar(keyword: str, linhas: list[dict], timeout: float = TIMEOUT_S) -> dict:
+def enviar(keyword: str, linhas: list[dict], timeout: float = TIMEOUT_S, cliente: dict | None = None) -> dict:
     """Envia em lotes de até 50 e devolve o resumo somado:
     {recebidos, novos, duplicados, invalidos, palavra_chave, enviados, lotes}."""
     url, chave = config()
-    payloads = montar_payloads(keyword, linhas)
+    payloads = montar_payloads(keyword, linhas, cliente)
     if not payloads:
         raise ErroAutomacao(SEM_LINKS, "vazio")
     resumo = {"recebidos": 0, "novos": 0, "duplicados": 0, "invalidos": 0,

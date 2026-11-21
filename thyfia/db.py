@@ -114,6 +114,57 @@ CREATE TABLE IF NOT EXISTS publicacoes_instagram (
 CREATE INDEX IF NOT EXISTS idx_pub_status ON publicacoes_instagram(status, agendado_para);
 CREATE INDEX IF NOT EXISTS idx_pub_item ON publicacoes_instagram(item_id);
 
+-- ===== Planos e assinaturas (Kiwify) =====
+-- uma linha por (e-mail, plano): cancelar o Plus não derruba um Premium comprado depois
+CREATE TABLE IF NOT EXISTS assinaturas (
+    id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+    email              TEXT NOT NULL,
+    plano              TEXT NOT NULL,               -- plus | pro | premium
+    status             TEXT NOT NULL,               -- ativa | atrasada | cancelada | reembolsada
+    valido_ate         TEXT,                        -- ISO local; acesso até essa data
+    origem             TEXT NOT NULL DEFAULT 'kiwify',  -- kiwify | manual
+    nome               TEXT,
+    kiwify_pedido      TEXT,
+    kiwify_assinatura  TEXT,
+    observacao         TEXT,
+    criado             TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+    atualizado         TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+    UNIQUE (email, plano)
+);
+CREATE INDEX IF NOT EXISTS idx_ass_email ON assinaturas(email);
+
+CREATE TABLE IF NOT EXISTS eventos_pagamento (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    recebido_em TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+    evento      TEXT,
+    email       TEXT,
+    produto     TEXT,
+    plano       TEXT,
+    resultado   TEXT NOT NULL,                      -- aplicado | ignorado | recusado | erro
+    detalhe     TEXT
+);
+
+-- configurações da plataforma (só o admin edita): Kiwify, n8n, Evolution…
+CREATE TABLE IF NOT EXISTS configuracoes (
+    chave      TEXT PRIMARY KEY,
+    valor      TEXT NOT NULL,
+    atualizado TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+);
+
+-- configuração de CADA cliente (multi-tenant): canais de divulgação e Instagram/Meta
+CREATE TABLE IF NOT EXISTS config_usuario (
+    usuario_id        INTEGER PRIMARY KEY REFERENCES usuarios(id) ON DELETE CASCADE,
+    whatsapp_numero   TEXT,        -- só dígitos com DDI (ex.: 5534999999999)
+    whatsapp_status   TEXT NOT NULL DEFAULT 'nao_configurado',  -- nao_configurado | aguardando | conectado
+    whatsapp_instancia TEXT,       -- nome da instância na Evolution (quando conectada pela ThyfIA)
+    telegram_canal    TEXT,        -- @canal ou id
+    ig_user_id        TEXT,
+    ig_token_cifrado  TEXT,        -- NUNCA em texto puro
+    ig_username       TEXT,
+    ig_validado_em    TEXT,
+    atualizado        TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+);
+
 CREATE INDEX IF NOT EXISTS idx_jobs_usuario ON jobs(usuario_id, criado);
 CREATE INDEX IF NOT EXISTS idx_pt_termo ON produto_termos(termo);
 """
@@ -148,6 +199,9 @@ def init() -> None:
         "ALTER TABLE jobs ADD COLUMN itens_importados INTEGER NOT NULL DEFAULT 0",
         # foto do produto (URL do CDN do ML, capturada na busca) — usada pelo Agente de Publicação
         "ALTER TABLE job_itens ADD COLUMN imagem TEXT",
+        # perfil: usuario | admin (o admin é o desenvolvedor/dono da plataforma)
+        "ALTER TABLE usuarios ADD COLUMN papel TEXT NOT NULL DEFAULT 'usuario'",
+        "ALTER TABLE usuarios ADD COLUMN ativo INTEGER NOT NULL DEFAULT 1",
     )
     for sql in migracoes:
         try:

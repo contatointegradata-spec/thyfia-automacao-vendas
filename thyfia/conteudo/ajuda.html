@@ -3,25 +3,49 @@
   <p>A ThyfIA transforma uma <b>palavra-chave</b> (ex.: “capinha iphone”) em dezenas de <b>links de afiliado do Mercado Livre</b> prontos para divulgar, e ajuda a levar esses links até os seus canais.</p>
   <p>O caminho completo, do começo ao fim:</p>
   <ol class="aj-fluxo">
+    <li><b>Escolher o seu plano</b> em <b>Meu plano</b> (o pagamento libera tudo sozinho)</li>
     <li><b>Conectar</b> o Mercado Livre (uma vez só)</li>
     <li><b>Gerar links</b> com uma palavra-chave</li>
     <li><b>Enviar para a automação</b> (n8n), que guarda os links numa fila</li>
     <li>A automação <b>publica uma oferta por vez</b> no WhatsApp e no Telegram, sorteando entre as categorias</li>
     <li>O <b>Agente de Publicação</b> escolhe o melhor item e agenda o post no Instagram</li>
   </ol>
+  <div class="aj-dica"><b>Planos:</b> o <b>Plus</b> gera os links; o <b>Pro</b> também envia para a automação e divulga no seu WhatsApp/Telegram; o <b>Premium</b> acrescenta o Agente de Publicação no Instagram. Recursos de outro plano aparecem com um cadeado 🔒.</div>
   <div class="aj-dica"><b>Dica:</b> você não precisa usar tudo. Só gerar links e baixar a planilha já resolve. As outras etapas são para automatizar a divulgação.</div>
   <div class="aj-menu-mapa">
     <h3>O que tem em cada menu</h3>
     <table class="aj-tabela">
       <tr><th>Menu</th><th>Para que serve</th></tr>
+      <tr><td><b>Meu plano</b></td><td>Mostra o seu plano, permite assinar ou fazer upgrade e traz o passo a passo do que falta configurar.</td></tr>
       <tr><td><b>Gerar links</b></td><td>Digita a palavra-chave e a ThyfIA gera os links.</td></tr>
       <tr><td><b>Integrações</b></td><td>Conecta (ou desconecta) a sua conta do Mercado Livre.</td></tr>
-      <tr><td><b>Agente de Publicação</b></td><td>Escolhe o melhor item, monta o post e agenda no Instagram.</td></tr>
+      <tr><td><b>Automação</b> <small>(Pro)</small></td><td>Você informa o seu WhatsApp (e, se quiser, o canal do Telegram) para receber as ofertas.</td></tr>
+      <tr><td><b>Agente de Publicação</b> <small>(Premium)</small></td><td>Conecta o seu Instagram e escolhe o melhor item, monta o post e agenda no Instagram.</td></tr>
       <tr><td><b>Histórico</b></td><td>Lista todas as gerações, baixa as planilhas e controla o envio para a automação.</td></tr>
       <tr><td><b>Cérebro</b></td><td>Mostra o que a ThyfIA já aprendeu com as buscas.</td></tr>
       <tr><td><b>Ajuda</b></td><td>Este guia.</td></tr>
     </table>
   </div>
+</section>
+
+<section class="aj-sec" id="planos" data-titulo="Planos e pagamento">
+  <h2>Planos e pagamento</h2>
+  <table class="aj-tabela">
+    <tr><th>Plano</th><th>Valor</th><th>O que inclui</th></tr>
+    <tr><td><b>Plus</b></td><td>R$ 59,90/mês</td><td>Gerador de links do Mercado Livre, planilha, histórico e Cérebro.</td></tr>
+    <tr><td><b>Pro</b></td><td>R$ 89,90/mês</td><td>Tudo do Plus + envio automático para a automação, que divulga as ofertas no seu WhatsApp e Telegram.</td></tr>
+    <tr><td><b>Premium</b></td><td>R$ 129,90/mês</td><td>Tudo do Pro + Agente de Publicação no Instagram, com passo a passo para ligar a sua conta Meta.</td></tr>
+  </table>
+
+  <h3>Como assinar ou fazer upgrade</h3>
+  <ol class="aj-passos">
+    <li>Abra <b>Meu plano</b> e clique no plano desejado. O pagamento abre em outra aba, na Kiwify.</li>
+    <li>Use no pagamento o <b>mesmo e-mail da sua conta</b> na ThyfIA. É por ele que o plano é liberado.</li>
+    <li>Assim que o pagamento é confirmado, a tela <b>libera sozinha</b> (se demorar, use <b>Já paguei, verificar</b>).</li>
+    <li>Siga o <b>passo a passo</b> que aparece na própria tela de Meu plano: ele mostra o que já foi feito e qual é o próximo passo.</li>
+  </ol>
+  <div class="aj-aviso"><b>Pagou com outro e-mail?</b> Fale com o suporte informando os dois e-mails. Se o pagamento for cancelado, reembolsado ou ficar em atraso, o acesso aos recursos pagos é encerrado automaticamente.</div>
+  <p><button class="aj-botao" data-ir="plano">Ir para Meu plano</button></p>
 </section>
 
 <section class="aj-sec" id="primeiros-passos" data-titulo="Primeiros passos">
@@ -85,15 +109,25 @@
 </section>
 
 <section class="aj-sec" id="enviar-automacao" data-titulo="Enviar para a automação">
-  <h2>Enviar para a automação (n8n)</h2>
+  <h2>Enviar para a automação <small>(plano Pro ou Premium)</small></h2>
   <p>A automação guarda os links numa fila (planilha) e publica <b>uma oferta de cada vez</b>, no ritmo certo, sem você precisar copiar e colar.</p>
+
+  <h3>Configure o seu número (uma vez)</h3>
+  <ol class="aj-passos">
+    <li>Abra <b>Automação</b> no menu.</li>
+    <li>No passo <b>Seu WhatsApp</b>, digite o número com DDD e clique em <b>Salvar número</b>. O código do Brasil (+55) é colocado sozinho.</li>
+    <li>Clique em <b>Enviar mensagem de teste</b> e confira se chegou no seu WhatsApp.</li>
+    <li><i>Opcional:</i> no passo <b>Canal do Telegram</b>, adicione o bot da ThyfIA como administrador do seu canal, digite o @ do canal e salve.</li>
+  </ol>
+  <p>Pronto: a ThyfIA já envia, junto com os links, o seu número e canal. Você <b>não precisa mexer no n8n</b>, a configuração é feita para você.</p>
+  <p><button class="aj-botao" data-ir="automacao">Ir para Automação</button></p>
 
   <h3>Como enviar</h3>
   <ul class="aj-lista">
     <li><b>Automático:</b> marque “Enviar automaticamente…” na tela de Gerar links. Quando a geração termina, o envio acontece sozinho.</li>
     <li><b>Manual:</b> clique em <b>➜ Enviar para automação</b> na tela de resultado ou, depois, no <b>Histórico</b>.</li>
   </ul>
-  <p>Se a opção estiver desativada (“Automação não configurada”), falta configurar o endereço e a chave do n8n no servidor. Veja “Solução de problemas”.</p>
+  <p>Se a opção estiver desativada, falta salvar o seu número em <b>Automação</b>. Se o seu plano for o Plus, o envio não está incluso: veja <b>Meu plano</b> para fazer o upgrade.</p>
 
   <h3>O que acontece depois do envio</h3>
   <ol class="aj-passos">
@@ -127,14 +161,25 @@
 </section>
 
 <section class="aj-sec" id="agente-publicacao" data-titulo="Agente de Publicação (Instagram)">
-  <h2>Agente de Publicação (Instagram)</h2>
+  <h2>Agente de Publicação (Instagram) <small>(plano Premium)</small></h2>
   <p>O agente <b>sugere</b> o melhor item e prepara o post. <b>Nada é publicado sem o seu clique.</b></p>
 
-  <h3>Antes de começar</h3>
+  <h3>Conectar a sua conta do Instagram (uma vez)</h3>
+  <p>Cada cliente publica na <b>sua própria conta</b>, usando um app gratuito criado por você na Meta. A tela do Agente de Publicação traz esse passo a passo guiado, com caixinhas para você ir marcando:</p>
+  <ol class="aj-passos">
+    <li><b>Conta profissional:</b> no app do Instagram, mude para conta <b>Comercial</b> ou <b>Criador de conteúdo</b> (grátis).</li>
+    <li><b>Conta de desenvolvedor:</b> entre em <code>developers.facebook.com</code> com o seu Facebook e aceite os termos.</li>
+    <li><b>Criar o app:</b> em <b>Meus apps → Criar app</b>, escolha o caso de uso de gerenciar conteúdo no Instagram. O app fica em modo de desenvolvimento, e <b>não precisa de análise da Meta</b>.</li>
+    <li><b>Testador:</b> em <b>Funções do app</b>, adicione o seu @ como <b>Testador do Instagram</b> e aceite o convite no Instagram (Configurações → Apps e sites → Convites de testador).</li>
+    <li><b>Token:</b> em <b>Instagram → Configuração da API com login do Instagram</b>, clique em <b>Gerar token</b> para a sua conta, autorizando a permissão de publicar. Copie o <b>token</b> e o <b>ID da conta</b>.</li>
+    <li>Cole os dois no quadro <b>Último passo</b> da ThyfIA e clique em <b>Conectar</b>. A ThyfIA confere com a Meta antes de salvar, e guarda o token <b>criptografado</b>.</li>
+  </ol>
+  <div class="aj-aviso"><b>Validade do token:</b> ele dura cerca de 60 dias. Quando expirar, a tela avisa; gere outro token no mesmo lugar e use <b>Trocar conta / token</b>.</div>
+
+  <h3>Antes de publicar</h3>
   <ul class="aj-lista">
     <li>No topo da tela deve aparecer o <b>@ da conta do Instagram</b> e quantas publicações ainda cabem hoje. O botão <b>↻</b> verifica de novo.</li>
-    <li>Se aparecer <b>“Instagram não configurado”</b>, o servidor ainda não tem o token da conta. Veja “Solução de problemas”.</li>
-    <li>A conta precisa ser <b>profissional</b> (comercial ou criador de conteúdo).</li>
+    <li>Se aparecer <b>“Instagram não conectado”</b>, siga o passo a passo acima.</li>
   </ul>
 
   <h3>Passo a passo: publicar o melhor item</h3>
@@ -222,15 +267,26 @@
       <li><b>Erro 404:</b> o fluxo de recebimento no n8n não está <b>publicado/ativo</b>.</li>
       <li><b>Token ou chave inválida (401):</b> a chave configurada na ThyfIA não é a mesma do n8n.</li>
       <li><b>Falha de rede:</b> o endereço do n8n está errado ou o n8n está fora do ar.</li>
-      <li><b>Automação não configurada:</b> falta definir o endereço e a chave do n8n no servidor.</li>
+      <li><b>“A automação ainda não foi habilitada na plataforma”:</b> é um ajuste do lado da ThyfIA. Fale com o suporte.</li>
+      <li><b>Falta o seu número:</b> salve o WhatsApp em <b>Automação</b>.</li>
+      <li><b>Plano:</b> o envio exige o plano Pro ou Premium.</li>
     </ul>
     <p>Depois de corrigir, use <b>↻ Tentar de novo</b> no Histórico. É seguro: links repetidos são ignorados.</p>
   </details>
   <details><summary>As ofertas não estão saindo no WhatsApp/Telegram</summary>
     <p>A automação só publica entre 08h e 21h, uma oferta a cada 30 minutos, e só se houver itens <b>Pendente</b> na fila. Confira se o envio mostra “enviado” no Histórico e se o fluxo do n8n está ativo.</p>
   </details>
-  <details><summary>“Instagram não configurado”</summary>
-    <p>O servidor precisa ter o token e o ID da conta do Instagram nas configurações. Isso é feito pelo administrador, uma vez, e depois a tela passa a mostrar o @ da conta.</p>
+  <details><summary>“Instagram não conectado” ou a Meta recusou o token</summary>
+    <p>Siga o passo a passo da tela do Agente de Publicação. Os erros mais comuns: o convite de <b>testador</b> não foi aceito no Instagram; a conta não é <b>profissional</b>; o token foi gerado sem a permissão de publicar; ou o ID colado não é o da conta do Instagram (copie o número que aparece junto do @ na tela de geração do token).</p>
+  </details>
+  <details><summary>Um recurso aparece com cadeado 🔒</summary>
+    <p>Ele faz parte de um plano acima do seu. Abra <b>Meu plano</b> e faça o upgrade; a liberação é automática depois do pagamento.</p>
+  </details>
+  <details><summary>Paguei e o plano não liberou</summary>
+    <p>Confirme que usou o <b>mesmo e-mail</b> da conta na ThyfIA e clique em <b>Já paguei, verificar</b> em Meu plano. Se o e-mail do pagamento foi outro, fale com o suporte.</p>
+  </details>
+  <details><summary>Não chegou a mensagem de teste no WhatsApp ou Telegram</summary>
+    <p>Confira o número (DDD + número) ou o @ do canal. No Telegram, o bot precisa ser <b>administrador</b> do canal com permissão de publicar. O teste de envio também pode estar indisponível se o suporte ainda não o habilitou.</p>
   </details>
   <details><summary>O Instagram recusou a imagem ou deu erro ao publicar</summary>
     <p>O Instagram exige uma imagem <b>JPEG</b> acessível publicamente. Envie a foto pelo botão <b>⬆ Enviar foto</b> (ela é convertida) ou use a foto do produto. Se a mensagem falar em limite diário, agende para mais tarde.</p>
@@ -239,7 +295,7 @@
     <p>Veja o status na lista de <b>Publicações</b>: se estiver com erro, a mensagem explica. Se estiver como “agendado” depois do horário, é porque o limite diário foi atingido ou houve falha temporária. A ThyfIA tenta de novo sozinha.</p>
   </details>
   <details><summary>Token do Instagram expirou</summary>
-    <p>O status da conta no topo do Agente mostra o erro. Gere um novo token no painel de desenvolvedores da Meta e atualize a configuração do servidor.</p>
+    <p>O status da conta no topo do Agente mostra o erro. Gere um novo token no painel de desenvolvedores da Meta (Instagram → Configuração da API) e use <b>Trocar conta / token</b>.</p>
   </details>
 </section>
 
@@ -249,6 +305,8 @@
     <li>A ThyfIA <b>nunca vê a sua senha</b> do Mercado Livre. O login é feito por você, no seu navegador.</li>
     <li>Sua senha da ThyfIA é guardada de forma protegida (não dá para ler de volta).</li>
     <li>Para apagar a sessão do Mercado Livre guardada, clique em <b>Desconectar</b> em Integrações.</li>
-    <li>Nunca compartilhe tokens (Instagram, n8n) por mensagem ou e-mail.</li>
+    <li>O token do seu Instagram é guardado <b>criptografado</b> e só é usado para publicar na <b>sua</b> conta. Os dados de cada cliente são separados.</li>
+    <li>Para desligar o Instagram, use <b>Desconectar</b> no Agente de Publicação.</li>
+    <li>Nunca compartilhe tokens por mensagem ou e-mail.</li>
   </ul>
 </section>
