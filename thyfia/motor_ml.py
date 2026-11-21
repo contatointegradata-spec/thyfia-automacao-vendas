@@ -33,6 +33,8 @@ from . import automacao, cerebro, db, itens, motor_busca
 HUB_URL = ml.HUB_URL
 TEMPO_LOGIN = 5 * 60  # segundos para a pessoa concluir o login
 MOSTRAR_NAVEGADOR = os.environ.get("THYFIA_MOSTRAR_NAVEGADOR") == "1"  # debug
+# Servidor sem tela (Docker/VPS): Chrome headless. O login no ML vem pela extensão (/api/ml/sessao).
+HEADLESS = os.environ.get("THYFIA_HEADLESS") == "1"
 
 _locks: dict[int, threading.Lock] = defaultdict(threading.Lock)
 
@@ -151,8 +153,12 @@ def navegador(uid: int, visivel: bool):
         "--no-default-browser-check",
         "--lang=pt-BR",
     ]
-    args += ["--window-position=-2400,-2400", "--window-size=1280,800"] if oculto \
-        else ["--window-size=1100,820", "--new-window"]
+    if HEADLESS:
+        args += ["--headless=new", "--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu",
+                 "--window-size=1280,800"]
+    else:
+        args += ["--window-position=-2400,-2400", "--window-size=1280,800"] if oculto \
+            else ["--window-size=1100,820", "--new-window"]
     args.append(HUB_URL if not oculto else "about:blank")
     proc = subprocess.Popen(args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
@@ -208,6 +214,10 @@ def _esta_logado(url: str) -> bool:
 # --------------------------------------------------------------------------- conexão
 def conectar(uid: int) -> None:
     """Abre uma janela do Chrome para a pessoa logar no ML; detecta sozinho quando terminar."""
+    if HEADLESS:
+        _set_status_ml(uid, "erro", "Este servidor não tem tela. Conecte pela extensão ThyfIA Conector "
+                                    "(botão de sincronizar) no seu navegador.")
+        return
     lock = _locks[uid]
     if not lock.acquire(blocking=False):
         _set_status_ml(uid, "erro", "Já existe uma operação em andamento para sua conta.")

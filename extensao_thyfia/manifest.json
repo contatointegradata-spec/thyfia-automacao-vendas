@@ -9,12 +9,13 @@
     "https://*.mercadolivre.com/*",
     "https://*.mercadolibre.com/*",
     "http://localhost:8000/*",
-    "http://127.0.0.1:8000/*"
+    "http://127.0.0.1:8000/*",
+    "https://thyfia.integradata.app.br/*"
   ],
   "background": { "service_worker": "background.js" },
   "content_scripts": [
     {
-      "matches": ["http://localhost:8000/*", "http://127.0.0.1:8000/*"],
+      "matches": ["http://localhost:8000/*", "http://127.0.0.1:8000/*", "https://thyfia.integradata.app.br/*"],
       "js": ["ponte.js"],
       "run_at": "document_start"
     }
