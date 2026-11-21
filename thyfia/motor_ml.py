@@ -16,8 +16,10 @@ import shutil
 import socket
 import subprocess
 import sys
+import tempfile
 import threading
 import time
+import logging
 import traceback
 import urllib.request
 from collections import defaultdict
@@ -36,6 +38,7 @@ MOSTRAR_NAVEGADOR = os.environ.get("THYFIA_MOSTRAR_NAVEGADOR") == "1"  # debug
 # Servidor sem tela (Docker/VPS): Chrome headless. O login no ML vem pela extensão (/api/ml/sessao).
 HEADLESS = os.environ.get("THYFIA_HEADLESS") == "1"
 
+_log = logging.getLogger("thyfia.motor_ml")
 _locks: dict[int, threading.Lock] = defaultdict(threading.Lock)
 
 
@@ -145,6 +148,13 @@ def navegador(uid: int, visivel: bool):
             (_perfil(uid) / "Default" / arq).unlink()
         except OSError:
             pass
+    # Trava de perfil deixada por um Chrome morto (ex.: container recriado no deploy → outro hostname):
+    # sem apagar, o Chrome novo recusa o perfil e fecha na hora. Aqui só há um Chrome por usuário (lock).
+    for arq in ("SingletonLock", "SingletonCookie", "SingletonSocket"):
+        try:
+            (_perfil(uid) / arq).unlink()
+        except OSError:
+            pass
     args = [
         _caminho_chrome(),
         f"--remote-debugging-port={porta}",
@@ -160,7 +170,9 @@ def navegador(uid: int, visivel: bool):
         args += ["--window-position=-2400,-2400", "--window-size=1280,800"] if oculto \
             else ["--window-size=1100,820", "--new-window"]
     args.append(HUB_URL if not oculto else "about:blank")
-    proc = subprocess.Popen(args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    _perfil(uid).mkdir(parents=True, exist_ok=True)
+    erro_chrome = tempfile.TemporaryFile()  # guarda o que o Chrome disser, para explicar uma falha
+    proc = subprocess.Popen(args, stdout=subprocess.DEVNULL, stderr=erro_chrome)
 
     # espera a porta de depuração responder
     fim = time.time() + 20
@@ -171,7 +183,12 @@ def navegador(uid: int, visivel: bool):
         except Exception:
             if proc.poll() is not None or time.time() > fim:
                 proc.kill()
-                raise RuntimeError("Não consegui abrir o Google Chrome. Ele está instalado?")
+                erro_chrome.seek(0)
+                detalhe = erro_chrome.read()[-400:].decode("utf-8", "replace").strip()
+                _log.error("Chrome não abriu (saída=%s): %s", proc.poll(), detalhe or "(sem mensagem)")
+                dica = f" Detalhe: {detalhe.splitlines()[-1][:160]}" if detalhe else ""
+                raise RuntimeError("Não consegui abrir o Chrome do servidor. Tente novamente em instantes; "
+                                   "se persistir, avise o suporte." + dica)
             time.sleep(0.3)
 
     pw = sync_playwright().start()
