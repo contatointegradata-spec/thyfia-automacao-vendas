@@ -25,6 +25,7 @@ RUN pip install -r requirements.txt
 
 COPY gerar_links_afiliado.py ./
 COPY thyfia ./thyfia
+COPY extensao_thyfia ./extensao_thyfia
 
 # banco, perfis do Chrome e fotos ficam no volume (não se perdem a cada deploy)
 VOLUME ["/app/dados"]
