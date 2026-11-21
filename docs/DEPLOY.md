@@ -25,3 +25,11 @@ Domínio: `https://thyfia.integradata.app.br` (registro A → 2.25.185.223).
 3. **Kiwify → Apps → Webhooks:** URL `https://thyfia.integradata.app.br/api/kiwify/webhook`, o mesmo token, os 3 produtos e os eventos: compra aprovada, reembolsada, chargeback, assinatura cancelada, atrasada e renovada.
 4. **Administração → Pagamentos:** use *Simular compra* para testar o vínculo produto → plano e acompanhe os últimos eventos recebidos.
 5. O cliente compra com o **mesmo e-mail** da conta; o plano libera sozinho. Acesso manual (cortesia/teste): Administração → Clientes → *Liberar plano*.
+
+## Conta de administrador (dono)
+No `/opt/thyfia/.env` da VPS:
+```
+THYFIA_ADMIN_EMAIL=seu@email.com
+THYFIA_ADMIN_SENHA=uma-senha-forte
+```
+Depois `cd /opt/thyfia && docker compose up -d`. Na subida a conta é criada (ou a senha é redefinida, se já existir) e vira administradora. Entre pela tela normal e **apague a linha `THYFIA_ADMIN_SENHA`** do `.env` (senão a senha volta a esse valor a cada reinício).
