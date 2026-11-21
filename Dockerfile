@@ -11,7 +11,7 @@ ENV PYTHONUNBUFFERED=1 \
     THYFIA_CHROME=/usr/bin/google-chrome-stable
 
 RUN apt-get update \
- && apt-get install -y --no-install-recommends ca-certificates curl gnupg fonts-liberation tzdata \
+ && apt-get install -y --no-install-recommends ca-certificates curl gnupg fonts-liberation tzdata libatomic1 \
  && curl -fsSL https://dl.google.com/linux/linux_signing_key.pub | gpg --dearmor -o /usr/share/keyrings/google-chrome.gpg \
  && echo "deb [arch=amd64 signed-by=/usr/share/keyrings/google-chrome.gpg] http://dl.google.com/linux/chrome/deb/ stable main" \
       > /etc/apt/sources.list.d/google-chrome.list \
@@ -22,6 +22,8 @@ RUN apt-get update \
 WORKDIR /app
 COPY requirements.txt .
 RUN pip install -r requirements.txt
+# falha cedo no build (e não só na 1ª geração) se o driver do Playwright não consegue rodar
+RUN python -c "import playwright, subprocess, pathlib; d = pathlib.Path(playwright.__file__).parent / \"driver\" / \"node\"; print(subprocess.run([str(d), \"--version\"], capture_output=True, text=True, check=True).stdout)"
 
 COPY gerar_links_afiliado.py ./
 COPY thyfia ./thyfia
