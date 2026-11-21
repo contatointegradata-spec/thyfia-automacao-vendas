@@ -11,12 +11,14 @@ são lidos do JSON que o ML embute na página de resultados (mais estável que s
 from __future__ import annotations
 
 import json
+import logging
 import re
 from urllib.parse import quote
 
 from playwright.sync_api import Page
 
 LINKBUILDER_URL = "https://www.mercadolivre.com.br/afiliados/linkbuilder"
+_log = logging.getLogger("thyfia.motor_busca")
 NOME_FRAME = "thyfia-motor"
 POR_PAGINA = 48
 MAX_PAGINAS = 4
@@ -178,7 +180,8 @@ def buscar(page: Page, termo: str, limite: int) -> list[dict]:
                     "O Mercado Livre pediu uma verificação de segurança na busca. "
                     "Abra o Mercado Livre no seu Chrome, faça uma busca qualquer e tente de novo."
                 )
-            novos = extrair_produtos(fr.content())
+            html = fr.content()
+            novos = extrair_produtos(html)
             if not novos:  # fallback: lê os cards renderizados
                 try:
                     novos = [
@@ -188,6 +191,15 @@ def buscar(page: Page, termo: str, limite: int) -> list[dict]:
                     ]
                 except Exception:
                     novos = []
+            if not novos:  # deixa no log o que o Mercado Livre devolveu, para diagnosticar
+                try:
+                    titulo = fr.title()
+                except Exception:
+                    titulo = "?"
+                baixo = html.lower()
+                _log.warning("Busca '%s' pág.%s sem produtos: url=%s título=%r html=%d bytes polycard=%s "
+                             "captcha=%s login=%s", termo, pagina, fr.url[:120], titulo[:80], len(html),
+                             "polycard" in baixo, "captcha" in baixo, "login" in baixo[:3000])
             antes = len(produtos)
             for p in novos:
                 if p["url"] not in vistos:
