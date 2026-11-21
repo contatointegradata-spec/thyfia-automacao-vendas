@@ -724,4 +724,5 @@ def admin_kiwify_simular(dados: Simulacao, u=Depends(admin_atual)):
     """Roda um evento de teste pelo MESMO caminho do webhook real (confere o vínculo produto → plano)."""
     return kiwify.processar({"webhook_event_type": dados.evento, "order_status": "paid" if "approved" in dados.evento else "",
                              "order_id": "SIMULADO", "Customer": {"email": dados.email, "full_name": "Teste"},
-                             "Product": {"product_id": dados.produto, "product_name": dados.produto}})
+                             "Product": {"product_id": dados.produto, "product_name": dados.produto},
+                             "Subscription": {"plan": {"id": dados.produto, "name": dados.produto}}})

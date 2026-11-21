@@ -407,8 +407,8 @@ async function admResumo() {
     const [r, cfg] = await Promise.all([api("/api/admin/resumo"), api("/api/admin/config")]);
     const c = Object.fromEntries(cfg.campos.map((x) => [x.chave, x]));
     const checks = [
-      ["Token do webhook da Kiwify", c.kiwify_token.definido], ["Produto Kiwify do Plus", c.kiwify_produto_plus.definido],
-      ["Produto Kiwify do Pro", c.kiwify_produto_pro.definido], ["Produto Kiwify do Premium", c.kiwify_produto_premium.definido],
+      ["Token do webhook da Kiwify", c.kiwify_token.definido], ["Plano Plus na Kiwify", c.kiwify_produto_plus.definido],
+      ["Plano Pro na Kiwify", c.kiwify_produto_pro.definido], ["Plano Premium na Kiwify", c.kiwify_produto_premium.definido],
       ["Links de checkout dos 3 planos", c.kiwify_link_plus.definido && c.kiwify_link_pro.definido && c.kiwify_link_premium.definido],
       ["Automação (n8n) habilitada", cfg.n8n_ok], ["Teste de WhatsApp (Evolution)", c.evolution_url.definido && c.evolution_apikey.definido && c.evolution_instancia.definido],
       ["Teste de Telegram (bot)", c.telegram_bot_token.definido && c.telegram_bot.definido],
@@ -511,9 +511,9 @@ async function admPagamentos() {
         <li>Em <b>Produtos</b>, escolha os 3 produtos de plano. Em <b>Eventos</b>, marque: compra aprovada, compra reembolsada, chargeback, assinatura cancelada, assinatura atrasada e assinatura renovada.</li></ol>
       <div class="ad-copiar"><code id="ad-wh">${esc(cfg.webhook_url)}</code><button class="btn btn-fantasma btn-mini" id="btn-ad-copiar">Copiar</button></div>
       <p class="mini">Cada chamada vem assinada pela Kiwify; chamadas sem assinatura válida são recusadas e aparecem no registro abaixo.</p></section>
-      <section class="painel"><h3>Testar o vínculo produto → plano</h3>
+      <section class="painel"><h3>Testar o vínculo Kiwify → plano</h3>
         <p class="muted">Simula uma compra aprovada pelo mesmo caminho do webhook real (cria uma assinatura de verdade para o e-mail informado).</p>
-        <div class="ad-sim"><input id="sim-email" type="email" placeholder="e-mail do cliente"><input id="sim-prod" type="text" placeholder="ID ou nome do produto na Kiwify">
+        <div class="ad-sim"><input id="sim-email" type="email" placeholder="e-mail do cliente"><input id="sim-prod" type="text" placeholder="nome do plano na Kiwify (ex.: ThyfIA Plus)">
         <button class="btn btn-fantasma" id="btn-sim">Simular compra</button></div><p class="envio-msg" id="sim-msg"></p></section>
       <section class="painel"><div class="pl-passos-topo"><h3>Últimos eventos</h3><button class="btn btn-fantasma btn-mini" id="btn-ev-atualizar">↻ Atualizar</button></div>
         <div class="ad-eventos">${ev.length ? ev.map((x) => `<div class="ad-ev"><span class="status-pill ${RES[x.resultado] || ""}">${esc(x.resultado)}</span>
@@ -534,7 +534,7 @@ async function admPagamentos() {
 
 const GRUPOS_CFG = [
   ["Pagamento (Kiwify)", ["kiwify_token", "kiwify_produto_plus", "kiwify_produto_pro", "kiwify_produto_premium", "kiwify_link_plus", "kiwify_link_pro", "kiwify_link_premium"],
-    "Cada plano é um produto na Kiwify. Em “Produto”, informe o ID ou o nome exato (pode listar vários separados por vírgula). Os links são os de checkout de cada produto."],
+    "Em “Plano … na Kiwify”, informe o nome exato do plano de assinatura (ex.: ThyfIA Plus) ou o ID. Serve tanto para 1 produto com 3 planos quanto para 1 produto por plano; pode listar vários separados por vírgula. Os links são os de checkout de cada plano."],
   ["Automação (n8n)", ["n8n_webhook_url", "n8n_api_key"], "Webhook do fluxo “Receber links da ThyfIA”. Um só para todos os clientes: cada envio leva os dados do cliente."],
   ["WhatsApp (Evolution API)", ["evolution_url", "evolution_apikey", "evolution_instancia"], "Só para o botão “Enviar mensagem de teste” do cliente. A instância é a que envia as ofertas."],
   ["Telegram", ["telegram_bot", "telegram_bot_token"], "O @ do bot é mostrado ao cliente no passo a passo; o token só serve para o teste de envio ao canal."],

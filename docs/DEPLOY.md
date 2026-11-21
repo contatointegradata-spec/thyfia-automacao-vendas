@@ -21,7 +21,7 @@ Domínio: `https://thyfia.integradata.app.br` (registro A → 2.25.185.223).
 
 ## Plataforma multi-cliente (planos + Kiwify)
 1. Entre com a conta do dono (`THYFIA_ADMIN_EMAIL`): o menu **Administração** aparece.
-2. **Administração → Configurações:** token do webhook da Kiwify, ID/nome do produto de cada plano (Plus, Pro, Premium), links de checkout, webhook/chave do n8n, Evolution (URL, chave, instância), bot do Telegram e WhatsApp do suporte.
+2. **Administração → Configurações:** token do webhook da Kiwify, nome (ou ID) do plano de assinatura na Kiwify para Plus, Pro e Premium (funciona com 1 produto de 3 planos ou 1 produto por plano), links de checkout, webhook/chave do n8n, Evolution (URL, chave, instância), bot do Telegram e WhatsApp do suporte.
 3. **Kiwify → Apps → Webhooks:** URL `https://thyfia.integradata.app.br/api/kiwify/webhook`, o mesmo token, os 3 produtos e os eventos: compra aprovada, reembolsada, chargeback, assinatura cancelada, atrasada e renovada.
 4. **Administração → Pagamentos:** use *Simular compra* para testar o vínculo produto → plano e acompanhe os últimos eventos recebidos.
 5. O cliente compra com o **mesmo e-mail** da conta; o plano libera sozinho. Acesso manual (cortesia/teste): Administração → Clientes → *Liberar plano*.

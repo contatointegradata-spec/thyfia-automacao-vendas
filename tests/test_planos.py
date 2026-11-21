@@ -277,6 +277,18 @@ class TestTenant(Base):
         self.assertEqual((a["whatsapp"], a["telegram"]), ("5534999991111", "@canal_um"))
         self.assertEqual((b["whatsapp"], b["telegram"]), ("5511988882222", ""))
 
+    def test_um_produto_com_tres_planos_casa_pelo_nome_do_plano(self):
+        for p, nome in (("plus", "ThyfIA Plus"), ("pro", "ThyfIA Pro"), ("premium", "ThyfIA Premium")):
+            configuracoes.definir(f"kiwify_produto_{p}", nome)
+        base = {"webhook_event_type": "order_approved", "order_status": "paid", "order_id": "X1",
+                "Customer": {"email": self.u["email"], "full_name": "C"},
+                "Product": {"product_id": "uuid-do-produto", "product_name": "ThyfIA"}}
+        for nome, esperado in (("ThyfIA Pro", "pro"), ("ThyfIA Premium", "premium"), ("ThyfIA Plus", "plus")):
+            r = kiwify.processar({**base, "Subscription": {"id": "S1", "plan": {"id": "p", "name": nome}}})
+            self.assertEqual((r["resultado"], r.get("plano")), ("aplicado", esperado))
+        r = kiwify.processar({**base, "Subscription": {"id": "S1", "plan": {"id": "p", "name": "Outro"}}})
+        self.assertEqual(r["resultado"], "erro")  # plano desconhecido: não libera nada
+
     def test_cancelamento_apos_reembolso_nao_desfaz_o_reembolso(self):
         planos.conceder(self.u["email"], "pro", origem="kiwify", valido_ate="2099-01-01T00:00:00")
         planos.marcar(self.u["email"], "pro", "reembolsada")

@@ -13,9 +13,9 @@ from . import cofre, db
 # chave → (variável de ambiente equivalente, é segredo?, rótulo)
 CAMPOS: dict[str, tuple[str, bool, str]] = {
     "kiwify_token": ("KIWIFY_TOKEN", True, "Token do webhook da Kiwify"),
-    "kiwify_produto_plus": ("KIWIFY_PRODUTO_PLUS", False, "Produto Kiwify do plano Plus (ID ou nome)"),
-    "kiwify_produto_pro": ("KIWIFY_PRODUTO_PRO", False, "Produto Kiwify do plano Pro (ID ou nome)"),
-    "kiwify_produto_premium": ("KIWIFY_PRODUTO_PREMIUM", False, "Produto Kiwify do plano Premium (ID ou nome)"),
+    "kiwify_produto_plus": ("KIWIFY_PRODUTO_PLUS", False, "Plano Plus na Kiwify (nome ou ID do plano; ou do produto)"),
+    "kiwify_produto_pro": ("KIWIFY_PRODUTO_PRO", False, "Plano Pro na Kiwify (nome ou ID do plano; ou do produto)"),
+    "kiwify_produto_premium": ("KIWIFY_PRODUTO_PREMIUM", False, "Plano Premium na Kiwify (nome ou ID do plano; ou do produto)"),
     "kiwify_link_plus": ("KIWIFY_LINK_PLUS", False, "Link de checkout — Plus"),
     "kiwify_link_pro": ("KIWIFY_LINK_PRO", False, "Link de checkout — Pro"),
     "kiwify_link_premium": ("KIWIFY_LINK_PREMIUM", False, "Link de checkout — Premium"),

@@ -72,20 +72,28 @@ def extrair(p: dict) -> dict:
         "nome": str(_g(base, "Customer", "full_name") or _g(base, "Customer", "first_name") or "").strip(),
         "produto_id": str(_g(base, "Product", "product_id") or "").strip(),
         "produto_nome": str(_g(base, "Product", "product_name") or "").strip(),
+        "plano_id": str(_g(base, "Subscription", "plan", "id") or "").strip(),
+        "plano_nome": str(_g(base, "Subscription", "plan", "name") or "").strip(),
         "pedido": str(base.get("order_id") or base.get("order_ref") or "").strip(),
         "assinatura_id": str(_g(base, "Subscription", "id") or base.get("subscription_id") or "").strip(),
         "proxima": _g(base, "Subscription", "next_payment") or _g(base, "Subscription", "customer_access", "next_payment"),
     }
 
 
-def plano_do_produto(produto_id: str, produto_nome: str) -> str | None:
-    """Casa o produto da Kiwify com um plano, pelo ID ou nome salvo em Admin → Configurações
-    (aceita vários separados por vírgula)."""
-    pid, pnome = _norm(produto_id), _norm(produto_nome)
-    for plano in planos.ORDEM:
-        alvos = [_norm(x) for x in configuracoes.obter(f"kiwify_produto_{plano}").split(",") if x.strip()]
-        if pid in alvos or (pnome and pnome in alvos):
-            return plano
+def plano_do_produto(produto_id: str, produto_nome: str, plano_id: str = "", plano_nome: str = "") -> str | None:
+    """Casa o pagamento da Kiwify com um plano da ThyfIA, pelo ID ou nome salvo em
+    Admin → Configurações (aceita vários separados por vírgula).
+    Primeiro olha o PLANO de assinatura (um produto com 3 planos); se não casar, olha o produto
+    (um produto por plano)."""
+    alvos_por_plano = {pl: [_norm(x) for x in configuracoes.obter(f"kiwify_produto_{pl}").split(",") if x.strip()]
+                       for pl in planos.ORDEM}
+    for ids in ((plano_id, plano_nome), (produto_id, produto_nome)):
+        chaves = {_norm(x) for x in ids if _norm(x)}
+        if not chaves:
+            continue
+        for pl in planos.ORDEM:
+            if chaves & set(alvos_por_plano[pl]):
+                return pl
     return None
 
 
@@ -137,10 +145,11 @@ def processar(payload: dict) -> dict:
     if not d["email"]:
         registrar(rotulo, "", produto, None, "erro", "Payload sem e-mail do cliente.")
         return {"resultado": "erro", "detalhe": "sem e-mail"}
-    plano = plano_do_produto(d["produto_id"], d["produto_nome"])
+    plano = plano_do_produto(d["produto_id"], d["produto_nome"], d["plano_id"], d["plano_nome"])
     if not plano:
         registrar(rotulo, d["email"], produto, None, "erro",
-                  "Produto não vinculado a nenhum plano (Admin → Configurações).")
+                  f"Plano/produto não vinculado (plano da Kiwify: {d['plano_nome'] or '—'}; produto: {produto or '—'}). "
+                  "Confira Admin → Configurações.")
         return {"resultado": "erro", "detalhe": "produto desconhecido"}
     try:
         if acao == "ativar":
