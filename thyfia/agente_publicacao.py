@@ -348,8 +348,15 @@ def _atualizar(pub_id: int, **campos) -> None:
 
 
 def _executar(pub_id: int, agendada: bool) -> None:
-    """Publica uma publicação que JÁ está em 'publicando' (o status funciona como trava)."""
+    """Publica uma publicação que JÁ está em 'publicando' (o status funciona como trava).
+    Usa a conta de Instagram do DONO do post (multi-tenant)."""
+    from . import tenant  # import local (evita ciclo)
     p = obter(pub_id)
+    with tenant.ig_ctx(p["usuario_id"]):
+        _executar_com_conta(pub_id, p, agendada)
+
+
+def _executar_com_conta(pub_id: int, p: dict, agendada: bool) -> None:
     try:
         if instagram.limite_publicacao()["restante"] <= 0:
             if agendada:  # volta para a fila e tenta de novo no próximo ciclo

@@ -47,6 +47,20 @@ def autenticar(email: str, senha: str):
     return None
 
 
+def garantir_admin() -> None:
+    """Define quem é o admin (dono da plataforma).
+    1) THYFIA_ADMIN_EMAIL, se a conta existir; 2) se ainda não há nenhum admin, a conta mais antiga.
+    Chamado na subida e a cada cadastro (assim o e-mail do dono vira admin ao se cadastrar)."""
+    import os
+    c = db.conn()
+    email = (os.environ.get("THYFIA_ADMIN_EMAIL") or "").strip().lower()
+    if email:
+        c.execute("UPDATE usuarios SET papel='admin' WHERE email=?", (email,))
+    elif not c.execute("SELECT 1 FROM usuarios WHERE papel='admin'").fetchone():
+        c.execute("UPDATE usuarios SET papel='admin' WHERE id=(SELECT MIN(id) FROM usuarios)")
+    c.commit()
+
+
 def criar_sessao(usuario_id: int) -> str:
     token = secrets.token_urlsafe(32)
     expira = (datetime.now() + DURACAO_SESSAO).isoformat(timespec="seconds")
@@ -61,7 +75,7 @@ def usuario_da_sessao(token: str | None):
         return None
     return db.conn().execute(
         "SELECT u.* FROM sessoes s JOIN usuarios u ON u.id = s.usuario_id "
-        "WHERE s.token=? AND s.expira > ?",
+        "WHERE s.token=? AND s.expira > ? AND u.ativo = 1",
         (token, datetime.now().isoformat(timespec="seconds")),
     ).fetchone()
 

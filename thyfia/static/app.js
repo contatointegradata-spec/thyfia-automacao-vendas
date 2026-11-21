@@ -30,7 +30,9 @@ async function api(caminho, opcoes = {}) {
   if (!r.ok) {
     let msg = dados?.detail || "Algo deu errado. Tente novamente.";
     if (Array.isArray(msg)) msg = "Verifique os campos e tente novamente.";
-    const e = new Error(msg); e.status = r.status; throw e;
+    const e = new Error(msg); e.status = r.status;
+    if (r.status === 402 && typeof aoPlanoNecessario === "function") aoPlanoNecessario(msg);
+    throw e;
   }
   return dados;
 }
@@ -245,11 +247,13 @@ function entrarNoApp(eu, origem) {
   $("#usuario-email").textContent = eu.email;
   $("#avatar").textContent = primeiro[0].toUpperCase();
   $("#saudacao").textContent = `${saudacao()}, ${primeiro}! ✦`;
+  aplicarPlano(eu);
   aplicarStatusMl(eu.ml);
   aplicarPreferencias(eu.preferencias);
+  atualizarPassos();
   // reinicia a animação dos itens do menu
   $$(".menu-item").forEach((m) => { m.style.animation = "none"; void m.offsetWidth; m.style.animation = ""; });
-  irPara("gerar", true);
+  irPara("gerar", true);  // sem plano, o guarda do irPara leva para "Meu plano"
   mostrarTela("#tela-app", origem ? "revelando" : "entrando", origem);
   requestAnimationFrame(moverIndicador);
   if (eu.job_ativo) { estado.job = eu.job_ativo.id; abrirGerando(eu.job_ativo); }
@@ -267,7 +271,13 @@ function moverIndicador() {
 addEventListener("resize", moverIndicador);
 
 async function irPara(view, imediato = false) {
-  if (view === estado.view && !imediato) return;
+  const falta = typeof bloqueioDaView === "function" ? bloqueioDaView(view) : null;
+  if (falta) {  // tela de um plano que o usuário não tem → mostra os planos, destacando o necessário
+    plano.destaque = falta;
+    if (view !== "plano" && estado.view !== "plano") toast("Esse recurso faz parte de outro plano. Veja as opções.", "info");
+    view = "plano";
+  }
+  if (view === estado.view && !imediato) { if (view === "plano") carregarPlano(); return; }
   const atual = $(`#view-${estado.view}`), nova = $(`#view-${view}`);
   $$(".menu-item").forEach((m) => m.classList.toggle("ativo", m.dataset.view === view));
   moverIndicador();
@@ -284,6 +294,10 @@ async function irPara(view, imediato = false) {
   if (view === "cerebro") carregarCerebro();
   if (view === "publicacao") abrirPublicacao();
   if (view === "ajuda") carregarAjuda();
+  if (view === "plano") carregarPlano(falta ? falta : null);
+  if (view === "automacao") abrirAutomacao();
+  if (view === "admin") abrirAdmin();
+  if (view === "gerar") atualizarPassos();
   if (view === "gerar") setTimeout(() => !$("#busca-card").classList.contains("liberado") || $("#input-termo").focus({ preventScroll: true }), 500);
 }
 $$(".menu-item").forEach((m) => m.addEventListener("click", () => irPara(m.dataset.view)));
@@ -696,20 +710,26 @@ async function acompanharEnvioAuto(id) {
 
 // preferência "enviar automaticamente"
 function aplicarPreferencias(p = {}) {
-  const chk = $("#chk-auto-envio"), lbl = chk.closest("label");
-  chk.checked = !!p.auto_enviar;
-  chk.disabled = p.automacao_configurada === false;
+  const chk = $("#chk-auto-envio"), lbl = chk.closest("label"), chk2 = $("#chk-auto-envio2");
+  const liberado = !estado.liberados || estado.liberados.automacao;
+  chk.checked = !!p.auto_enviar; chk2.checked = !!p.auto_enviar;
+  chk.disabled = chk2.disabled = p.automacao_configurada === false;
+  lbl.hidden = !liberado;  // Plus não tem automação
+  const fim = $("#fim-envio"); if (fim) fim.hidden = !liberado;
   lbl.style.opacity = chk.disabled ? ".5" : "";
-  lbl.title = chk.disabled ? "Automação não configurada (defina N8N_WEBHOOK_URL e N8N_API_KEY no .env)"
-    : "Envia os links para o n8n (WhatsApp/Telegram) assim que a geração terminar";
+  lbl.title = chk.disabled ? "Configure seu WhatsApp em Automação para ligar o envio automático"
+    : "Envia os links para a automação (WhatsApp/Telegram) assim que a geração terminar";
+  if (typeof au !== "undefined" && au.cfg && estado.view === "automacao") renderAutomacao();
 }
-$("#chk-auto-envio").addEventListener("change", async (e) => {
+async function mudarAutoEnvio(e) {
   const quer = e.target.checked;
   try {
     aplicarPreferencias(await api("/api/preferencias", { body: { auto_enviar: quer } }));
     toast(quer ? "Envio automático ligado." : "Envio automático desligado.", "ok");
-  } catch (err) { e.target.checked = !quer; toast(err.message, "erro"); }
-});
+  } catch (err) { e.target.checked = !quer; toast(err.message, "erro"); if (err.status === 409) irPara("automacao"); }
+}
+$("#chk-auto-envio").addEventListener("change", mudarAutoEnvio);
+$("#chk-auto-envio2").addEventListener("change", mudarAutoEnvio);
 
 function erroGerando(job) {
   pararPolls();
@@ -771,6 +791,7 @@ function renderEnvioHist(box, j) {
     : j.envio_status === "erro" ? resumoEnvio(j) : "";
   det.title = det.textContent;
   const btn = $("button", box);
+  if (estado.liberados && !estado.liberados.automacao) { btn.hidden = true; $(".selo", box).hidden = true; }
   btn.textContent = j.envio_status === "erro" ? "↻ Tentar de novo"
     : j.envio_status === "enviado" ? "↻ Reenviar" : "➜ Enviar para automação";
   const semLinks = !(j.links ?? j.ok);  // links salvos no banco
@@ -784,7 +805,7 @@ function renderEnvioHist(box, j) {
 }
 
 /* ------------------------------------------------------------------ AGENTE DE PUBLICAÇÃO */
-const pub = { item: null, editando: null, foto: "", fotoLocal: "", fotoProduto: "", user: "achei_baratinho_oficial", ig: null };
+const pub = { item: null, editando: null, foto: "", fotoLocal: "", fotoProduto: "", user: "sua_conta", ig: null };
 const ROTULO_PUB = { rascunho: "rascunho", agendado: "agendado", publicando: "publicando…", publicado: "publicado", erro: "erro", cancelado: "cancelado" };
 
 function abrirPublicacao() { statusInstagram(); carregarPalavras(); carregarPublicacoes(); }
@@ -797,8 +818,8 @@ async function statusInstagram(atualizar = false) {
     pub.ig = s;
     $("#pub-aviso-txt").textContent = s.aviso;
     if (!s.configurado) {
-      box.classList.add("off"); conta.textContent = "Instagram não configurado";
-      lim.textContent = "Defina IG_ACCESS_TOKEN e IG_USER_ID no .env e reinicie o ThyfIA.";
+      box.classList.add("off"); conta.textContent = "Instagram não conectado";
+      lim.textContent = "Siga o passo a passo abaixo para conectar a sua conta (leva uns 10 minutos).";
     } else if (s.erro) {
       box.classList.add("erro"); conta.textContent = "Não consegui acessar a conta"; lim.textContent = s.erro;
     } else {
@@ -807,6 +828,7 @@ async function statusInstagram(atualizar = false) {
       lim.textContent = s.limite ? `${s.limite.restante} de ${s.limite.total} publicações disponíveis nas próximas 24h` : "";
     }
     lim.title = lim.textContent;
+    ajustarTelaInstagram(s);
     $("#pv-user").textContent = "@" + pub.user; $("#pv-user2").textContent = pub.user;
   } catch (e) { conta.textContent = "Erro ao verificar a conta"; lim.textContent = e.message; }
 }

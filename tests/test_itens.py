@@ -174,6 +174,8 @@ class TestEnvioDoBanco(BaseBanco):
             job = app_mod.enviar_job("job1", self.u)
         self.assertEqual(urlopen.call_count, 1)
         corpo = corpos(urlopen)[0]
+        # multi-tenant: o n8n recebe também PARA QUEM divulgar (cliente)
+        self.assertEqual(corpo.pop("cliente")["id"], self.u["id"])
         self.assertEqual(corpo, {"keyword": "carregador", "links": [
             {"titulo": "Carregador A", "preco": 27.06, "url": "https://ml/p/1", "afiliado": "https://meli.la/a",
              "keyword": "carregador"},

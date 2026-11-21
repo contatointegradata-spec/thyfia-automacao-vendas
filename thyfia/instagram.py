@@ -15,6 +15,8 @@ Teste manual da conta (só lê, não publica nada):
 
 from __future__ import annotations
 
+import contextlib
+import contextvars
 import logging
 import os
 import re
@@ -30,7 +32,21 @@ VERSAO_PADRAO = "v21.0"
 TIMEOUT = 30
 NAO_CONFIGURADO = "Instagram não configurado"
 
-_host_ativo: str | None = None  # host que respondeu em validar_conta()
+_hosts_ativos: dict[str, str] = {}  # IG user id → host que respondeu em validar_conta()
+# credenciais do cliente em uso nesta thread/requisição (multi-tenant). Sem isso, vale o .env (modo local).
+_cred: contextvars.ContextVar[dict | None] = contextvars.ContextVar("thyfia_ig_cred", default=None)
+
+
+@contextlib.contextmanager
+def credenciais(token: str, user_id: str, host: str | None = None, versao: str | None = None):
+    """Usa o token/ID deste cliente em tudo o que for chamado dentro do bloco."""
+    t = _cred.set({"token": (token or "").strip(), "user_id": (user_id or "").strip(),
+                   "host": ((host or "").strip() or HOST_PADRAO).rstrip("/"),
+                   "versao": (versao or "").strip() or os.environ.get("IG_GRAPH_VERSION", "").strip() or VERSAO_PADRAO})
+    try:
+        yield
+    finally:
+        _cred.reset(t)
 
 
 class ErroInstagram(Exception):
@@ -46,6 +62,9 @@ class ErroInstagram(Exception):
 
 # --------------------------------------------------------------------------- configuração
 def config() -> dict:
+    c = _cred.get()
+    if c is not None:
+        return dict(c)
     return {
         "token": (os.environ.get("IG_ACCESS_TOKEN") or "").strip(),
         "user_id": (os.environ.get("IG_USER_ID") or "").strip(),
@@ -73,7 +92,7 @@ _CODIGOS = {190: "token", 102: "token", 463: "token", 467: "token",
             4: "limite", 17: "limite", 32: "limite", 613: "limite", 9: "limite",
             9004: "imagem", 36000: "imagem", 36001: "imagem", 36003: "imagem", 36004: "imagem"}
 _DICAS = {
-    "token": "O token do Instagram é inválido ou expirou — gere um novo e atualize IG_ACCESS_TOKEN no .env.",
+    "token": "O token do Instagram é inválido ou expirou — gere um novo token e atualize em Agente de Publicação → Conectar Instagram.",
     "limite": "Muitas chamadas ao Instagram em pouco tempo. Aguarde alguns minutos.",
     "imagem": "O Instagram não conseguiu usar a imagem (precisa ser um JPEG público, proporção entre 4:5 e 1.91:1).",
 }
@@ -99,8 +118,8 @@ def _req(metodo: str, caminho: str, params: dict | None = None, host: str | None
          timeout: int = TIMEOUT) -> dict:
     c = config()
     if not (c["token"] and c["user_id"]):
-        raise ErroInstagram(NAO_CONFIGURADO + " (defina IG_ACCESS_TOKEN e IG_USER_ID no .env).", "config")
-    url = f"{(host or _host_ativo or c['host']).rstrip('/')}/{c['versao']}/{caminho.lstrip('/')}"
+        raise ErroInstagram(NAO_CONFIGURADO + " (conecte sua conta em Agente de Publicação).", "config")
+    url = f"{(host or _hosts_ativos.get(c['user_id']) or c['host']).rstrip('/')}/{c['versao']}/{caminho.lstrip('/')}"
     dados = {**(params or {}), "access_token": c["token"]}
     try:
         if metodo == "GET":
@@ -127,7 +146,6 @@ def _req(metodo: str, caminho: str, params: dict | None = None, host: str | None
 def validar_conta() -> dict:
     """GET /{IG_USER_ID}?fields=id,username. Se falhar no host configurado, tenta o
     graph.instagram.com. Retorna {id, username, host, host_padrao}."""
-    global _host_ativo
     c = config()
     hosts = [c["host"]] + ([HOST_INSTAGRAM] if c["host"] != HOST_INSTAGRAM else [])
     erros: list[ErroInstagram] = []
@@ -139,7 +157,7 @@ def validar_conta() -> dict:
                 raise
             erros.append(e)
             continue
-        _host_ativo = h
+        _hosts_ativos[c["user_id"]] = h
         if h != c["host"]:
             log.info("Instagram: a conta respondeu em %s (não em %s).", h, c["host"])
         return {"id": str(d.get("id", "")), "username": d.get("username", ""),

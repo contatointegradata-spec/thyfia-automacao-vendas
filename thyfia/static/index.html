@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/styles.css">
+  <link rel="stylesheet" href="/static/styles.css?v=3">
 </head>
 <body>
 
@@ -116,14 +116,18 @@
     </div>
     <nav class="menu" id="menu">
       <span class="menu-ind"></span>
-      <button class="menu-item ativo" data-view="gerar"><span class="mi">✦</span><span>Gerar links</span></button>
-      <button class="menu-item" data-view="integracoes"><span class="mi">⌁</span><span>Integrações</span><span class="dot-status" id="dot-ml"></span></button>
-      <button class="menu-item" data-view="publicacao"><span class="mi">◈</span><span>Agente de Publicação</span></button>
-      <button class="menu-item" data-view="historico"><span class="mi">◷</span><span>Histórico</span></button>
-      <button class="menu-item" data-view="cerebro"><span class="mi">◉</span><span>Cérebro</span></button>
+      <button class="menu-item ativo" data-view="gerar"><span class="mi">✦</span><span>Gerar links</span><span class="cadeado" aria-hidden="true">🔒</span></button>
+      <button class="menu-item" data-view="integracoes"><span class="mi">⌁</span><span>Integrações</span><span class="dot-status" id="dot-ml"></span><span class="cadeado" aria-hidden="true">🔒</span></button>
+      <button class="menu-item" data-view="automacao"><span class="mi">⚡</span><span>Automação</span><span class="selo-plano">Pro</span><span class="cadeado" aria-hidden="true">🔒</span></button>
+      <button class="menu-item" data-view="publicacao"><span class="mi">◈</span><span>Agente de Publicação</span><span class="selo-plano">Premium</span><span class="cadeado" aria-hidden="true">🔒</span></button>
+      <button class="menu-item" data-view="historico"><span class="mi">◷</span><span>Histórico</span><span class="cadeado" aria-hidden="true">🔒</span></button>
+      <button class="menu-item" data-view="cerebro"><span class="mi">◉</span><span>Cérebro</span><span class="cadeado" aria-hidden="true">🔒</span></button>
+      <button class="menu-item" data-view="plano"><span class="mi">★</span><span>Meu plano</span><span class="dot-status" id="dot-plano"></span></button>
       <button class="menu-item" data-view="ajuda"><span class="mi">?</span><span>Ajuda</span></button>
+      <button class="menu-item" data-view="admin" id="menu-admin" hidden><span class="mi">⚙</span><span>Administração</span></button>
     </nav>
     <div class="sidebar-rodape">
+      <button class="plano-chip" id="plano-chip" data-ir="plano" title="Ver meu plano"><span class="pc-nome" id="pc-nome">Sem plano</span><span class="pc-sub" id="pc-sub">Escolha um plano</span></button>
       <div class="usuario">
         <div class="avatar" id="avatar">K</div>
         <div class="usuario-info"><strong id="usuario-nome">—</strong><small id="usuario-email">—</small></div>
@@ -140,6 +144,12 @@
         <h1>O que vamos <span class="grad">divulgar</span> hoje?</h1>
         <p class="muted">Digite a palavra-chave do produto. A ThyfIA cuida do resto.</p>
       </header>
+
+      <button class="onb-banner" id="onb-banner" data-ir="plano" hidden>
+        <span class="onb-anel"><svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="15" class="anel-fundo"/><circle cx="18" cy="18" r="15" class="anel-valor" id="onb-anel"/></svg><b id="onb-num">0/0</b></span>
+        <span class="onb-txt"><strong id="onb-titulo">Primeiros passos</strong><small id="onb-sub"></small></span>
+        <span class="onb-seta">Ver passo a passo ›</span>
+      </button>
 
       <div class="busca-card" id="busca-card">
         <div class="bloqueio" id="bloqueio-ml">
@@ -220,14 +230,44 @@
         <p class="muted">O agente escolhe o melhor item e prepara o post. Você revisa e aprova — nada é publicado sem o seu clique.</p>
       </header>
 
+      <section class="painel ig-wizard" id="ig-wizard" hidden>
+        <div class="wz-topo">
+          <div>
+            <h3>Conectar seu Instagram / Meta</h3>
+            <p class="muted">Você cria um app seu na Meta (grátis, ~10 minutos) e cola aqui o token. Assim os posts saem da <b>sua</b> conta — a ThyfIA nunca vê a sua senha.</p>
+          </div>
+          <button class="btn btn-fantasma btn-mini" id="btn-wz-fechar" title="Fechar" hidden>✕</button>
+        </div>
+        <div class="wz-progresso"><span id="wz-barra"></span></div>
+        <p class="mini" id="wz-contagem"></p>
+        <div class="wz-lista" id="wz-lista"></div>
+        <form class="wz-conectar" id="form-ig" autocomplete="off" novalidate>
+          <h4>Último passo: colar os dados aqui</h4>
+          <label class="pub-campo"><span>ID da conta do Instagram</span>
+            <input type="text" id="ig-in-id" inputmode="numeric" placeholder="ex.: 17841450161230918" autocomplete="off">
+          </label>
+          <label class="pub-campo"><span>Token de acesso</span>
+            <span class="senha-wrap"><input type="password" id="ig-in-token" placeholder="Cole o token inteiro" autocomplete="off" spellcheck="false"><button type="button" class="olho" id="ig-olho" aria-label="Mostrar token">👁</button></span>
+          </label>
+          <p class="mini">🔒 O token é guardado <b>criptografado</b> e nunca volta para o navegador. A ThyfIA só salva depois de a Meta confirmar que ele funciona.</p>
+          <p class="envio-msg" id="ig-msg" role="status" aria-live="polite"></p>
+          <div class="wz-acoes">
+            <button class="btn btn-primario" type="submit" id="btn-ig-conectar"><span class="btn-txt">Validar e conectar</span><span class="spinner"></span></button>
+            <button class="btn btn-fantasma" type="button" id="btn-ig-remover" hidden>Desconectar conta</button>
+          </div>
+        </form>
+      </section>
+
       <div class="ig-status" id="ig-status">
         <div class="ig-logo">IG</div>
         <div class="ig-info"><strong id="ig-conta">Verificando a conta…</strong><small id="ig-limite"></small></div>
+        <button class="btn btn-fantasma btn-mini" id="btn-ig-conectar-abrir" hidden>Conectar</button>
+        <button class="btn btn-fantasma btn-mini" id="btn-ig-trocar" hidden title="Trocar conta ou renovar o token">Trocar conta / token</button>
         <button class="btn btn-fantasma btn-mini" id="btn-ig-atualizar" title="Verificar de novo">↻</button>
       </div>
-      <p class="pub-aviso">⏰ <span id="pub-aviso-txt">O ThyfIA precisa estar rodando no horário agendado para publicar.</span></p>
+      <p class="pub-aviso" id="pub-aviso">⏰ <span id="pub-aviso-txt">O ThyfIA precisa estar rodando no horário agendado para publicar.</span></p>
 
-      <div class="painel pub-controles">
+      <div class="painel pub-controles" id="pub-controles">
         <label class="pub-campo"><span>Palavra-chave</span>
           <select id="pub-keyword"><option value="">Mais recente</option></select>
         </label>
@@ -247,12 +287,12 @@
         </div>
         <div class="pub-editor-grid">
           <div class="ig-preview">
-            <div class="ig-preview-topo"><span class="ig-avatar"></span><b id="pv-user">@achei_baratinho_oficial</b></div>
+            <div class="ig-preview-topo"><span class="ig-avatar"></span><b id="pv-user">@sua_conta</b></div>
             <div class="ig-preview-img" id="pv-img-box">
               <img id="pv-img" alt="Prévia da imagem do post" hidden>
               <div class="pv-sem-foto" id="pv-sem-foto">Sem foto<br><small>envie uma imagem ao lado</small></div>
             </div>
-            <p class="ig-preview-legenda"><b id="pv-user2">achei_baratinho_oficial</b> <span id="pv-legenda"></span></p>
+            <p class="ig-preview-legenda"><b id="pv-user2">sua_conta</b> <span id="pv-legenda"></span></p>
           </div>
           <div class="pub-form">
             <div class="pub-foto">
@@ -327,6 +367,134 @@
           </div>
         </div>
       </div>
+    </div>
+
+    <!-- ---------- Meu plano ---------- -->
+    <div class="view" id="view-plano" hidden>
+      <header class="view-topo">
+        <h1>Meu <span class="grad">plano</span></h1>
+        <p class="muted" id="plano-sub">Escolha o plano ideal para o seu momento. Você pode subir de plano quando quiser.</p>
+      </header>
+      <div class="pl-aviso" id="pl-aviso" hidden></div>
+      <section class="painel pl-status" id="pl-status"></section>
+      <div class="pl-espera" id="pl-espera" hidden>
+        <span class="pl-espera-ic"></span>
+        <div><strong>Aguardando a confirmação do pagamento…</strong><small>Pix e cartão confirmam em segundos; boleto pode levar até 2 dias úteis. Esta tela libera sozinha.</small></div>
+        <button class="btn btn-fantasma btn-mini" id="btn-pl-verificar">Já paguei — verificar</button>
+      </div>
+      <div class="pl-grade" id="pl-grade"></div>
+      <p class="pl-nota" id="pl-nota"></p>
+      <section class="painel" id="pl-passos-box" hidden>
+        <div class="pl-passos-topo"><h3>Seu passo a passo</h3><span class="status-pill" id="pl-passos-pill"></span></div>
+        <div class="pl-progresso"><span id="pl-passos-barra"></span></div>
+        <ol class="pl-passos" id="pl-passos"></ol>
+      </section>
+      <section class="painel">
+        <h3>Compare os planos</h3>
+        <div class="pl-tabela-wrap"><table class="pl-tabela" id="pl-tabela"></table></div>
+      </section>
+      <section class="painel pl-faq">
+        <h3>Perguntas frequentes</h3>
+        <details><summary>Como o plano é liberado depois do pagamento?</summary><p>Assim que a Kiwify confirma o pagamento, ela avisa a ThyfIA e o seu plano é liberado automaticamente — normalmente em poucos segundos. Para isso, use na compra o <b>mesmo e-mail</b> da sua conta ThyfIA.</p></details>
+        <details><summary>Comprei com outro e-mail. E agora?</summary><p>Fale com o suporte informando o e-mail usado na compra e o e-mail da sua conta: o administrador vincula o plano manualmente.</p></details>
+        <details><summary>Posso mudar de plano?</summary><p>Pode. Para subir (Plus → Pro → Premium) basta assinar o plano maior; ele passa a valer assim que o pagamento é confirmado.</p></details>
+        <details><summary>E se eu cancelar?</summary><p>Você continua com acesso até o fim do período já pago. Depois disso, os recursos do plano são bloqueados, mas o seu histórico e as suas configurações ficam guardados.</p></details>
+        <details><summary>Preciso entender de n8n ou de programação?</summary><p>Não. Tudo é configurado aqui, em tela, com passo a passo: Mercado Livre, WhatsApp, Telegram e Instagram.</p></details>
+      </section>
+    </div>
+
+    <!-- ---------- Automação (Pro) ---------- -->
+    <div class="view" id="view-automacao" hidden>
+      <header class="view-topo">
+        <h1>Auto<span class="grad">mação</span></h1>
+        <p class="muted">Configure aonde as suas ofertas chegam. A ThyfIA cuida do resto: sorteia a categoria, monta a mensagem e divulga nos horários certos.</p>
+      </header>
+
+      <div class="au-resumo" id="au-resumo"></div>
+
+      <section class="painel au-passo" id="au-p1">
+        <div class="au-num">1</div>
+        <div class="au-corpo">
+          <h3>Seu WhatsApp <span class="obrig">obrigatório</span></h3>
+          <p class="muted">É o número que recebe as ofertas prontas (com foto, título, preço e link). É só encaminhar a mensagem para o seu canal ou grupo de divulgação.</p>
+          <form class="au-form" id="form-whats" autocomplete="off" novalidate>
+            <label class="pub-campo"><span>Número com DDD</span>
+              <input type="tel" id="au-whats" inputmode="tel" placeholder="(34) 99999-9999" autocomplete="tel">
+            </label>
+            <p class="mini" id="au-whats-prev"></p>
+            <div class="au-acoes">
+              <button class="btn btn-primario" type="submit" id="btn-au-salvar"><span class="btn-txt">Salvar número</span><span class="spinner"></span></button>
+              <button class="btn btn-fantasma" type="button" id="btn-au-teste-whats" hidden><span class="btn-txt">Enviar mensagem de teste</span><span class="spinner"></span></button>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <section class="painel au-passo" id="au-p2">
+        <div class="au-num">2</div>
+        <div class="au-corpo">
+          <h3>Canal do Telegram <span class="opc">opcional</span></h3>
+          <p class="muted">Se você tem um canal no Telegram, a ThyfIA publica a mesma oferta lá, com foto e botão “Ver oferta”.</p>
+          <ol class="passos au-lista">
+            <li>No Telegram, crie um <b>canal</b> (ou use o seu) e defina um <b>@ público</b>.</li>
+            <li>Abra <b>Administradores → Adicionar administrador</b> e escolha o bot <b id="au-bot">da ThyfIA</b>.</li>
+            <li>Deixe ligada a permissão <b>Publicar mensagens</b> e confirme.</li>
+            <li>Digite o @ do canal abaixo, salve e clique em <b>Enviar teste</b>.</li>
+          </ol>
+          <form class="au-form" id="form-tg" autocomplete="off" novalidate>
+            <label class="pub-campo"><span>@ do canal</span>
+              <input type="text" id="au-tg" placeholder="@minhasofertas" autocomplete="off" autocapitalize="none" spellcheck="false">
+            </label>
+            <div class="au-acoes">
+              <button class="btn btn-primario" type="submit" id="btn-au-salvar-tg"><span class="btn-txt">Salvar canal</span><span class="spinner"></span></button>
+              <button class="btn btn-fantasma" type="button" id="btn-au-teste-tg" hidden><span class="btn-txt">Enviar teste ao canal</span><span class="spinner"></span></button>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <section class="painel au-passo" id="au-p3">
+        <div class="au-num">3</div>
+        <div class="au-corpo">
+          <h3>Envio dos links</h3>
+          <p class="muted">Depois de gerar links, você envia para a fila da automação. Escolha como prefere:</p>
+          <label class="auto-envio au-auto">
+            <input type="checkbox" id="chk-auto-envio2">
+            <span class="auto-caixa" aria-hidden="true"></span>
+            <span>Enviar <b>automaticamente</b> assim que cada geração terminar</span>
+          </label>
+          <p class="mini">Prefere decidir caso a caso? Deixe desligado e use o botão <b>Enviar para automação</b> no fim da geração (ou no Histórico).</p>
+          <p class="envio-msg" id="au-msg" role="status" aria-live="polite"></p>
+        </div>
+      </section>
+
+      <section class="painel">
+        <h3>Como a automação trabalha por você</h3>
+        <ol class="au-timeline">
+          <li><b>Você gera</b> os links de várias categorias (ex.: carregador, capinha, fone).</li>
+          <li><b>A ThyfIA envia</b> tudo para a fila da sua conta na automação. Links repetidos são ignorados.</li>
+          <li><b>De 30 em 30 minutos, das 08h às 21h</b>, a automação sorteia uma <b>categoria</b> e depois uma oferta dela — nenhuma categoria domina.</li>
+          <li><b>A oferta chega pronta</b> no seu WhatsApp (e no Telegram, se você ligou) e é marcada como enviada.</li>
+        </ol>
+      </section>
+    </div>
+
+    <!-- ---------- Administração ---------- -->
+    <div class="view" id="view-admin" hidden>
+      <header class="view-topo">
+        <h1>Admi<span class="grad">nistração</span></h1>
+        <p class="muted">Área do dono da plataforma: clientes, pagamentos e configurações. Só você enxerga isto.</p>
+      </header>
+      <div class="ad-abas" id="ad-abas" role="tablist">
+        <button class="ad-aba ativo" data-aba="resumo">Visão geral</button>
+        <button class="ad-aba" data-aba="usuarios">Clientes</button>
+        <button class="ad-aba" data-aba="pagamentos">Pagamentos (Kiwify)</button>
+        <button class="ad-aba" data-aba="config">Configurações</button>
+      </div>
+      <div class="ad-painel" id="ad-resumo"></div>
+      <div class="ad-painel" id="ad-usuarios" hidden></div>
+      <div class="ad-painel" id="ad-pagamentos" hidden></div>
+      <div class="ad-painel" id="ad-config" hidden></div>
     </div>
 
     <!-- ---------- Ajuda ---------- -->
@@ -468,6 +636,7 @@
   </defs>
 </svg>
 
-<script src="/static/app.js"></script>
+<script src="/static/app.js?v=3"></script>
+<script src="/static/planos.js?v=3"></script>
 </body>
 </html>
