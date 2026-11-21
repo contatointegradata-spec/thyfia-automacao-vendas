@@ -77,9 +77,53 @@ async function conectar() {
   });
 }
 
+// ---- busca de produtos no navegador da própria pessoa
+// O Mercado Livre não entrega a página de resultados ao IP do servidor; no navegador da pessoa, com a
+// conta dela, entrega normalmente. Aqui só lemos a página de resultados e mandamos os cartões dos produtos.
+const POR_PAGINA = 48;
+const MARCA = '"polycard":{';
+
+function urlBusca(termo, pagina) {
+  const slug = encodeURIComponent(termo.trim().replace(/\s+/g, "-"));
+  return pagina === 0
+    ? `https://lista.mercadolivre.com.br/${slug}`
+    : `https://lista.mercadolivre.com.br/${slug}_Desde_${pagina * POR_PAGINA + 1}_NoIndex_True`;
+}
+
+// guarda só o começo de cada cartão (o suficiente para título, preço, link, vendas, nota e foto)
+function cortarCartoes(html) {
+  const t = html.replace(/\\\\"/g, '"').replace(/\\"/g, '"');  // o ML às vezes escapa o JSON
+  const partes = t.split(MARCA).slice(1);
+  return partes.map((p) => MARCA + p.slice(0, 6000)).join("\n");
+}
+
+async function buscarProdutos(termo, limite) {
+  const paginas = Math.min(4, Math.ceil((limite + 10) / POR_PAGINA));
+  let trechos = "", cartoes = 0;
+  for (let pg = 0; pg < paginas; pg++) {
+    const r = await fetch(urlBusca(termo, pg), { credentials: "include" });
+    if (!r.ok || /captcha|account-verification|\/jms\/|login/.test(r.url)) {
+      if (cartoes) break;
+      return { ok: false, erro: "O Mercado Livre pediu uma verificação. Abra o Mercado Livre neste navegador, faça uma busca e tente de novo." };
+    }
+    const cortado = cortarCartoes(await r.text());
+    const n = cortado ? cortado.split(MARCA).length - 1 : 0;
+    if (!n) break;
+    trechos += cortado + "\n";
+    cartoes += n;
+    if (cartoes >= limite + 10) break;
+  }
+  return cartoes ? { ok: true, trechos, cartoes } : { ok: false, erro: "Nenhum produto encontrado." };
+}
+
 chrome.runtime.onMessage.addListener((msg, _sender, responder) => {
   if (msg?.acao === "sincronizar") {
     coletarCookies().then((cookies) => responder({ ok: true, cookies }));
+    return true;
+  }
+  if (msg?.acao === "buscar") {
+    buscarProdutos(String(msg.termo || ""), Number(msg.limite) || 20)
+      .then(responder, (e) => responder({ ok: false, erro: String(e?.message || e) }));
     return true;
   }
   if (msg?.acao === "conectar") {

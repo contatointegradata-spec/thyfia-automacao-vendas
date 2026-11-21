@@ -353,7 +353,7 @@ function estadoModal(qual) {
 /* ---- extensão ThyfIA Conector (login no próprio navegador) ---- */
 const temExtensao = () => !!document.documentElement.dataset.thyfiaExt;
 
-function falarComExtensao(acao, tempo = 6 * 60 * 1000) {
+function falarComExtensao(acao, tempo = 6 * 60 * 1000, dados) {
   return new Promise((resolve, reject) => {
     const id = Math.random().toString(36).slice(2);
     const ouvir = (e) => {
@@ -363,7 +363,7 @@ function falarComExtensao(acao, tempo = 6 * 60 * 1000) {
     };
     const t = setTimeout(() => { removeEventListener("message", ouvir); reject(new Error("A extensão não respondeu.")); }, tempo);
     addEventListener("message", ouvir);
-    postMessage({ origem: "thyfia-pagina", id, acao }, location.origin);
+    postMessage({ origem: "thyfia-pagina", id, acao, dados }, location.origin);
   });
 }
 
@@ -554,7 +554,13 @@ $("#form-busca").addEventListener("submit", async (e) => {
   carregando(btn, true);
   try {
     await sincronizarSessao(); // usa a sessão mais recente do ML deste navegador
-    const { id } = await api("/api/jobs", { body: { termo, limite: estado.limite } });
+    // a busca de produtos roda neste navegador (o ML recusa a busca vinda do IP do servidor)
+    let trechos = null;
+    if (temExtensao()) {
+      try { trechos = (await falarComExtensao("buscar", 60000, { termo, limite: estado.limite })).trechos || null; }
+      catch { /* sem extensão atualizada/sem resultado: o servidor tenta sozinho */ }
+    }
+    const { id } = await api("/api/jobs", { body: { termo, limite: estado.limite, trechos } });
     estado.job = id;
     await espera(350);
     abrirGerando({ id, termo, status: "iniciando", total: 0, feitos: 0, ok: 0 });

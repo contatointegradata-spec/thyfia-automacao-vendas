@@ -339,7 +339,7 @@ def enviar_para_automacao(job_id: str, termo: str) -> dict:
     return resumo
 
 
-def executar_job(job_id: str, uid: int, termo: str, limite: int) -> None:
+def executar_job(job_id: str, uid: int, termo: str, limite: int, trechos: str | None = None) -> None:
     lock = _locks[uid]
     with lock:
         resultados: list[dict] = []
@@ -358,7 +358,10 @@ def executar_job(job_id: str, uid: int, termo: str, limite: int) -> None:
                 # 1) coleta (motor de busca dentro do linkbuilder) + cérebro
                 _atualizar_job(job_id, status="coletando")
                 try:
-                    produtos = motor_busca.buscar(page, termo, limite + 10)
+                    # 1ª opção: produtos lidos pela extensão no navegador da pessoa; senão o servidor busca
+                    produtos = motor_busca.extrair_produtos(trechos) if trechos else []
+                    if not produtos:
+                        produtos = motor_busca.buscar(page, termo, limite + 10)
                 except motor_busca.BuscaBloqueada:
                     # sem resultados ao vivo: usa o que a ThyfIA já conhece, se houver
                     produtos = cerebro.recuperar(termo, limite)

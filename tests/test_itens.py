@@ -162,6 +162,46 @@ class TestGeracao(BaseBanco):
         ws = load_workbook(arq).active
         self.assertEqual([c.value for c in ws[1]], CABECALHOS)
 
+    def test_usa_produtos_lidos_pela_extensao_sem_buscar_no_servidor(self):
+        self.criar_job("g3", status="iniciando")
+        trechos = (
+            '"polycard":{"metadata":{"id":"MLB111","url":"www.mercadolivre.com.br/whey-a/p/MLB111#pos"},'
+            '"title":{"text":"Whey A"},"prc":79.9,"sales":120}\n'
+            '"polycard":{"metadata":{"id":"MLB222","url":"www.mercadolivre.com.br/whey-b/p/MLB222"},'
+            '"title":{"text":"Whey B"},"prc":59.5}'
+        )
+        gerados = []
+
+        def gerar_link(page, url, capturados):
+            gerados.append(url)
+            return "https://meli.la/" + url[-6:]
+
+        with mock.patch.object(motor_ml, "navegador", navegador_falso), \
+             mock.patch.object(motor_ml, "_carregar_sessao"), \
+             mock.patch.object(motor_ml.ml, "escutar_rede"), \
+             mock.patch.object(motor_ml.ml, "gerar_link", side_effect=gerar_link), \
+             mock.patch.object(motor_ml.motor_busca, "buscar", side_effect=AssertionError("não deve buscar")), \
+             mock.patch.dict(os.environ, {"THYFIA_SALVAR_PLANILHA": "0"}):
+            motor_ml.executar_job("g3", 1, "whey", 2, trechos=trechos)
+
+        job = db.conn().execute("SELECT * FROM jobs WHERE id='g3'").fetchone()
+        self.assertEqual(job["status"], "concluido", job["erro"])
+        self.assertEqual(len(gerados), 2)
+        self.assertTrue(all("mercadolivre.com.br" in u for u in gerados))
+        self.assertEqual({i["titulo"] for i in itens.itens_do_job("g3")}, {"Whey A", "Whey B"})
+
+    def test_sem_trechos_ou_vazios_o_servidor_busca_sozinho(self):
+        self.criar_job("g4", status="iniciando")
+        prods = [{"titulo": "A", "preco": "10,00", "url": "https://www.mercadolivre.com.br/p/MLB9"}]
+        with mock.patch.object(motor_ml, "navegador", navegador_falso), \
+             mock.patch.object(motor_ml, "_carregar_sessao"), \
+             mock.patch.object(motor_ml.ml, "escutar_rede"), \
+             mock.patch.object(motor_ml.ml, "gerar_link", return_value="https://meli.la/z"), \
+             mock.patch.object(motor_ml.motor_busca, "buscar", return_value=prods) as busca, \
+             mock.patch.dict(os.environ, {"THYFIA_SALVAR_PLANILHA": "0"}):
+            motor_ml.executar_job("g4", 1, "carregador", 1, trechos="lixo sem cartões")
+        busca.assert_called_once()
+
 
 # --------------------------------------------------------------------------- envio
 class TestEnvioDoBanco(BaseBanco):

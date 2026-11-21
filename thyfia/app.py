@@ -94,6 +94,7 @@ class Login(BaseModel):
 class NovoJob(BaseModel):
     termo: str = Field(min_length=2, max_length=80)
     limite: int = Field(default=20, ge=1, le=50)
+    trechos: str | None = Field(default=None, max_length=3_000_000)  # cartões lidos pela extensão
 
 
 # --------------------------------------------------------------------------- helpers
@@ -290,7 +291,7 @@ def criar_job(dados: NovoJob, u=Depends(exige("gerar"))):
               (job_id, u["id"], termo, dados.limite))
     c.commit()
     threading.Thread(target=motor_ml.executar_job, args=(job_id, u["id"], termo, dados.limite),
-                     daemon=True).start()
+                     kwargs={"trechos": dados.trechos}, daemon=True).start()
     return {"id": job_id}
 
 
