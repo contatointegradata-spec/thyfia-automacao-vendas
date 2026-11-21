@@ -71,7 +71,7 @@ class TestMontarLinks(unittest.TestCase):
         item = automacao.montar_links([linha(1)])[0]
         self.assertEqual(item, {"titulo": "Carregador 1", "preco": 27.06,
                                 "url": "https://www.mercadolivre.com.br/p/MLB1",
-                                "afiliado": "https://meli.la/abc1"})
+                                "afiliado": "https://meli.la/abc1", "keyword": ""})
 
     def test_ignora_link_invalido(self):
         linhas = [linha(1), linha(2, link="NÃO GERADO"), linha(3, link=""),
@@ -86,6 +86,20 @@ class TestMontarLinks(unittest.TestCase):
 
     def test_remove_link_repetido(self):
         self.assertEqual(len(automacao.montar_links([linha(1), linha(1)])), 1)
+
+
+class TestKeywordPorItem(unittest.TestCase):
+    def test_cada_item_leva_a_sua_keyword(self):
+        linhas = [{**linha(1), "busca": "carregador"}, {**linha(2), "busca": " fone  bluetooth "}, linha(3)]
+        itens = automacao.montar_links(linhas, "padrao")
+        self.assertEqual([i["keyword"] for i in itens], ["carregador", "fone bluetooth", "padrao"])
+        # os campos de antes continuam iguais
+        self.assertEqual(list(itens[0]), ["titulo", "preco", "url", "afiliado", "keyword"])
+
+    def test_payload_mantem_keyword_no_topo_e_repete_em_cada_item(self):
+        payloads = automacao.montar_payloads("carregador", [linha(i) for i in range(60)])
+        self.assertTrue(all(p["keyword"] == "carregador" for p in payloads))
+        self.assertTrue(all(l["keyword"] == "carregador" for p in payloads for l in p["links"]))
 
 
 class TestLotes(unittest.TestCase):
@@ -200,7 +214,7 @@ class TestPlanilha(unittest.TestCase):
             itens = automacao.montar_links(automacao.ler_planilha(arq))
         self.assertEqual(itens, [{"titulo": "Carregador A", "preco": 27.06,
                                   "url": "https://www.mercadolivre.com.br/p/MLB1",
-                                  "afiliado": "https://meli.la/1Z2RsLz"}])
+                                  "afiliado": "https://meli.la/1Z2RsLz", "keyword": "carregador"}])
 
 
 if __name__ == "__main__":

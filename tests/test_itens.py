@@ -175,8 +175,10 @@ class TestEnvioDoBanco(BaseBanco):
         self.assertEqual(urlopen.call_count, 1)
         corpo = corpos(urlopen)[0]
         self.assertEqual(corpo, {"keyword": "carregador", "links": [
-            {"titulo": "Carregador A", "preco": 27.06, "url": "https://ml/p/1", "afiliado": "https://meli.la/a"},
-            {"titulo": "Carregador B", "url": "https://ml/p/2", "afiliado": "https://meli.la/b"},  # sem "preco"
+            {"titulo": "Carregador A", "preco": 27.06, "url": "https://ml/p/1", "afiliado": "https://meli.la/a",
+             "keyword": "carregador"},
+            {"titulo": "Carregador B", "url": "https://ml/p/2", "afiliado": "https://meli.la/b",
+             "keyword": "carregador"},  # sem "preco"
         ]})
         self.assertEqual(job["envio_status"], "enviado")
         self.assertEqual(job["envio_resumo"]["novos"], 2)
@@ -213,6 +215,9 @@ class TestEnvioDoBanco(BaseBanco):
         enviados = [(c["keyword"], [l["afiliado"] for l in c["links"]]) for c in corpos(urlopen)]
         self.assertEqual(enviados, [("carregador", ["https://meli.la/a", "https://meli.la/c"]),
                                     ("fone", ["https://meli.la/b"])])
+        # cada linha leva a categoria certa, igual à keyword do topo da sua chamada
+        for c in corpos(urlopen):
+            self.assertTrue(all(l["keyword"] == c["keyword"] for l in c["links"]))
         self.assertEqual(job["envio_resumo"]["novos"], 2)
 
 
@@ -247,7 +252,8 @@ class TestImportacao(BaseBanco):
         self.assertIsInstance(primeiro["preco"], float)
         self.assertEqual(primeiro["preco"], 27.06)
         self.assertEqual(primeiro["afiliado"], "https://meli.la/1Z2RsLz")
-        self.assertEqual(set(primeiro), {"titulo", "preco", "url", "afiliado"})
+        self.assertEqual(set(primeiro), {"titulo", "preco", "url", "afiliado", "keyword"})
+        self.assertEqual(primeiro["keyword"], "carregador")
 
     def test_le_uma_vez_so(self):
         arq = self.planilha([["21/11/2026 10:05", "carregador", "A", "1,00", "u", "https://meli.la/a"]])

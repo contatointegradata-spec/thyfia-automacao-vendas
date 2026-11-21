@@ -77,8 +77,9 @@ def _texto(valor) -> str:
     return re.sub(r"\s+", " ", str(valor or "")).strip()
 
 
-def montar_links(linhas: list[dict]) -> list[dict]:
-    """linhas: [{titulo, preco, url, link}] → itens do payload. Ignora quem não tem link."""
+def montar_links(linhas: list[dict], keyword_padrao: str = "") -> list[dict]:
+    """linhas: [{titulo, preco, url, link, busca?}] → itens do payload. Ignora quem não tem link.
+    Cada item leva "keyword" = a busca que o gerou (ou keyword_padrao, se a linha não tiver)."""
     itens, vistos = [], set()
     for l in linhas:
         afiliado = _texto(l.get("link") or l.get("afiliado"))
@@ -91,6 +92,7 @@ def montar_links(linhas: list[dict]) -> list[dict]:
             item["preco"] = preco
         item["url"] = _texto(l.get("url"))
         item["afiliado"] = afiliado
+        item["keyword"] = _texto(l.get("busca")) or _texto(keyword_padrao)
         itens.append(item)
     return itens
 
@@ -101,7 +103,8 @@ def lotes(itens: list, tamanho: int = TAMANHO_LOTE) -> list[list]:
 
 def montar_payloads(keyword: str, linhas: list[dict]) -> list[dict]:
     kw = _texto(keyword)
-    return [{"keyword": kw, "links": lote} for lote in lotes(montar_links(linhas))]
+    # "keyword" no topo continua sendo enviado (compatibilidade); cada link também leva o seu
+    return [{"keyword": kw, "links": lote} for lote in lotes(montar_links(linhas, kw))]
 
 
 def ler_planilha(caminho: str | Path) -> list[dict]:
