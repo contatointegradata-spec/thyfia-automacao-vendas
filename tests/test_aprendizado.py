@@ -135,6 +135,65 @@ class TestClassificadorQueAprende(Base):
         self.assertEqual((por["coisa estranha"]["nicho"], por["coisa estranha"]["nicho_origem"]), ("casa", "correção sua"))
 
 
+class TestGrupoNaBusca(Base):
+    """"Para qual grupo?" em Gerar links: o Cérebro sugere o nicho ao digitar e a escolha vale para a busca."""
+
+    def sugerir(self, busca):
+        return app_mod.nicho_sugerido(busca=busca, u={"id": 1})
+
+    def criar(self, termo, nicho="", pro=True):
+        dados = app_mod.NovoJob(termo=termo, nicho=nicho)
+        with mock.patch.object(app_mod.motor_ml, "status_ml", return_value={"status": "conectado"}), \
+                mock.patch.object(app_mod.planos, "tem_recurso", return_value=pro), \
+                mock.patch.object(app_mod.threading, "Thread"):
+            return app_mod.criar_job(dados, u={"id": 1})
+
+    def test_sugere_o_nicho_pelo_que_foi_digitado(self):
+        r = self.sugerir("furadeira de impacto")
+        self.assertEqual((r["nicho"], r["origem"], r["nome"]), ("ferramentas", "palavra-chave", "Ferramentas e jardim"))
+        self.assertEqual(self.sugerir("whey protein")["nicho"], "fit")
+
+    def test_sem_pista_ou_sem_texto_nao_sugere_nada(self):
+        for q in ("coisa estranha xyz", "", "   "):
+            r = self.sugerir(q)
+            self.assertIsNone(r["nicho"], q)
+            self.assertEqual((r["nome"], r["emoji"]), ("", ""))
+
+    def test_catalogo_nao_oferece_todos_os_nichos(self):
+        slugs = [n["slug"] for n in self.sugerir("")["catalogo"]]
+        self.assertIn("ferramentas", slugs)
+        self.assertNotIn("geral", slugs)
+
+    def test_correcao_anterior_aparece_como_sugestao(self):
+        aprendizado.corrigir_nicho(1, "coisa estranha", "casa")
+        self.assertEqual((self.sugerir("coisa estranha")["nicho"], self.sugerir("coisa estranha")["origem"]),
+                         ("casa", "correção sua"))
+
+    def test_a_escolha_ao_gerar_vira_a_correcao_da_busca(self):
+        self.criar("coisa estranha", "casa")
+        self.assertEqual(aprendizado.nicho_de(1, "coisa estranha"), ("casa", "correção sua"))
+
+    def test_automatico_nao_mexe_na_correcao_que_ja_existe(self):
+        aprendizado.corrigir_nicho(1, "coisa estranha", "casa")
+        self.criar("coisa estranha", "")
+        self.assertEqual(aprendizado.nicho_de(1, "coisa estranha"), ("casa", "correção sua"))
+        db.conn().execute("UPDATE jobs SET status='concluido'")  # a anterior terminou; senão o backend recusa a 2ª
+        db.conn().commit()
+        self.criar("coisa estranha", "geral")  # "todos os nichos" também não apaga nada
+        self.assertEqual(aprendizado.nicho_de(1, "coisa estranha"), ("casa", "correção sua"))
+
+    def test_nicho_invalido_e_recusado_antes_de_criar_a_geracao(self):
+        antes = db.conn().execute("SELECT COUNT(*) FROM jobs").fetchone()[0]
+        with self.assertRaises(HTTPException) as e:
+            self.criar("coisa estranha", "inexistente")
+        self.assertEqual(e.exception.status_code, 400)
+        self.assertEqual(db.conn().execute("SELECT COUNT(*) FROM jobs").fetchone()[0], antes)
+
+    def test_sem_plano_do_piloto_a_escolha_e_ignorada(self):
+        self.criar("coisa estranha", "casa", pro=False)
+        self.assertIsNone(aprendizado.nicho_de(1, "coisa estranha")[0])
+
+
 class TestFeedback(Base):
     def ensinar(self, dim_ok, dim_ruim, n=10, ok=8, ruim=1):
         for i in range(n):

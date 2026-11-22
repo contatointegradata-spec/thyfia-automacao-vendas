@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/styles.css?v=12">
+  <link rel="stylesheet" href="/static/styles.css?v=13">
 </head>
 <body>
 
@@ -181,6 +181,11 @@
               <button type="button" data-v="30">30</button>
               <button type="button" data-v="50">50</button>
             </div>
+          </div>
+          <div class="nicho-linha" id="nicho-linha" hidden>
+            <label for="sel-nicho" class="muted">Para qual grupo?</label>
+            <select id="sel-nicho" class="gn-sel" aria-describedby="nicho-dica"><option value="">Automático</option></select>
+            <small id="nicho-dica" class="mini" aria-live="polite"></small>
           </div>
           <label class="auto-envio" title="Envia os links para o n8n (WhatsApp/Telegram) assim que a geração terminar">
             <input type="checkbox" id="chk-auto-envio">
@@ -840,7 +845,7 @@
   </defs>
 </svg>
 
-<script src="/static/app.js?v=16"></script>
+<script src="/static/app.js?v=17"></script>
 <script src="/static/planos.js?v=7"></script>
 <script src="/static/piloto.js?v=6"></script>
 </body>
