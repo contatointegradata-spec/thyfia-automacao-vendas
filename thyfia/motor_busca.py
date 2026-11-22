@@ -57,6 +57,7 @@ def _preco_br(valor: str | None) -> str:
 RE_URL = re.compile(r'"metadata":\{"id":"(MLB\d+)".*?"url":"([^"]+)"', re.S)
 RE_TITULO = re.compile(r'"title":\{"text":"((?:[^"\\]|\\.)*)"')
 RE_PRECO = re.compile(r'"prc":([\d.]+)')
+RE_PRECO_ATUAL = re.compile(r'"current_price":\{"value":([\d.]+)')  # cartões sem "prc" trazem o preço aqui
 RE_VENDAS = re.compile(r'"sales":(\d+)')
 RE_NOTA = re.compile(r'"reviews_rating":([\d.]+)')
 # id de foto do ML: "608923-MLB120463575227_102026" (formato inconfundível, diferente do id do item)
@@ -81,7 +82,7 @@ def extrair_produtos(html: str) -> list[dict]:
             continue
         vistos.add(url)
         tit = RE_TITULO.search(bloco)
-        prc = RE_PRECO.search(bloco[:4000])
+        prc = RE_PRECO.search(bloco[:4000]) or RE_PRECO_ATUAL.search(bloco)
         vendas = RE_VENDAS.search(bloco[:4000])
         nota = RE_NOTA.search(bloco[:4000])
         foto = RE_FOTO.search(bloco)

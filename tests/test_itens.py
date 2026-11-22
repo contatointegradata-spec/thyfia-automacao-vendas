@@ -113,6 +113,12 @@ class FakePage:
     def wait_for_timeout(self, *a):
         pass
 
+    def on(self, *a):
+        pass
+
+    def evaluate(self, *a, **k):
+        return {"titulo": "Gerador", "campo": "", "botoes": ["Gerar"], "texto": ""}
+
 
 @contextmanager
 def navegador_falso(uid, visivel):
@@ -190,6 +196,12 @@ class TestGeracao(BaseBanco):
         self.assertTrue(all("mercadolivre.com.br" in u for u in gerados))
         self.assertEqual({i["titulo"] for i in itens.itens_do_job("g3")}, {"Whey A", "Whey B"})
 
+    def test_preco_vem_de_current_price_quando_nao_ha_prc(self):
+        from thyfia import motor_busca
+        trechos = ('"polycard":{"metadata":{"id":"MLB5","url":"www.mercadolivre.com.br/kit/p/MLB5"},'
+                   '"title":{"text":"Kit 12"},"price":{"current_price":{"value":89.9,"currency":"BRL"}}}')
+        self.assertEqual(motor_busca.extrair_produtos(trechos)[0]["preco"], "89,90")
+
     def test_sem_trechos_ou_vazios_o_servidor_busca_sozinho(self):
         self.criar_job("g4", status="iniciando")
         prods = [{"titulo": "A", "preco": "10,00", "url": "https://www.mercadolivre.com.br/p/MLB9"}]
@@ -201,6 +213,47 @@ class TestGeracao(BaseBanco):
              mock.patch.dict(os.environ, {"THYFIA_SALVAR_PLANILHA": "0"}):
             motor_ml.executar_job("g4", 1, "carregador", 1, trechos="lixo sem cartões")
         busca.assert_called_once()
+
+    def test_para_cedo_quando_nenhum_link_sai_em_5_produtos_seguidos(self):
+        self.criar_job("g5", status="iniciando")
+        produtos = [{"titulo": f"P{i}", "preco": "1,00", "url": f"https://www.mercadolivre.com.br/p/MLB{i}"} for i in range(20)]
+        chamadas = []
+
+        def gerar_link(page, url, capturados):
+            chamadas.append(url)
+            return None
+
+        with mock.patch.object(motor_ml, "navegador", navegador_falso), \
+             mock.patch.object(motor_ml, "_carregar_sessao"), \
+             mock.patch.object(motor_ml.ml, "escutar_rede"), \
+             mock.patch.object(motor_ml.ml, "gerar_link", side_effect=gerar_link), \
+             mock.patch.object(motor_ml.motor_busca, "buscar", return_value=produtos), \
+             mock.patch.dict(os.environ, {"THYFIA_SALVAR_PLANILHA": "0"}):
+            motor_ml.executar_job("g5", 1, "whey", 20)
+
+        self.assertEqual(len(chamadas), 5)  # não insiste nos 20 produtos
+        job = db.conn().execute("SELECT * FROM jobs WHERE id='g5'").fetchone()
+        self.assertEqual(job["status"], "erro")
+        self.assertIn("não respondeu", job["erro"])
+
+    def test_nao_para_se_ja_gerou_algum_link(self):
+        self.criar_job("g6", status="iniciando")
+        produtos = [{"titulo": f"P{i}", "preco": "1,00", "url": f"https://www.mercadolivre.com.br/p/MLB{i}"} for i in range(9)]
+
+        def gerar_link(page, url, capturados):
+            return "https://meli.la/ok" + url[-1] if url.endswith("MLB0") else None  # 1 ok, 8 produtos sem link
+
+        with mock.patch.object(motor_ml, "navegador", navegador_falso), \
+             mock.patch.object(motor_ml, "_carregar_sessao"), \
+             mock.patch.object(motor_ml.ml, "escutar_rede"), \
+             mock.patch.object(motor_ml.ml, "gerar_link", side_effect=gerar_link), \
+             mock.patch.object(motor_ml.motor_busca, "buscar", return_value=produtos), \
+             mock.patch.dict(os.environ, {"THYFIA_SALVAR_PLANILHA": "0"}):
+            motor_ml.executar_job("g6", 1, "whey", 9)
+
+        job = db.conn().execute("SELECT * FROM jobs WHERE id='g6'").fetchone()
+        self.assertEqual(job["status"], "concluido", job["erro"])
+        self.assertEqual(len(itens.itens_do_job("g6")), 9)
 
 
 # --------------------------------------------------------------------------- envio

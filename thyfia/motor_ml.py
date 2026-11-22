@@ -339,6 +339,20 @@ def enviar_para_automacao(job_id: str, termo: str) -> dict:
     return resumo
 
 
+def _diagnostico_pagina(page, rede: list[str]) -> str:
+    """Resumo do que a página do gerador de links mostra (para o log, quando nenhum link sai)."""
+    try:
+        info = page.evaluate("""() => {
+          const campo = document.querySelector("textarea, input[type='text'], input[type='url']");
+          const botoes = [...document.querySelectorAll("button")].map(b => (b.innerText || "").trim() + (b.disabled ? "[off]" : "")).filter(Boolean);
+          return {titulo: document.title, campo: campo ? (campo.value || "").slice(0, 80) : null,
+                  botoes: botoes.slice(0, 6), texto: (document.body.innerText || "").replace(/\\s+/g, " ").slice(0, 300)};
+        }""")
+    except Exception as e:  # página fechada etc.
+        info = {"erro": str(e)[:100]}
+    return f"url={page.url[:100]} info={info} rede={rede[-6:]}"
+
+
 def executar_job(job_id: str, uid: int, termo: str, limite: int, trechos: str | None = None) -> None:
     lock = _locks[uid]
     with lock:
@@ -348,6 +362,10 @@ def executar_job(job_id: str, uid: int, termo: str, limite: int, trechos: str | 
                 _carregar_sessao(ctx, uid)  # sessão do navegador da pessoa (extensão)
                 capturados: list[str] = []
                 ml.escutar_rede(page, capturados)
+                rede: list[str] = []  # últimas respostas de API do gerador (status + url), para diagnóstico
+                page.on("response", lambda r: rede.append(f"{r.status} {r.url[:90]}")
+                        if r.request.resource_type in ("xhr", "fetch")
+                        and any(x in r.url for x in ("affiliate", "afiliados", "link")) else None)
 
                 # tudo acontece numa única aba, parada no Gerador de Links
                 page.goto(ml.LINKBUILDER_URL, wait_until="domcontentloaded")
@@ -380,6 +398,7 @@ def executar_job(job_id: str, uid: int, termo: str, limite: int, trechos: str | 
 
                 # 2) geração dos links
                 ok = 0
+                falhas_seguidas = 0
                 for i, prod in enumerate(produtos, 1):
                     # (não abre a página do produto: o título já vem da busca/cérebro)
                     try:
@@ -395,6 +414,17 @@ def executar_job(job_id: str, uid: int, termo: str, limite: int, trechos: str | 
                             pass
                     if not link and "login" in page.url:
                         raise SessaoExpirada()
+                    if link:
+                        falhas_seguidas = 0
+                    else:
+                        falhas_seguidas += 1
+                        if falhas_seguidas == 1:
+                            _log.warning("Sem link para %s — %s", prod["url"][:80], _diagnostico_pagina(page, rede))
+                        if ok == 0 and falhas_seguidas >= 5:
+                            # nada saiu em 5 produtos seguidos: o gerador não está respondendo; não gasta minutos à toa
+                            raise RuntimeError(
+                                "O gerador de links do Mercado Livre não respondeu. Tente de novo em alguns minutos; "
+                                "se persistir, reconecte o Mercado Livre em Integrações.")
                     ok += bool(link)
                     resultados.append({**prod, "ok": bool(link)})
                     # grava o item no banco assim que o link é criado (fonte dos dados)
