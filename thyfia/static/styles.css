@@ -834,3 +834,66 @@ button { cursor: pointer; background: none; border: 0; }
 @media (max-width: 560px) { .ad-stats { grid-template-columns: 1fr; } .pl-passo { flex-wrap: wrap; } }
 .view.entrando .ad-stats .stat { opacity: 1; animation: none; }
 .pl-lista { align-content: start; }
+
+/* ---------- Agente de Publicação: canais → formatos ---------- */
+.pub-trilha { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 0 0 16px; font-size: 14px; color: var(--texto-3); }
+.pub-trilha button { font: inherit; font-weight: 700; color: var(--texto-2, var(--texto)); background: none; border: 0; padding: 4px 0; cursor: pointer; }
+.pub-trilha button:hover { color: var(--roxo); }
+.pub-trilha span:last-child { color: var(--texto); font-weight: 700; }
+.canal-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px; margin-bottom: 22px; }
+.canal-grid[hidden] { display: none; }
+.canal-card { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 12px; text-align: left; font: inherit; color: var(--texto); padding: 20px; border-radius: var(--raio); background: var(--superficie); border: 1px solid var(--borda); cursor: pointer; opacity: 0; animation: sobe .5s calc(var(--i) * .07s) var(--ease) forwards; transition: border-color .3s, transform .3s var(--ease), box-shadow .3s; }
+.canal-card:hover, .canal-card:focus-visible { border-color: rgba(139,92,246,.55); transform: translateY(-3px); box-shadow: 0 16px 40px -22px rgba(139,92,246,.8); outline: none; }
+.canal-icone { width: 46px; height: 46px; border-radius: 13px; display: grid; place-items: center; font-weight: 800; font-size: 18px; color: #fff; background: var(--superficie-2, #2a2740); }
+.canal-card.ig .canal-icone { background: linear-gradient(45deg, #f9ce34, #ee2a7b 55%, #6228d7); }
+.canal-card.fb .canal-icone { background: #1877f2; font-size: 24px; }
+.canal-card.wa .canal-icone { background: #25d366; }
+.canal-txt strong { display: block; font-size: 17px; margin-bottom: 4px; }
+.canal-txt small { color: var(--texto-3); line-height: 1.4; }
+.canal-selo, .badge-breve { font-size: 11.5px; font-weight: 700; padding: 3px 9px; border-radius: 999px; border: 1px solid var(--borda); color: var(--texto-3); white-space: nowrap; }
+.canal-selo { position: absolute; top: 14px; right: 14px; }
+.canal-selo.ok { color: var(--verde); border-color: rgba(52,211,153,.35); }
+.canal-selo.off { color: var(--ciano); border-color: rgba(34,211,238,.35); }
+.canal-selo.breve, .badge-breve { color: #fbbf24; border-color: rgba(251,191,36,.4); }
+.canal-selo.via, .badge-breve.via { color: var(--roxo); border-color: rgba(139,92,246,.45); }
+.ig-logo.fb { background: #1877f2; font-size: 22px; }
+.pub-breve, .pub-whats, .fb-conectar { margin-bottom: 20px; }
+.breve-topo { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+.breve-topo h3 { margin: 0; }
+.reels-modos { display: grid; gap: 10px; margin: 14px 0 18px; }
+.reels-modo { display: flex; gap: 12px; align-items: flex-start; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--borda); opacity: .75; }
+.reels-modo span { display: flex; flex-direction: column; gap: 2px; }
+.reels-modo small { color: var(--texto-3); }
+.fb-passos { margin: 12px 0 18px; padding: 10px 14px; border-radius: 12px; border: 1px solid var(--borda); }
+.fb-passos summary { cursor: pointer; font-weight: 700; }
+.fb-passos ol { margin: 10px 0 2px 18px; padding: 0; display: grid; gap: 8px; color: var(--texto-3); line-height: 1.5; }
+.wa-estado { display: grid; gap: 6px; margin: 14px 0 18px; }
+.wa-linha { margin: 0; font-size: 14px; color: var(--texto-3); }
+.wa-linha.ok { color: var(--verde); }
+
+/* editor: story (9:16) e carrossel */
+.ig-preview.story { max-width: 250px; }
+.ig-preview-img { position: relative; }
+.ig-preview-img.story { aspect-ratio: 9 / 16; }
+.pv-contagem { position: absolute; top: 10px; right: 10px; font-size: 12px; font-weight: 700; color: #fff; background: rgba(0,0,0,.6); padding: 3px 9px; border-radius: 999px; }
+.pub-carrossel { margin-bottom: 14px; }
+.carr-bandeja { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 10px; margin: 8px 0 12px; }
+.carr-foto { position: relative; aspect-ratio: 1; border-radius: 12px; overflow: hidden; background: #fff; border: 1px solid var(--borda); }
+.carr-foto img { width: 100%; height: 100%; object-fit: contain; }
+.carr-n { position: absolute; top: 6px; left: 6px; font-size: 11px; font-weight: 800; color: #fff; background: rgba(0,0,0,.65); padding: 2px 7px; border-radius: 999px; }
+.carr-acoes { position: absolute; inset: auto 0 0 0; display: flex; justify-content: space-between; gap: 2px; padding: 4px; background: linear-gradient(transparent, rgba(0,0,0,.7)); opacity: 0; transition: opacity .2s; }
+.carr-foto:hover .carr-acoes, .carr-foto:focus-within .carr-acoes { opacity: 1; }
+.carr-acoes button { font-size: 11px; color: #fff; background: rgba(255,255,255,.18); border: 0; border-radius: 7px; padding: 4px 7px; cursor: pointer; }
+.carr-acoes button:hover { background: rgba(251,113,133,.7); }
+@media (hover: none) { .carr-acoes { opacity: 1; } }
+
+/* ---------- Reels e Facebook no editor ---------- */
+.pub-reels { margin-bottom: 14px; }
+.reels-fonte { display: flex; flex-wrap: wrap; gap: 8px 18px; margin: 8px 0 12px; }
+.reels-fonte label, .reels-preco { display: flex; align-items: center; gap: 8px; font-size: 14px; cursor: pointer; }
+.reels-preco { margin-top: 10px; color: var(--texto-3); }
+#pub-ws-editor[hidden], #pub-ws-instagram[hidden], #pub-ws-facebook[hidden] { display: none; }
+.ig-preview-img video { width: 100%; height: 100%; object-fit: contain; background: #000; display: block; }
+.ig-preview-img video[hidden] { display: none; }
+#reels-msg.ok { color: var(--verde); }
+#reels-msg.erro { color: var(--vermelho); }

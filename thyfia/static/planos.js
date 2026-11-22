@@ -383,7 +383,6 @@ function ajustarTelaInstagram(s) {
   $("#btn-ig-remover").hidden = semConta;
   $("#btn-ig-atualizar").hidden = semConta;
   ["pub-controles", "pub-info", "pub-candidatos", "pub-aviso"].forEach((id) => { const el = $("#" + id); if (el) el.hidden = semConta; });
-  $("#pub-lista").closest(".painel").hidden = semConta;
   if (semConta) { mostrarWizardIg(true); $("#btn-wz-fechar").hidden = true; }
   else if (!$("#ig-wizard").hidden && $("#btn-wz-fechar").hidden) mostrarWizardIg(false);
 }
