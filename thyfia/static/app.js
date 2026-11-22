@@ -400,12 +400,17 @@ async function conectarViaExtensao(ov) {
   estadoModal("m-aguardando");
   $("#ml-instrucao").innerHTML = "Abrimos o Mercado Livre numa janelinha <b>deste navegador</b>. Se você já estiver logado, a conexão é automática — senão, é só entrar na sua conta por lá.";
   $("#ml-msg").textContent = "Verificando seu login…";
+  const dica = setTimeout(() => {
+    $("#ml-msg").textContent = "Ainda aguardando… procure a janelinha do Mercado Livre (pode estar atrás desta janela) e entre na sua conta.";
+  }, 20000);
   try {
     const r = await falarComExtensao("conectar");
+    clearTimeout(dica);
     $("#ml-msg").textContent = "Login reconhecido! Salvando conexão…";
     aplicarStatusMl(await api("/api/ml/sessao", { body: { cookies: r.cookies } }));
     await sucessoMl(ov);
   } catch (e) {
+    clearTimeout(dica);
     $("#ml-erro").textContent = e.message; estadoModal("m-erro");
   }
 }
