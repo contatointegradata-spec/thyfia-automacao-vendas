@@ -353,6 +353,79 @@ def _diagnostico_pagina(page, rede: list[str]) -> str:
     return f"url={page.url[:100]} info={info} rede={rede[-6:]}"
 
 
+# ---------------------------------------------------------------------------
+# Geração pelo navegador da pessoa (extensão). O Mercado Livre recusa o gerador de links quando a
+# requisição vem do IP do servidor, mas atende normalmente no navegador do cliente. Aqui o servidor só
+# prepara a lista de produtos e recebe os links; quem abre o gerador é a extensão.
+# ---------------------------------------------------------------------------
+def preparar_job_extensao(job_id: str, uid: int, termo: str, limite: int, trechos: str) -> None:
+    """Lê os cartões enviados pela extensão, ranqueia e guarda os produtos aguardando link."""
+    try:
+        _atualizar_job(job_id, status="coletando")
+        produtos = motor_busca.extrair_produtos(trechos) or cerebro.recuperar(termo, limite)
+        produtos = cerebro.ranquear(produtos)
+        if len(produtos) < limite:  # completa com o que a ThyfIA já conhece
+            produtos += cerebro.recuperar(termo, limite - len(produtos), excluir={p["url"] for p in produtos})
+        produtos = produtos[:limite]
+        if not produtos:
+            raise RuntimeError("Nenhum produto encontrado para essa busca.")
+        for prod in produtos:
+            itens.salvar_item(job_id, termo, prod.get("titulo", ""), prod.get("preco"), prod["url"], None,
+                              imagem=prod.get("imagem"), processado=0)
+        _atualizar_job(job_id, status="gerando", total=len(produtos), feitos=0, ok=0)
+    except Exception as e:
+        traceback.print_exc()
+        _atualizar_job(job_id, status="erro", erro=str(e)[:300] or "Erro inesperado.")
+
+
+def registrar_link(job_id: str, uid: int, url: str, link: str | None) -> None:
+    """Recebe o resultado de um produto (link gerado no navegador da pessoa, ou None). Quando todos
+    os produtos têm resultado, fecha a geração (aprendizado, cópia local, envio automático)."""
+    job = db.conn().execute("SELECT * FROM jobs WHERE id=? AND usuario_id=?", (job_id, uid)).fetchone()
+    if not job or job["status"] != "gerando":
+        return
+    if link and not ml.RE_LINK_AFILIADO.fullmatch(link):
+        link = None  # só aceita link de afiliado de verdade
+    itens.registrar_resultado(job_id, url, link)
+    total, com_link = itens.contar(job_id)
+    feitos = itens.processados(job_id)
+    _atualizar_job(job_id, feitos=feitos, ok=com_link)
+    if feitos < total:
+        return
+    termo = job["termo"]
+    auto = _quer_auto_envio(uid) and com_link > 0
+    campos = {"status": "concluido" if com_link else "erro", "finalizado": datetime.now().isoformat(timespec="seconds")}
+    if not com_link:
+        campos["erro"] = "Não foi possível gerar nenhum link. Confira se o Mercado Livre está conectado e tente de novo."
+    elif auto:
+        campos.update(envio_status="enviando", envio_erro=None)
+    # só uma resposta consegue fechar o job (duas respostas ao mesmo tempo não fecham duas vezes)
+    sets = ", ".join(f"{k}=?" for k in campos)
+    c = db.conn()
+    fechou = c.execute(f"UPDATE jobs SET {sets} WHERE id=? AND status='gerando'", (*campos.values(), job_id)).rowcount
+    c.commit()
+    if not fechou or not com_link:
+        return
+    resultados = [{"url": i["url_produto"], "titulo": i["titulo"], "preco": f"{i['preco']:.2f}".replace(".", ",") if i["preco"] is not None else "",
+                   "ok": bool(i["link_afiliado"])}
+                  for i in itens.itens_do_job(job_id)]
+    cerebro.aprender_busca(termo, resultados)
+    _atualizar_job(job_id, arquivo=_salvar_planilha_local(job_id, uid, termo), itens_importados=1)
+    if auto:  # falha no envio fica registrada no envio, não derruba a geração
+        try:
+            enviar_para_automacao(job_id, termo)
+        except automacao.ErroAutomacao:
+            pass
+
+
+def abortar_job(job_id: str, uid: int, mensagem: str) -> None:
+    """A extensão não conseguiu gerar (login pedido, gerador fora do ar…): encerra com a explicação."""
+    c = db.conn()
+    c.execute("UPDATE jobs SET status='erro', erro=? WHERE id=? AND usuario_id=? AND status IN ('coletando','gerando')",
+              ((mensagem or "A geração foi interrompida.")[:300], job_id, uid))
+    c.commit()
+
+
 def executar_job(job_id: str, uid: int, termo: str, limite: int, trechos: str | None = None) -> None:
     lock = _locks[uid]
     with lock:
@@ -454,6 +527,6 @@ def executar_job(job_id: str, uid: int, termo: str, limite: int, trechos: str | 
                            erro="Sua sessão do Mercado Livre expirou. Conecte sua conta novamente.")
         except Exception as e:
             traceback.print_exc()
-            if resultados:  # aproveita o que já foi feito
+            if any(r["ok"] for r in resultados):  # aproveita o que já foi feito (só se algo funcionou)
                 cerebro.aprender_busca(termo, resultados)
             _atualizar_job(job_id, status="erro", erro=str(e)[:300] or "Erro inesperado.")

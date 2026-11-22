@@ -1,5 +1,6 @@
 // ThyfIA Conector — abre o login do Mercado Livre numa janelinha deste navegador,
 // detecta quando a pessoa está logada e entrega a sessão para a ThyfIA.
+importScripts("gerador.js");  // gerarNaPagina(): gera um link na página do gerador de links
 const HUB = "https://www.mercadolivre.com.br/afiliados/hub?is_affiliate=true";
 const DOMINIOS = ["mercadolivre.com.br", "mercadolivre.com", "mercadolibre.com"];
 const TEMPO_LIMITE = 5 * 60 * 1000;
@@ -163,6 +164,49 @@ async function buscarProdutos(termo, limite) {
   return cartoes ? { ok: true, trechos, cartoes } : { ok: false, erro: "Nenhum produto encontrado." };
 }
 
+
+// ---- geração dos links de afiliado no navegador da própria pessoa
+// O gerador de links do ML também recusa o IP do servidor. Mantemos uma aba de fundo no gerador e,
+// para cada produto, preenchemos o campo e clicamos em "Gerar" — como a pessoa faria.
+const LINKBUILDER = "https://www.mercadolivre.com.br/afiliados/linkbuilder";
+let abaGerador = null;
+let fechaGerador = null;
+
+function fecharGerador() {
+  clearTimeout(fechaGerador);
+  if (abaGerador) chrome.tabs.remove(abaGerador).catch(() => {});
+  abaGerador = null;
+}
+
+async function prepararGerador() {
+  if (abaGerador) {
+    try {
+      const t = await chrome.tabs.get(abaGerador);
+      if (/afiliados\/linkbuilder/.test(t.url || "")) return abaGerador;
+    } catch { /* a aba foi fechada */ }
+    abaGerador = null;
+  }
+  const t = await chrome.tabs.create({ url: LINKBUILDER, active: false });
+  abaGerador = t.id;
+  await esperarCarregar(t.id);
+  return t.id;
+}
+
+async function gerarLink(url) {
+  clearTimeout(fechaGerador);
+  fechaGerador = setTimeout(fecharGerador, 90 * 1000);  // some sozinha se a página da ThyfIA for fechada
+  const tabId = await prepararGerador();
+  const [{ result }] = await chrome.scripting.executeScript({
+    target: { tabId }, world: "MAIN", func: gerarNaPagina, args: [url, 20000],
+  });
+  if (result?.ok) return { ok: true, link: result.link };
+  if (result?.erro === "login") {
+    fecharGerador();
+    return { ok: false, login: true, erro: "O Mercado Livre pediu o login ou uma verificação. Abra o Mercado Livre neste navegador, entre na sua conta e tente de novo." };
+  }
+  return { ok: true, link: null, motivo: result?.erro, detalhe: result?.detalhe };
+}
+
 chrome.runtime.onMessage.addListener((msg, _sender, responder) => {
   if (msg?.acao === "sincronizar") {
     coletarCookies().then((cookies) => responder({ ok: true, cookies }));
@@ -172,6 +216,16 @@ chrome.runtime.onMessage.addListener((msg, _sender, responder) => {
     buscarProdutos(String(msg.termo || ""), Number(msg.limite) || 20)
       .then(responder, (e) => responder({ ok: false, erro: String(e?.message || e) }));
     return true;
+  }
+  if (msg?.acao === "gerar") {
+    gerarLink(String(msg.url || ""))
+      .then(responder, (e) => responder({ ok: false, erro: String(e?.message || e) }));
+    return true;
+  }
+  if (msg?.acao === "gerar_fim") {
+    fecharGerador();
+    responder({ ok: true });
+    return false;
   }
   if (msg?.acao === "conectar") {
     conectar().then(responder, (e) => responder({ ok: false, erro: String(e?.message || e) }));

@@ -95,6 +95,16 @@ class NovoJob(BaseModel):
     termo: str = Field(min_length=2, max_length=80)
     limite: int = Field(default=20, ge=1, le=50)
     trechos: str | None = Field(default=None, max_length=3_000_000)  # cartões lidos pela extensão
+    na_extensao: bool = False  # os links são gerados no navegador da pessoa (extensão ≥ 1.4.0)
+
+
+class ResultadoLink(BaseModel):
+    url: str = Field(max_length=1000)
+    link: str | None = Field(default=None, max_length=300)
+
+
+class AbortarJob(BaseModel):
+    erro: str = Field(default="", max_length=300)
 
 
 # --------------------------------------------------------------------------- helpers
@@ -282,14 +292,23 @@ def ml_desconectar(u=Depends(usuario_atual)):
 def criar_job(dados: NovoJob, u=Depends(exige("gerar"))):
     if motor_ml.status_ml(u["id"])["status"] != "conectado":
         raise HTTPException(400, "Conecte sua conta do Mercado Livre primeiro.")
+    # geração feita pelo navegador que a pessoa fechou no meio nunca termina: libera depois de um tempo
+    c = db.conn()
+    c.execute(f"UPDATE jobs SET status='erro', erro='A geração foi interrompida (a página foi fechada). Tente de novo.' "
+              f"WHERE usuario_id=? AND status IN ({','.join('?' * len(ATIVOS))}) "
+              "AND criado < datetime('now','-20 minutes','localtime')", (u["id"], *ATIVOS))
+    c.commit()
     if _job_ativo(u["id"]):
         raise HTTPException(409, "Você já tem uma geração em andamento.")
     job_id = secrets.token_hex(8)
     termo = dados.termo.strip()
-    c = db.conn()
     c.execute("INSERT INTO jobs (id, usuario_id, termo, limite) VALUES (?,?,?,?)",
               (job_id, u["id"], termo, dados.limite))
     c.commit()
+    if dados.na_extensao and dados.trechos:
+        # os links saem do navegador da pessoa: o servidor só prepara a lista (sem abrir o Chrome)
+        motor_ml.preparar_job_extensao(job_id, u["id"], termo, dados.limite, dados.trechos)
+        return {"id": job_id, "modo": "extensao"}
     threading.Thread(target=motor_ml.executar_job, args=(job_id, u["id"], termo, dados.limite),
                      kwargs={"trechos": dados.trechos}, daemon=True).start()
     return {"id": job_id}
@@ -311,6 +330,27 @@ def _job_do_usuario(job_id: str, uid: int):
 
 @app.get("/api/jobs/{job_id}")
 def ver_job(job_id: str, u=Depends(usuario_atual)):
+    return _job_dict(_job_do_usuario(job_id, u["id"]))
+
+
+@app.get("/api/jobs/{job_id}/pendentes")
+def job_pendentes(job_id: str, u=Depends(usuario_atual)):
+    """Produtos que ainda aguardam o link (a extensão gera no navegador da pessoa)."""
+    _job_do_usuario(job_id, u["id"])
+    return {"urls": itens.pendentes(job_id)}
+
+
+@app.post("/api/jobs/{job_id}/links")
+def job_receber_link(job_id: str, dados: ResultadoLink, u=Depends(usuario_atual)):
+    _job_do_usuario(job_id, u["id"])
+    motor_ml.registrar_link(job_id, u["id"], dados.url, dados.link)
+    return _job_dict(_job_do_usuario(job_id, u["id"]))
+
+
+@app.post("/api/jobs/{job_id}/abortar")
+def job_abortar(job_id: str, dados: AbortarJob, u=Depends(usuario_atual)):
+    _job_do_usuario(job_id, u["id"])
+    motor_ml.abortar_job(job_id, u["id"], dados.erro)
     return _job_dict(_job_do_usuario(job_id, u["id"]))
 
 

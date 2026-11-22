@@ -256,6 +256,136 @@ class TestGeracao(BaseBanco):
         self.assertEqual(len(itens.itens_do_job("g6")), 9)
 
 
+class TestGeracaoNaExtensao(BaseBanco):
+    """Os links são gerados no navegador da pessoa; o servidor prepara a lista e recebe os resultados."""
+    TRECHOS = (
+        '"polycard":{"metadata":{"id":"MLB111","url":"www.mercadolivre.com.br/whey-a/p/MLB111"},'
+        '"title":{"text":"Whey A"},"prc":79.9}\n'
+        '"polycard":{"metadata":{"id":"MLB222","url":"www.mercadolivre.com.br/whey-b/p/MLB222"},'
+        '"title":{"text":"Whey B"},"prc":59.5}\n'
+        '"polycard":{"metadata":{"id":"MLB333","url":"www.mercadolivre.com.br/whey-c/p/MLB333"},'
+        '"title":{"text":"Whey C"},"prc":10.0}'
+    )
+
+    def preparar(self, job_id="x1", limite=3):
+        self.criar_job(job_id, termo="whey", status="iniciando")
+        with mock.patch.dict(os.environ, {"THYFIA_SALVAR_PLANILHA": "0"}):
+            motor_ml.preparar_job_extensao(job_id, 1, "whey", limite, self.TRECHOS)
+        return job_id
+
+    def job(self, job_id):
+        return db.conn().execute("SELECT * FROM jobs WHERE id=?", (job_id,)).fetchone()
+
+    def test_prepara_a_lista_sem_abrir_navegador(self):
+        with mock.patch.object(motor_ml, "navegador", side_effect=AssertionError("não deve abrir o Chrome")):
+            jid = self.preparar()
+        j = self.job(jid)
+        self.assertEqual((j["status"], j["total"], j["feitos"]), ("gerando", 3, 0))
+        self.assertEqual(len(itens.pendentes(jid)), 3)
+        # ainda sem link: aparecem como "não gerado"
+        self.assertEqual(itens.contar(jid), (3, 0))
+
+    def test_recebe_links_e_conclui_quando_todos_tem_resultado(self):
+        jid = self.preparar()
+        urls = itens.pendentes(jid)
+        with mock.patch.dict(os.environ, {"THYFIA_SALVAR_PLANILHA": "0"}):
+            motor_ml.registrar_link(jid, 1, urls[0], "https://meli.la/AAA")
+            motor_ml.registrar_link(jid, 1, urls[1], None)  # esse produto não gerou
+            self.assertEqual(self.job(jid)["status"], "gerando")
+            self.assertEqual((self.job(jid)["feitos"], self.job(jid)["ok"]), (2, 1))
+            motor_ml.registrar_link(jid, 1, urls[2], "https://meli.la/CCC")
+        j = self.job(jid)
+        self.assertEqual((j["status"], j["feitos"], j["ok"], j["total"]), ("concluido", 3, 2, 3))
+        self.assertEqual(itens.pendentes(jid), [])
+        links = sorted(i["link_afiliado"] or "" for i in itens.itens_do_job(jid))
+        self.assertEqual(links, ["", "https://meli.la/AAA", "https://meli.la/CCC"])
+
+    def test_resposta_repetida_ou_link_estranho_nao_conta(self):
+        jid = self.preparar()
+        urls = itens.pendentes(jid)
+        motor_ml.registrar_link(jid, 1, urls[0], "https://meli.la/AAA")
+        motor_ml.registrar_link(jid, 1, urls[0], "https://meli.la/BBB")  # repetido: ignorado
+        motor_ml.registrar_link(jid, 1, urls[1], "https://evil.example.com/x")  # não é link de afiliado
+        j = self.job(jid)
+        self.assertEqual((j["feitos"], j["ok"]), (2, 1))
+        self.assertEqual(sorted(filter(None, (i["link_afiliado"] for i in itens.itens_do_job(jid)))),
+                         ["https://meli.la/AAA"])
+
+    def test_sem_nenhum_link_termina_com_erro_e_nao_marca_produtos_como_ruins(self):
+        db.conn().execute("DELETE FROM produtos WHERE url LIKE '%MLB111%'")  # outros testes podem ter aprendido
+        db.conn().commit()
+        jid = self.preparar()
+        for u in itens.pendentes(jid):
+            motor_ml.registrar_link(jid, 1, u, None)
+        j = self.job(jid)
+        self.assertEqual(j["status"], "erro")
+        self.assertIn("nenhum link", j["erro"])
+        n = db.conn().execute("SELECT COUNT(*) AS n FROM produtos WHERE url LIKE '%MLB111%'").fetchone()["n"]
+        self.assertEqual(n, 0)  # falha do ambiente não vira "produto inelegível"
+
+    def test_so_o_dono_registra_e_so_enquanto_gerando(self):
+        jid = self.preparar()
+        u = itens.pendentes(jid)[0]
+        motor_ml.registrar_link(jid, 999, u, "https://meli.la/ZZZ")  # outro usuário: ignorado
+        self.assertEqual(self.job(jid)["feitos"], 0)
+        motor_ml.abortar_job(jid, 1, "O Mercado Livre pediu o login.")
+        self.assertEqual((self.job(jid)["status"], self.job(jid)["erro"]), ("erro", "O Mercado Livre pediu o login."))
+        motor_ml.registrar_link(jid, 1, u, "https://meli.la/ZZZ")  # job já encerrado: ignorado
+        self.assertEqual(self.job(jid)["feitos"], 0)
+
+    def test_sem_produtos_da_erro_claro(self):
+        self.criar_job("x9", termo="zzz", status="iniciando")
+        motor_ml.preparar_job_extensao("x9", 1, "zzz", 3, "sem cartões aqui")
+        j = self.job("x9")
+        self.assertEqual(j["status"], "erro")
+        self.assertIn("Nenhum produto", j["erro"])
+
+
+    def test_endpoints_do_fluxo_completo(self):
+        from thyfia import app as app_mod
+        u = {"id": 1}
+        with mock.patch.object(motor_ml, "status_ml", return_value={"status": "conectado"}), \
+             mock.patch.dict(os.environ, {"THYFIA_SALVAR_PLANILHA": "0"}), \
+             mock.patch.object(motor_ml, "navegador", side_effect=AssertionError("não deve abrir o Chrome")):
+            r = app_mod.criar_job(app_mod.NovoJob(termo="whey", limite=3, trechos=self.TRECHOS, na_extensao=True), u)
+            self.assertEqual(r["modo"], "extensao")
+            jid = r["id"]
+            urls = app_mod.job_pendentes(jid, u)["urls"]
+            self.assertEqual(len(urls), 3)
+            with self.assertRaises(Exception):  # já existe uma geração em andamento
+                app_mod.criar_job(app_mod.NovoJob(termo="outra", limite=3, trechos=self.TRECHOS, na_extensao=True), u)
+            for i, url in enumerate(urls):
+                j = app_mod.job_receber_link(jid, app_mod.ResultadoLink(url=url, link=f"https://meli.la/E{i}"), u)
+            self.assertEqual((j["status"], j["ok"], j["total"]), ("concluido", 3, 3))
+            self.assertEqual(app_mod.job_pendentes(jid, u)["urls"], [])
+
+    def test_geracao_abandonada_libera_o_usuario_depois_de_um_tempo(self):
+        from thyfia import app as app_mod
+        c = db.conn()
+        c.execute("INSERT INTO jobs (id, usuario_id, termo, limite, status, criado) "
+                  "VALUES ('velho',1,'x',20,'gerando', datetime('now','-30 minutes','localtime'))")
+        c.commit()
+        with mock.patch.object(motor_ml, "status_ml", return_value={"status": "conectado"}):
+            r = app_mod.criar_job(app_mod.NovoJob(termo="whey", limite=3, trechos=self.TRECHOS, na_extensao=True), {"id": 1})
+        self.assertEqual(r["modo"], "extensao")
+        self.assertEqual(c.execute("SELECT status FROM jobs WHERE id='velho'").fetchone()["status"], "erro")
+
+    def test_falhas_antigas_do_bloqueio_de_ip_sao_zeradas_uma_vez(self):
+        c = db.conn()
+        c.execute("DELETE FROM migracoes_unicas")
+        c.execute("INSERT OR REPLACE INTO produtos (url, titulo, titulo_norm, preco, vistos, gerados, falhas, atualizado) "
+                  "VALUES ('https://x/p/MLB1','a','a','1',2,0,2,'2026-01-01'), ('https://x/p/MLB2','b','b','1',3,1,2,'2026-01-01')")
+        c.commit()
+        db.init()
+        r = {x["url"]: x["falhas"] for x in c.execute("SELECT url, falhas FROM produtos WHERE url LIKE 'https://x/p/MLB%'")}
+        self.assertEqual(r["https://x/p/MLB1"], 0)   # nunca gerou: era culpa do ambiente
+        self.assertEqual(r["https://x/p/MLB2"], 2)   # já gerou antes: mantém
+        c.execute("UPDATE produtos SET falhas=2 WHERE url='https://x/p/MLB1'"); c.commit()
+        db.init()  # segunda inicialização não zera de novo
+        self.assertEqual(c.execute("SELECT falhas FROM produtos WHERE url='https://x/p/MLB1'").fetchone()["falhas"], 2)
+        c.execute("DELETE FROM produtos WHERE url LIKE 'https://x/p/MLB%'"); c.commit()
+
+
 # --------------------------------------------------------------------------- envio
 class TestEnvioDoBanco(BaseBanco):
     def test_envia_do_banco_sem_arquivo_local(self):
