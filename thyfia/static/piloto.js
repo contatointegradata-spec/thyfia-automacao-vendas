@@ -1,7 +1,7 @@
 /* =====================================================================
    ThyfIA — Piloto Automático (carregado depois de planos.js: usa $, $$, api, toast, estado, esc, brl…)
    ===================================================================== */
-const piloto = { dados: null, timer: null, waTimer: null, qr: "", qrEm: 0, escolhendo: false, grupos: [], sel: new Set(), filtro: "", waAssin: "" };
+const piloto = { nichoDe: {}, dados: null, timer: null, waTimer: null, qr: "", qrEm: 0, escolhendo: false, grupos: [], sel: new Set(), filtro: "", waAssin: "" };
 
 const PL_TIPOS = {
   whatsapp_grupo: { nome: "Grupo de WhatsApp", rotulo: "Link de convite do grupo", ph: "https://chat.whatsapp.com/…" },
@@ -18,6 +18,9 @@ const PL_ACOES = {
   desligado: "Ligue o Piloto primeiro.",
 };
 
+function plNichos() { return piloto.dados?.nichos || [{ slug: "geral", nome: "Todos os nichos", emoji: "🌐" }]; }
+function plOpcoesNicho(sel) { return plNichos().map((n) => `<option value="${esc(n.slug)}" ${n.slug === sel ? "selected" : ""}>${n.emoji} ${esc(n.nome)}</option>`).join(""); }
+function plNicho(slug) { return plNichos().find((n) => n.slug === slug) || { nome: "Sem nicho", emoji: "•" }; }
 function plMsg(t, tipo) { const m = $("#pl-msg"); m.textContent = t || ""; m.className = "envio-msg " + (tipo || ""); }
 function plHora(iso) { return iso ? new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : ""; }
 
@@ -61,6 +64,7 @@ function renderPiloto(silencioso) {
   if (falta.length) av.textContent = `A ThyfIA ainda não habilitou o envio por ${falta.join(" e ")}. Se for o canal que você quer usar, fale com o suporte.`;
 
   renderWhatsapp();
+  renderNichos(d);
   renderDestinos(d);
   if (!silencioso || !$("#form-pl-config").contains(document.activeElement)) preencherRegras(c);
   renderEstoque(d);
@@ -69,9 +73,18 @@ function renderPiloto(silencioso) {
   atualizarDica();
 }
 
+function renderNichos(d) {
+  const sel = $("#pl-nicho-novo"), atual = sel.value || "geral";
+  if (sel.dataset.n !== String(plNichos().length)) { sel.innerHTML = plOpcoesNicho(atual); sel.dataset.n = String(plNichos().length); }
+  const box = $("#pl-cobertura"), cob = (d.cobertura || []).filter((x) => x.nicho !== "geral");
+  box.hidden = !cob.length;
+  box.innerHTML = cob.map((x) => `<span class="pl-chip ${x.ofertas < 2 ? "alerta" : ""}" title="${x.ofertas} oferta(s) pronta(s) para este nicho">${x.emoji} ${esc(x.nome)} · ${x.grupos} grupo(s) · ${x.ofertas} oferta(s)${x.ofertas < 2 ? " ⚠️" : ""}</span>`).join("")
+    + (cob.some((x) => x.ofertas < 2) ? `<p class="mini">⚠️ Poucas ofertas nesse nicho. Gere links com buscas dele (ex.: “whey”, “air fryer”) para o Piloto ter o que enviar.</p>` : "");
+}
+
 function renderDestinos(d) {
   const box = $("#pl-destinos");
-  if (box.contains(document.activeElement) && document.activeElement.classList.contains("pl-cod")) return;  // não atrapalha quem digita o código
+  if (box.contains(document.activeElement) && (document.activeElement.classList.contains("pl-cod") || document.activeElement.classList.contains("pl-nicho"))) return;  // não atrapalha quem digita o código
   if (!d.destinos.length) { box.innerHTML = `<p class="pl-vazio">Nenhum destino ainda. Conecte o WhatsApp e escolha seus grupos, ou adicione um Telegram abaixo.</p>`; return; }
   box.innerHTML = d.destinos.map((x) => {
     const t = PL_TIPOS[x.tipo];
@@ -80,7 +93,7 @@ function renderDestinos(d) {
     const acoes = !x.verificado
       ? `<input class="pl-cod" inputmode="numeric" maxlength="4" placeholder="0000" data-cod="${x.id}" aria-label="Código recebido no destino"><button class="btn btn-primario btn-mini" data-confirmar="${x.id}" type="button"><span class="btn-txt">Confirmar</span><span class="spinner"></span></button>`
       : `<button class="btn btn-fantasma btn-mini" data-alternar="${x.id}" data-ativo="${x.ativo ? 0 : 1}" type="button">${x.ativo ? "Pausar" : "Ligar"}</button>`;
-    return `<div class="pl-destino ${x.ativo || !x.verificado ? "" : "off"}"><div class="pl-d-info"><b>${esc(x.nome || x.ref)}</b><small>${esc(t.nome)} · ${esc(x.ref)}</small>${x.erro ? `<div class="pl-d-erro">${esc(x.erro)}</div>` : ""}</div>${exp}${tag}<div class="pl-d-acoes">${acoes}<button class="btn btn-fantasma btn-mini" data-remover="${x.id}" type="button" aria-label="Remover destino">✕</button></div></div>`;
+    return `<div class="pl-destino ${x.ativo || !x.verificado ? "" : "off"}"><div class="pl-d-info"><b>${esc(x.nome || x.ref)}</b><small>${esc(t.nome)} · ${esc(x.ref)}</small><label class="pl-nicho-l">Nicho <select class="pl-nicho" data-nicho="${x.id}" aria-label="Nicho de ${esc(x.nome || x.ref)}">${plOpcoesNicho(x.nicho)}</select></label>${x.erro ? `<div class="pl-d-erro">${esc(x.erro)}</div>` : ""}</div>${exp}${tag}<div class="pl-d-acoes">${acoes}<button class="btn btn-fantasma btn-mini" data-remover="${x.id}" type="button" aria-label="Remover destino">✕</button></div></div>`;
   }).join("");
 }
 
@@ -96,7 +109,7 @@ function renderEstoque(d) {
   const e = d.estoque, box = $("#pl-estoque");
   if (!e.total) { box.innerHTML = `<p class="pl-vazio">Sem ofertas novas dentro das suas regras. Gere mais links em <b>Gerar links</b> — o Piloto avisa no seu WhatsApp quando o estoque acaba.</p>`; return; }
   box.innerHTML = e.proximas.map((o) =>
-    `<div class="pl-oferta"><span class="pl-pontos" title="Pontuação do Cérebro">${o.pontos}</span><b>${esc(o.titulo)}</b><small>${brl(o.preco)} · ${esc(o.busca)}</small><small>Por que o Cérebro gosta: ${esc(o.motivos.join("; ") || "melhor pontuação disponível")}</small></div>`).join("")
+    `<div class="pl-oferta"><span class="pl-pontos" title="Pontuação do Cérebro">${o.pontos}</span><b>${esc(o.titulo)}</b><small>${brl(o.preco)} · ${esc(o.busca)} · ${o.nicho ? plNicho(o.nicho).emoji + " " + esc(plNicho(o.nicho).nome) : "sem nicho definido"}</small><small>Por que o Cérebro gosta: ${esc(o.motivos.join("; ") || "melhor pontuação disponível")}</small></div>`).join("")
     + (e.total > e.proximas.length ? `<p class="mini">+ ${e.total - e.proximas.length} oferta(s) na fila.</p>` : "");
 }
 
@@ -198,6 +211,7 @@ async function abrirGrupos() {
   try {
     piloto.grupos = await api("/api/piloto/whatsapp/grupos");
     piloto.sel = new Set(piloto.grupos.filter((g) => g.selecionado).map((g) => g.jid));
+    piloto.nichoDe = Object.fromEntries(piloto.grupos.map((g) => [g.jid, g.nicho || "geral"]));
     piloto.filtro = ""; piloto.escolhendo = true;
     $("#pl-wa-corpo").innerHTML = `<h4 class="pl-sub">Em quais grupos o Piloto publica?</h4>
       <input type="text" id="pl-g-busca" class="pl-busca" placeholder="Buscar grupo…" autocomplete="off" aria-label="Buscar grupo">
@@ -212,7 +226,7 @@ function renderGrupos() {
   const f = piloto.filtro.toLowerCase();
   const lista = piloto.grupos.filter((g) => !f || g.nome.toLowerCase().includes(f));
   $("#pl-g-lista").innerHTML = lista.length ? lista.map((g) =>
-    `<label class="pl-grupo"><input type="checkbox" data-jid="${esc(g.jid)}" ${piloto.sel.has(g.jid) ? "checked" : ""}><span class="auto-caixa" aria-hidden="true"></span><span class="pl-g-nome">${esc(g.nome)}</span>${g.tamanho ? `<small>${g.tamanho} membros</small>` : ""}</label>`).join("")
+    `<label class="pl-grupo"><input type="checkbox" data-jid="${esc(g.jid)}" ${piloto.sel.has(g.jid) ? "checked" : ""}><span class="auto-caixa" aria-hidden="true"></span><span class="pl-g-nome">${esc(g.nome)}</span>${g.tamanho ? `<small>${g.tamanho} membros</small>` : ""}<select class="pl-nicho" data-gnicho="${esc(g.jid)}" aria-label="Nicho de ${esc(g.nome)}">${plOpcoesNicho(piloto.nichoDe[g.jid])}</select></label>`).join("")
     : `<p class="pl-vazio">${piloto.grupos.length ? "Nenhum grupo com esse nome." : "Não encontrei grupos neste WhatsApp."}</p>`;
   $("#btn-g-salvar .btn-txt").textContent = `Salvar grupos (${piloto.sel.size})`;
 }
@@ -226,7 +240,7 @@ $("#pl-wa-corpo").addEventListener("click", async (e) => {
   else if (b.id === "btn-g-salvar") {
     carregando(b, true);
     try {
-      piloto.dados.destinos = await api("/api/piloto/whatsapp/grupos", { method: "PUT", body: { jids: [...piloto.sel] } });
+      piloto.dados.destinos = await api("/api/piloto/whatsapp/grupos", { method: "PUT", body: { jids: [...piloto.sel], nichos: Object.fromEntries([...piloto.sel].map((j) => [j, piloto.nichoDe[j] || "geral"])) } });
       piloto.escolhendo = false; plMsg(piloto.sel.size ? "Grupos salvos. O Piloto já pode publicar neles." : "Nenhum grupo selecionado.", "ok");
       await carregarPiloto(); renderWhatsapp(true);
     } catch (err) { plMsg(err.message, "erro"); carregando(b, false); }
@@ -237,6 +251,8 @@ $("#pl-wa-corpo").addEventListener("click", async (e) => {
   }
 });
 $("#pl-wa-corpo").addEventListener("change", (e) => {
+  const n = e.target.closest("select[data-gnicho]");
+  if (n) { piloto.nichoDe[n.dataset.gnicho] = n.value; if (n.value !== "geral") piloto.sel.add(n.dataset.gnicho); renderGrupos(); return; }
   const c = e.target.closest("input[data-jid]"); if (!c) return;
   c.checked ? piloto.sel.add(c.dataset.jid) : piloto.sel.delete(c.dataset.jid);
   $("#btn-g-salvar .btn-txt").textContent = `Salvar grupos (${piloto.sel.size})`;
@@ -264,7 +280,7 @@ $("#form-pl-destino").addEventListener("submit", async (e) => {
   carregando(btn, true); plMsg("");
   try {
     const tipo = $("#pl-tipo").value, meu = tipo === "whatsapp_canal" && piloto.dados?.whatsapp?.estado === "conectado";
-    await api("/api/piloto/destinos", { body: { tipo, entrada, meu_numero: meu } });
+    await api("/api/piloto/destinos", { body: { tipo, entrada, meu_numero: meu, nicho: $("#pl-nicho-novo").value } });
     $("#pl-entrada").value = "";
     plMsg(meu ? "Canal adicionado." : "Código enviado ao destino. Abra lá, veja os 4 dígitos e digite aqui em “Confirmar”.", "ok");
     await carregarPiloto();
@@ -287,6 +303,12 @@ $("#pl-destinos").addEventListener("click", async (e) => {
     } else return;
     await carregarPiloto();
   } catch (err) { plMsg(err.message, "erro"); }
+});
+
+$("#pl-destinos").addEventListener("change", async (e) => {
+  const s = e.target.closest("select[data-nicho]"); if (!s) return;
+  try { await api(`/api/piloto/destinos/${s.dataset.nicho}`, { method: "PUT", body: { nicho: s.value } }); plMsg(`Nicho alterado para ${plNicho(s.value).nome}.`, "ok"); await carregarPiloto(); }
+  catch (err) { plMsg(err.message, "erro"); await carregarPiloto(); }
 });
 
 $("#form-pl-config").addEventListener("submit", async (e) => {

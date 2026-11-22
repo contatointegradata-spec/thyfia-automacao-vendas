@@ -598,10 +598,12 @@ class PilotoDestino(BaseModel):
     entrada: str = Field(max_length=300)
     nome: str = Field(default="", max_length=80)
     meu_numero: bool = False
+    nicho: str = Field(default="geral", max_length=20)
 
 
 class PilotoGrupos(BaseModel):
     jids: list[str] = Field(max_length=60)
+    nichos: dict[str, str] = Field(default_factory=dict, max_length=60)  # jid → nicho
 
 
 class PilotoCodigo(BaseModel):
@@ -609,7 +611,8 @@ class PilotoCodigo(BaseModel):
 
 
 class PilotoAtivo(BaseModel):
-    ativo: bool
+    ativo: bool | None = None
+    nicho: str | None = Field(default=None, max_length=20)
 
 
 def _erro_piloto(e: Exception) -> HTTPException:
@@ -665,7 +668,7 @@ def piloto_whatsapp_grupos(u=Depends(exige("automacao"))):
 @app.put("/api/piloto/whatsapp/grupos")
 def piloto_whatsapp_grupos_salvar(dados: PilotoGrupos, u=Depends(exige("automacao"))):
     try:
-        return piloto.salvar_grupos(u["id"], dados.jids)
+        return piloto.salvar_grupos(u["id"], dados.jids, dados.nichos)
     except Exception as e:
         raise _erro_piloto(e)
 
@@ -673,7 +676,7 @@ def piloto_whatsapp_grupos_salvar(dados: PilotoGrupos, u=Depends(exige("automaca
 @app.post("/api/piloto/destinos")
 def piloto_destino_novo(dados: PilotoDestino, u=Depends(exige("automacao"))):
     try:
-        return piloto.adicionar_destino(u["id"], dados.tipo, dados.entrada, dados.nome, dados.meu_numero)
+        return piloto.adicionar_destino(u["id"], dados.tipo, dados.entrada, dados.nome, dados.meu_numero, dados.nicho)
     except Exception as e:
         raise _erro_piloto(e)
 
@@ -689,7 +692,14 @@ def piloto_destino_confirmar(did: int, dados: PilotoCodigo, u=Depends(exige("aut
 @app.put("/api/piloto/destinos/{did}")
 def piloto_destino_alternar(did: int, dados: PilotoAtivo, u=Depends(exige("automacao"))):
     try:
-        return piloto.alternar_destino(u["id"], did, dados.ativo)
+        if dados.ativo is None and dados.nicho is None:
+            raise piloto.ErroPiloto("Nada para alterar.")
+        d = None
+        if dados.ativo is not None:
+            d = piloto.alternar_destino(u["id"], did, dados.ativo)
+        if dados.nicho is not None:
+            d = piloto.definir_nicho(u["id"], did, dados.nicho)
+        return d
     except Exception as e:
         raise _erro_piloto(e)
 
