@@ -55,6 +55,18 @@ def _texto(v) -> str:
     return re.sub(r"\s+", " ", str(v if v is not None else "")).strip()
 
 
+def _numero(v) -> float | None:
+    try:
+        return float(v) if v not in (None, "") else None
+    except (TypeError, ValueError):
+        return None
+
+
+def _inteiro(v) -> int | None:
+    n = _numero(v)
+    return int(n) if n is not None else None
+
+
 def agora_iso() -> str:
     return datetime.now(TZ_SP).isoformat(timespec="seconds")
 
@@ -100,15 +112,20 @@ def _link_valido(link) -> str | None:
 # --------------------------------------------------------------------------- gravação / leitura
 def salvar_item(job_id: str, busca: str, titulo, preco, url_produto, link_afiliado,
                 criado_em: str | None = None, conn: sqlite3.Connection | None = None,
-                commit: bool = True, imagem: str | None = None, processado: int = 1) -> bool:
+                commit: bool = True, imagem: str | None = None, processado: int = 1,
+                selo: str | None = None, preco_de=None, desconto_pct=None, condicao: str | None = None,
+                vendas=None, nota=None) -> bool:
     """Grava um item da geração. Ignora link de afiliado repetido no mesmo job.
-    Retorna True se gravou."""
+    Retorna True se gravou. `selo`, `preco_de`, `desconto_pct`, `condicao`, `vendas` e `nota` vêm do cartão da busca."""
     c = conn or db.conn()
     cur = c.execute(
         "INSERT OR IGNORE INTO job_itens (job_id, busca, titulo, preco, url_produto, link_afiliado, "
-        "criado_em, imagem, processado) VALUES (?,?,?,?,?,?,?,?,?)",
+        "criado_em, imagem, processado, selo, preco_de, desconto_pct, condicao, vendas, nota) "
+        "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (job_id, _texto(busca), _texto(titulo), preco_numero(preco), _texto(url_produto),
-         _link_valido(link_afiliado), criado_em or agora_iso(), _link_valido(imagem), processado),
+         _link_valido(link_afiliado), criado_em or agora_iso(), _link_valido(imagem), processado,
+         _texto(selo)[:40] or None, _numero(preco_de), _inteiro(desconto_pct),
+         condicao if condicao in ("cupom", "pix") else None, _inteiro(vendas), _numero(nota)),
     )
     if commit:
         c.commit()

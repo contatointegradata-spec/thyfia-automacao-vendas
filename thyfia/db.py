@@ -331,6 +331,13 @@ def init() -> None:
         "ALTER TABLE piloto_envios ADD COLUMN nicho TEXT",
         "ALTER TABLE piloto_envios ADD COLUMN variante TEXT",
         "ALTER TABLE piloto_envios ADD COLUMN avaliado INTEGER NOT NULL DEFAULT 0",
+        # o que o cartão da busca mostra: selo, preço "de", % de desconto, condição do preço (cupom|pix), vendas e nota
+        "ALTER TABLE job_itens ADD COLUMN selo TEXT",
+        "ALTER TABLE job_itens ADD COLUMN preco_de REAL",
+        "ALTER TABLE job_itens ADD COLUMN desconto_pct INTEGER",
+        "ALTER TABLE job_itens ADD COLUMN condicao TEXT",
+        "ALTER TABLE job_itens ADD COLUMN vendas INTEGER",
+        "ALTER TABLE job_itens ADD COLUMN nota REAL",
     )
     for sql in migracoes:
         try:

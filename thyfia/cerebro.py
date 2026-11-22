@@ -308,6 +308,9 @@ def curar_ofertas(ofertas: list[dict], *, ultima_busca: str = "", envios_por_bus
 
         if o.get("imagem"):
             pontos += 5
+        if "MAIS VENDIDO" in str(o.get("selo") or "").upper():
+            pontos += 6
+            motivos.append("selo “Mais vendido” do Mercado Livre")
         if ultima and busca == ultima:
             pontos -= 25
             motivos.append("mesma categoria do último envio (rebaixada)")

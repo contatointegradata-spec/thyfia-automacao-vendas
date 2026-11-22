@@ -30,6 +30,22 @@ ofertas do cliente ─► Cérebro.curar_ofertas ─► mensagens.compor ─► 
 - **Nichos** (`thyfia/nichos.py`): cada destino tem um nicho (`geral`, fit, tech, casa, auto, beleza, moda, pet, bebê, ferramentas). O Cérebro classifica cada oferta pelo termo da busca (peso 3) e pelo título (peso 1), com frases prontas valendo mais ("carregador veicular" → auto, "carregador" → tech). A cada ciclo, `planejar` escolhe a melhor oferta **de cada nicho que tem grupo** (a diversificação de categorias olha só o que saiu para aquele nicho) e a manda só aos grupos dele; grupos `geral` recebem a melhor das que sobraram. Nicho sem oferta é pulado e o dono é avisado (1x/dia, dizendo quais). O limite diário vale **por grupo**. Sem nichos configurados, tudo continua como antes (uma oferta para todos). **Na hora da busca** (Gerar links, planos com o Piloto): o campo "Para qual grupo?" já vem em "Automático (nicho que o Cérebro deduziu)" e deixa trocar; se o Cérebro não reconhece a busca, avisa e pede a escolha. A escolha vale só para aquela busca (digitar outro termo volta ao automático), é gravada como correção do cliente (`nicho_busca`) e ensina o Cérebro. `GET /api/nicho-sugerido?busca=` devolve a sugestão e `POST /api/jobs` aceita `nicho`. O painel mostra a cobertura por nicho (grupos × ofertas prontas) e o resumo do dia traz o estoque por nicho.
 - **Plano**: Pro (recurso `automacao`).
 
+## 3.1 O que o cartão da busca do Mercado Livre entrega (confirmado em 22/11/2026)
+Lido pela extensão no JSON `"polycard"` da lista de resultados (`tests/fixtures/cartoes_ml_busca.txt` é uma amostra real).
+Se o Mercado Livre mudar o formato, estes são os campos a conferir em `motor_busca.py`:
+
+| Dado | Campo no JSON | Como a mensagem usa |
+|---|---|---|
+| Selo | `float_highlight_generic.highlight` → `{"id":"best_seller","text":"MAIS VENDIDO"}`; outro visto: `commercial_event` = "BLACK FRIDAY" | "🏆 Mais vendido no Mercado Livre" / "🖤 Black Friday". Selo desconhecido é guardado, mas não vai ao texto. O Cérebro dá +6 pontos ao "Mais vendido". |
+| Preço "de" e % | `components[price].previous_price.value` e `discount_pct` | "~R$ de~ por *R$ preço* (X% OFF)". Só se o "de" for maior que o preço; % entre 5 e 90. Com o "de" do ML, a frase "Baixou X%" do nosso histórico não repete. |
+| Condição do preço | `price.discount_complement.label.text`: "com Cupom" ou "no Pix" | O preço exibido **só vale** nessa condição. "com cupom" + "🎟️ Ative o cupom na página do produto antes de comprar"; "no Pix". Valor e código do cupom o cartão não traz. |
+| Vendas e nota | `signal.sales`, `signal.reviews_rating` | "⭐ 4,8 · +250 mil vendidos", só com nota ≥ 4,5 e ≥ 500 vendas. |
+
+Não aparecem na busca: "Mais compartilhado", "Mais buscado" e a comissão ("Ganhos %"); são do Hub de afiliados.
+Cartões de anúncio (`is_advertising`, URL `click1.`) continuam descartados. O cartão "no Pix" ainda não foi visto em JSON
+(só no HTML da página): o parser assume o mesmo campo `discount_complement` do "com Cupom".
+Fora da lista de itens guardados e do texto: frete (depende do CEP de quem vê), "20% OFF com Saldo no Mercado Pago" (depende de pagamento) e loja oficial.
+
 ## 4. Auditoria do n8n (workflows 03 e 04)
 1. **03 envia a si mesmo, não ao grupo**: manda a oferta para o seu número para você encaminhar; instância da Evolution fixa no nó (`Integradata tec`) e a coluna `Instancia` da planilha é ignorada.
 2. **Planilha como fila**: sem trava (duas execuções podem pegar a mesma linha), sem retentativa, sem registro de erro por linha.
