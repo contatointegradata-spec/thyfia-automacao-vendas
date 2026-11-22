@@ -34,6 +34,8 @@ PLANOS: dict[str, dict] = {
             "Divulgação sorteada por categoria no seu WhatsApp e Telegram",
             "Configuração guiada do seu número, feita em tela",
             "Reenvio seguro (links duplicados são ignorados)",
+            "Piloto Automático: o Cérebro escolhe a melhor oferta e envia sozinho para os seus grupos e canais",
+            "Resumo diário e alertas no seu WhatsApp",
         ],
         "nao_inclui": ["Agente de Publicação no Instagram"],
     },

@@ -26,7 +26,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from . import (agente_publicacao, auth, automacao, cerebro, configuracoes, db, facebook, imagem_host, instagram,
+from . import (piloto, agente_publicacao, auth, automacao, cerebro, configuracoes, db, facebook, imagem_host, instagram,
                itens, kiwify, motor_ml, planos, tenant, video)
 
 STATIC = Path(__file__).resolve().parent / "static"
@@ -61,6 +61,7 @@ except Exception:  # nunca impede o servidor de subir
 for _nome in ("thyfia.publicacao", "thyfia.instagram", "thyfia.imagem"):
     logging.getLogger(_nome).setLevel(logging.INFO)
 agente_publicacao.iniciar_agendador()
+piloto.iniciar_agendador()  # Piloto Automático (THYFIA_PILOTO=0 desliga)
 
 app = FastAPI(title="ThyfIA", docs_url=None, redoc_url=None)
 
@@ -574,6 +575,117 @@ def publicacao_publicar_agora(dados: NovaPublicacao, u=Depends(exige("agente")))
         raise _erro_pub(e)
     _cache_ig["em"] = 0  # o limite mudou
     return pub
+
+
+# --------------------------------------------------------------------------- Piloto Automático (Pro)
+class PilotoConfig(BaseModel):
+    ativo: bool | None = None
+    modo: str | None = None
+    hora_ini: int | None = None
+    hora_fim: int | None = None
+    intervalo_min: int | None = None
+    max_dia: int | None = None
+    validade_dias: int | None = None
+    preco_min: float | None = None
+    preco_max: float | None = None
+    palavras: list[str] | None = None
+    estilo: str | None = None
+    relatorio: bool | None = None
+
+
+class PilotoDestino(BaseModel):
+    tipo: str = Field(max_length=20)
+    entrada: str = Field(max_length=300)
+    nome: str = Field(default="", max_length=80)
+
+
+class PilotoCodigo(BaseModel):
+    codigo: str = Field(max_length=10)
+
+
+class PilotoAtivo(BaseModel):
+    ativo: bool
+
+
+def _erro_piloto(e: Exception) -> HTTPException:
+    if isinstance(e, piloto.ErroPiloto):
+        return HTTPException(e.status, str(e))
+    logging.getLogger("thyfia.piloto").exception("erro inesperado no Piloto")
+    return HTTPException(500, "Algo deu errado no Piloto Automático. Tente de novo.")
+
+
+@app.get("/api/piloto")
+def piloto_status(u=Depends(exige("automacao"))):
+    return piloto.status(u["id"])
+
+
+@app.put("/api/piloto/config")
+def piloto_config(dados: PilotoConfig, u=Depends(exige("automacao"))):
+    try:
+        piloto.salvar_config(u["id"], dados.model_dump(exclude_unset=True))
+    except Exception as e:
+        raise _erro_piloto(e)
+    return piloto.status(u["id"])
+
+
+@app.post("/api/piloto/destinos")
+def piloto_destino_novo(dados: PilotoDestino, u=Depends(exige("automacao"))):
+    try:
+        return piloto.adicionar_destino(u["id"], dados.tipo, dados.entrada, dados.nome)
+    except Exception as e:
+        raise _erro_piloto(e)
+
+
+@app.post("/api/piloto/destinos/{did}/confirmar")
+def piloto_destino_confirmar(did: int, dados: PilotoCodigo, u=Depends(exige("automacao"))):
+    try:
+        return piloto.confirmar_destino(u["id"], did, dados.codigo)
+    except Exception as e:
+        raise _erro_piloto(e)
+
+
+@app.put("/api/piloto/destinos/{did}")
+def piloto_destino_alternar(did: int, dados: PilotoAtivo, u=Depends(exige("automacao"))):
+    try:
+        return piloto.alternar_destino(u["id"], did, dados.ativo)
+    except Exception as e:
+        raise _erro_piloto(e)
+
+
+@app.delete("/api/piloto/destinos/{did}")
+def piloto_destino_remover(did: int, u=Depends(exige("automacao"))):
+    try:
+        piloto.remover_destino(u["id"], did)
+    except Exception as e:
+        raise _erro_piloto(e)
+    return {"ok": True}
+
+
+@app.post("/api/piloto/enviar-agora")
+def piloto_enviar_agora(u=Depends(exige("automacao"))):
+    try:
+        r = piloto.planejar(u["id"], forcar=True)
+        if r.get("acao") == "planejou":
+            piloto.despachar(u["id"])
+        return r
+    except Exception as e:
+        raise _erro_piloto(e)
+
+
+@app.post("/api/piloto/aprovar/{item_id}")
+def piloto_aprovar(item_id: int, u=Depends(exige("automacao"))):
+    try:
+        return {"destinos": piloto.aprovar(u["id"], item_id)}
+    except Exception as e:
+        raise _erro_piloto(e)
+
+
+@app.post("/api/piloto/pular/{item_id}")
+def piloto_pular(item_id: int, u=Depends(exige("automacao"))):
+    try:
+        return {"destinos": piloto.pular(u["id"], item_id)}
+    except Exception as e:
+        raise _erro_piloto(e)
 
 
 @app.get("/api/publicacao")

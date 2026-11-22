@@ -12,6 +12,7 @@ os.environ["N8N_WEBHOOK_URL"] = "https://n8n.exemplo.test/webhook/thyfia-links"
 os.environ["N8N_API_KEY"] = "token-de-teste-123"
 os.environ["THYFIA_LIMPAR_PLANILHAS_DIAS"] = "0"
 os.environ["THYFIA_AGENDADOR"] = "0"
+os.environ["THYFIA_PILOTO"] = "0"
 # Instagram falso: definido aqui para o load_dotenv nunca trazer o token real do .env
 os.environ["IG_GRAPH_HOST"] = "https://graph.facebook.com"
 os.environ["IG_GRAPH_VERSION"] = "v21.0"

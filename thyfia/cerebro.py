@@ -206,3 +206,95 @@ def estatisticas() -> dict:
             for r in top
         ],
     }
+
+
+# --------------------------------------------------------------------------- curadoria de ofertas (Piloto Automático)
+def _idade_dias(criado_em: str | None, agora: datetime) -> float:
+    try:
+        d = datetime.fromisoformat(str(criado_em or "").replace("Z", "+00:00"))
+    except ValueError:
+        return 0.0
+    if d.tzinfo is None:
+        d = d.replace(tzinfo=agora.tzinfo)
+    return max((agora - d).total_seconds() / 86400, 0.0)
+
+
+def curar_ofertas(ofertas: list[dict], *, ultima_busca: str = "", envios_por_busca: dict[str, int] | None = None,
+                  validade_dias: float = 7, agora: datetime | None = None) -> list[dict]:
+    """Ranqueia as ofertas do cliente para o Piloto Automático. Cada oferta:
+    {id, busca, titulo, preco, url_produto, link_afiliado, imagem, criado_em}.
+
+    O Cérebro decide com o que aprendeu de TODA a comunidade (sem LLM, 100% explicável):
+      • descarta o que a comunidade já viu falhar (produto inelegível ao programa de afiliados);
+      • premia produto com link já validado (`gerados`) e busca com boa taxa de sucesso;
+      • premia o que está fresco (preço envelhece) e o preço abaixo da mediana da própria busca;
+      • diversifica: evita repetir a categoria do último envio e dá vez à categoria menos usada.
+    Devolve cópias com `pontos` e `motivos` (lista de frases), da melhor para a pior."""
+    from datetime import timezone
+
+    if not ofertas:
+        return []
+    agora = agora or datetime.now(timezone.utc)
+    envios_por_busca = envios_por_busca or {}
+    c = db.conn()
+
+    urls = [o["url_produto"] for o in ofertas if o.get("url_produto")]
+    produtos: dict[str, object] = {}
+    for i in range(0, len(urls), 400):
+        lote = urls[i:i + 400]
+        for r in c.execute(
+            f"SELECT url, gerados, falhas FROM produtos WHERE url IN ({','.join('?' * len(lote))})", lote
+        ):
+            produtos[r["url"]] = r
+    termos = {r["termo"]: r for r in c.execute("SELECT termo, links_ok, links_total FROM termos")}
+
+    por_busca: dict[str, list[float]] = {}
+    for o in ofertas:
+        por_busca.setdefault(normalizar(o.get("busca", "")), []).append(float(o["preco"]))
+    medianas = {k: sorted(v)[len(v) // 2] for k, v in por_busca.items()}
+    menos_usada = min((envios_por_busca.get(k, 0) for k in por_busca), default=0)
+    ultima = normalizar(ultima_busca)
+
+    saida = []
+    for o in ofertas:
+        p = produtos.get(o.get("url_produto"))
+        if p is not None and _inelegivel(p):
+            continue  # a comunidade já viu esse produto falhar: não gasta um envio com ele
+        busca = normalizar(o.get("busca", ""))
+        pontos, motivos = 50.0, []
+
+        if p is not None and p["gerados"] > 0:
+            pontos += min(10 * math.log1p(p["gerados"]), 15)
+            motivos.append(f"link já validado {p['gerados']}x pela comunidade")
+        t = termos.get(busca)
+        if t is not None and t["links_total"]:
+            taxa = t["links_ok"] / t["links_total"]
+            pontos += 10 * taxa
+            if taxa >= 0.7:
+                motivos.append(f"busca “{o.get('busca', '')}” converte links em {round(100 * taxa)}% dos casos")
+
+        idade = _idade_dias(o.get("criado_em"), agora)
+        frescor = max(0.0, 1 - idade / max(validade_dias, 1))
+        pontos += 20 * frescor
+        if idade < 1:
+            motivos.append("encontrada hoje")
+        elif frescor >= 0.5:
+            motivos.append(f"encontrada há {int(idade)} dia(s)")
+
+        med = medianas.get(busca) or 0
+        if med and float(o["preco"]) < med:
+            pontos += min(15 * (1 - float(o["preco"]) / med) * 2, 15)
+            motivos.append("preço abaixo da mediana da própria busca")
+
+        if o.get("imagem"):
+            pontos += 5
+        if ultima and busca == ultima:
+            pontos -= 25
+            motivos.append("mesma categoria do último envio (rebaixada)")
+        elif envios_por_busca.get(busca, 0) <= menos_usada:
+            pontos += 10
+            motivos.append("categoria menos divulgada recentemente")
+
+        saida.append({**o, "pontos": round(pontos, 1), "motivos": motivos})
+    saida.sort(key=lambda x: (-x["pontos"], -int(x.get("id") or 0)))
+    return saida

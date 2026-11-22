@@ -7,7 +7,7 @@ const brl = (v) => Number(v).toLocaleString("pt-BR", { style: "currency", curren
 const dia = (iso) => (iso ? new Date(iso.replace(" ", "T")).toLocaleDateString("pt-BR") : "—");
 const NOME_PLANO = { plus: "Plus", pro: "Pro", premium: "Premium" };
 // qual recurso libera cada tela
-const TRAVA = { gerar: "gerar", integracoes: "gerar", historico: "gerar", cerebro: "gerar", automacao: "automacao", publicacao: "agente" };
+const TRAVA = { gerar: "gerar", integracoes: "gerar", historico: "gerar", cerebro: "gerar", automacao: "automacao", piloto: "automacao", publicacao: "agente" };
 const PLANO_DO_RECURSO = { gerar: "plus", automacao: "pro", agente: "premium" };
 
 const plano = { cat: null, espera: null, destaque: null, passos: [] };
