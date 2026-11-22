@@ -597,6 +597,11 @@ class PilotoDestino(BaseModel):
     tipo: str = Field(max_length=20)
     entrada: str = Field(max_length=300)
     nome: str = Field(default="", max_length=80)
+    meu_numero: bool = False
+
+
+class PilotoGrupos(BaseModel):
+    jids: list[str] = Field(max_length=60)
 
 
 class PilotoCodigo(BaseModel):
@@ -628,10 +633,47 @@ def piloto_config(dados: PilotoConfig, u=Depends(exige("automacao"))):
     return piloto.status(u["id"])
 
 
+@app.get("/api/piloto/whatsapp")
+def piloto_whatsapp(u=Depends(exige("automacao"))):
+    return piloto.whatsapp_status(u["id"], atualizar=True)
+
+
+@app.post("/api/piloto/whatsapp/conectar")
+def piloto_whatsapp_conectar(u=Depends(exige("automacao"))):
+    try:
+        return piloto.whatsapp_conectar(u["id"])
+    except Exception as e:
+        raise _erro_piloto(e)
+
+
+@app.post("/api/piloto/whatsapp/desconectar")
+def piloto_whatsapp_desconectar(u=Depends(exige("automacao"))):
+    try:
+        return piloto.whatsapp_desconectar(u["id"])
+    except Exception as e:
+        raise _erro_piloto(e)
+
+
+@app.get("/api/piloto/whatsapp/grupos")
+def piloto_whatsapp_grupos(u=Depends(exige("automacao"))):
+    try:
+        return piloto.grupos_whatsapp(u["id"])
+    except Exception as e:
+        raise _erro_piloto(e)
+
+
+@app.put("/api/piloto/whatsapp/grupos")
+def piloto_whatsapp_grupos_salvar(dados: PilotoGrupos, u=Depends(exige("automacao"))):
+    try:
+        return piloto.salvar_grupos(u["id"], dados.jids)
+    except Exception as e:
+        raise _erro_piloto(e)
+
+
 @app.post("/api/piloto/destinos")
 def piloto_destino_novo(dados: PilotoDestino, u=Depends(exige("automacao"))):
     try:
-        return piloto.adicionar_destino(u["id"], dados.tipo, dados.entrada, dados.nome)
+        return piloto.adicionar_destino(u["id"], dados.tipo, dados.entrada, dados.nome, dados.meu_numero)
     except Exception as e:
         raise _erro_piloto(e)
 
