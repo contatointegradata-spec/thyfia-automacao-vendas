@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/styles.css?v=10">
+  <link rel="stylesheet" href="/static/styles.css?v=11">
 </head>
 <body>
 
@@ -448,6 +448,8 @@
             <li><b>Filtra</b> produtos que já falharam no programa de afiliados.</li>
             <li><b>Prioriza</b> os produtos que mais geraram link com sucesso.</li>
             <li><b>Sugere</b> termos e buscas relacionadas aprendidas de todos.</li>
+            <li><b>Lembra</b> o preço de cada produto dia a dia e só fala em queda quando ela é real.</li>
+            <li><b>Aprende</b> o nicho de palavras novas e o que o <i>seu</i> público clica, aprova ou ignora.</li>
           </ol>
           <div class="taxa">
             <div class="taxa-anel"><svg viewBox="0 0 120 120"><circle cx="60" cy="60" r="52" class="anel-fundo"/><circle cx="60" cy="60" r="52" class="anel-valor" id="anel-taxa"/></svg><strong id="taxa-num">0%</strong></div>
@@ -456,6 +458,15 @@
         </div>
       </div>
     </div>
+
+    <section class="painel ap-painel" id="ap-painel" hidden>
+      <h3>O que o Cérebro aprendeu <span class="pl-tag" id="ap-fase"></span></h3>
+      <div class="ap-grade">
+        <div><h4>Com o seu público</h4><div id="ap-publico"></div></div>
+        <div><h4>Palavras novas por nicho</h4><div id="ap-palavras"></div></div>
+        <div><h4>Quedas de preço detectadas</h4><div id="ap-quedas"></div></div>
+      </div>
+    </section>
 
     <!-- ---------- Meu plano ---------- -->
     <div class="view" id="view-plano" hidden>
@@ -651,6 +662,10 @@
               <input type="checkbox" id="pl-relatorio"><span class="auto-caixa" aria-hidden="true"></span>
               <span>Receber um <b>resumo do dia</b> no meu WhatsApp (e avisos quando algo precisar de atenção)</span>
             </label>
+            <label class="auto-envio au-auto">
+              <input type="checkbox" id="pl-rastrear"><span class="auto-caixa" aria-hidden="true"></span>
+              <span><b>Medir cliques</b> nas ofertas: o link da mensagem passa pela ThyfIA (e leva direto ao produto, com o seu link de afiliado) e o Cérebro aprende o que o seu público realmente clica.</span>
+            </label>
             <div class="au-acoes"><button class="btn btn-primario" type="submit" id="btn-pl-salvar"><span class="btn-txt">Salvar regras</span><span class="spinner"></span></button></div>
           </form>
           <p class="mini">Para proteger o seu grupo e o número da ThyfIA, o intervalo mínimo é de 10 minutos e cada mensagem é espaçada de forma aleatória entre os destinos.</p>
@@ -825,8 +840,8 @@
   </defs>
 </svg>
 
-<script src="/static/app.js?v=14"></script>
+<script src="/static/app.js?v=15"></script>
 <script src="/static/planos.js?v=6"></script>
-<script src="/static/piloto.js?v=4"></script>
+<script src="/static/piloto.js?v=5"></script>
 </body>
 </html>

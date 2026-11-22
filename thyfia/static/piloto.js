@@ -103,13 +103,14 @@ function preencherRegras(c) {
   $("#pl-pmin").value = c.preco_min ?? ""; $("#pl-pmax").value = c.preco_max ?? "";
   $("#pl-estilo").value = c.estilo; $("#pl-modo").value = c.modo;
   $("#pl-palavras").value = (c.palavras || []).join(", "); $("#pl-relatorio").checked = c.relatorio;
+  $("#pl-rastrear").checked = !!c.rastrear;
 }
 
 function renderEstoque(d) {
   const e = d.estoque, box = $("#pl-estoque");
   if (!e.total) { box.innerHTML = `<p class="pl-vazio">Sem ofertas novas dentro das suas regras. Gere mais links em <b>Gerar links</b> — o Piloto avisa no seu WhatsApp quando o estoque acaba.</p>`; return; }
   box.innerHTML = e.proximas.map((o) =>
-    `<div class="pl-oferta"><span class="pl-pontos" title="Pontuação do Cérebro">${o.pontos}</span><b>${esc(o.titulo)}</b><small>${brl(o.preco)} · ${esc(o.busca)} · ${o.nicho ? plNicho(o.nicho).emoji + " " + esc(plNicho(o.nicho).nome) : "sem nicho definido"}</small><small>Por que o Cérebro gosta: ${esc(o.motivos.join("; ") || "melhor pontuação disponível")}</small></div>`).join("")
+    `<div class="pl-oferta"><span class="pl-pontos" title="Pontuação do Cérebro">${o.pontos}</span><b>${esc(o.titulo)}</b><small>${brl(o.preco)} · ${esc(o.busca)}</small><label class="pl-nicho-l">Nicho${o.nicho_origem ? ` <em>(${esc(o.nicho_origem)})</em>` : ""} <select class="pl-nicho" data-busca="${esc(o.busca)}" aria-label="Nicho da busca ${esc(o.busca)}"><option value="">${o.nicho ? "automático" : "sem nicho — escolher"}</option>${plNichos().filter((n) => n.slug !== "geral").map((n) => `<option value="${esc(n.slug)}" ${o.nicho === n.slug && o.nicho_origem === "correção sua" ? "selected" : ""}>${n.emoji} ${esc(n.nome)}</option>`).join("")}</select></label><small>Por que o Cérebro gosta: ${esc(o.motivos.join("; ") || "melhor pontuação disponível")}</small></div>`).join("")
     + (e.total > e.proximas.length ? `<p class="mini">+ ${e.total - e.proximas.length} oferta(s) na fila.</p>` : "");
 }
 
@@ -125,7 +126,7 @@ function renderRecentes(d) {
   if (!d.recentes.length) { box.innerHTML = `<p class="pl-vazio">Os envios aparecem aqui assim que o Piloto começar.</p>`; return; }
   const nomes = { enviado: "enviado", pendente: "na fila", aguardando: "aguardando", erro: "erro", pulado: "pulado" };
   box.innerHTML = d.recentes.map((r) =>
-    `<div class="pl-linha"><span class="pl-t"><b>${esc(r.titulo)}</b><br><span class="pl-q">${esc(r.destino_nome || r.destino_ref || "")}${r.erro ? " · " + esc(r.erro) : ""}</span></span><span class="pl-tag ${r.status === "enviado" ? "ok" : r.status === "erro" ? "" : "espera"}">${nomes[r.status] || r.status}</span><span class="pl-q">${plHora(r.enviado_em || r.criado_em)}</span></div>`).join("");
+    `<div class="pl-linha"><span class="pl-t"><b>${esc(r.titulo)}</b><br><span class="pl-q">${esc(r.destino_nome || r.destino_ref || "")}${r.erro ? " · " + esc(r.erro) : ""}</span></span><span class="pl-tag ${r.status === "enviado" ? "ok" : r.status === "erro" ? "" : "espera"}">${nomes[r.status] || r.status}</span><span class="pl-q">${r.cliques ? r.cliques + " clique(s) · " : ""}${plHora(r.enviado_em || r.criado_em)}</span></div>`).join("");
 }
 
 function atualizarDica() {
@@ -311,6 +312,12 @@ $("#pl-destinos").addEventListener("change", async (e) => {
   catch (err) { plMsg(err.message, "erro"); await carregarPiloto(); }
 });
 
+$("#pl-estoque").addEventListener("change", async (e) => {
+  const s = e.target.closest("select[data-busca]"); if (!s) return;
+  try { piloto.dados = await api("/api/piloto/nicho-busca", { method: "PUT", body: { busca: s.dataset.busca, nicho: s.value } }); renderPiloto(); plMsg("Nicho da busca atualizado — o Cérebro aprendeu com a sua correção.", "ok"); }
+  catch (err) { plMsg(err.message, "erro"); }
+});
+
 $("#form-pl-config").addEventListener("submit", async (e) => {
   e.preventDefault();
   const btn = $("#btn-pl-salvar"), num = (id) => { const v = $(id).value; return v === "" ? null : Number(v); };
@@ -318,7 +325,7 @@ $("#form-pl-config").addEventListener("submit", async (e) => {
   await salvarPiloto({
     hora_ini: num("#pl-hora-ini"), hora_fim: num("#pl-hora-fim"), intervalo_min: num("#pl-intervalo"), max_dia: num("#pl-max-dia"),
     validade_dias: num("#pl-validade"), preco_min: num("#pl-pmin"), preco_max: num("#pl-pmax"), estilo: $("#pl-estilo").value,
-    modo: $("#pl-modo").value, relatorio: $("#pl-relatorio").checked,
+    modo: $("#pl-modo").value, relatorio: $("#pl-relatorio").checked, rastrear: $("#pl-rastrear").checked,
     palavras: $("#pl-palavras").value.split(",").map((s) => s.trim()).filter(Boolean),
   }, "Regras salvas.");
   carregando(btn, false);
@@ -342,3 +349,25 @@ $("#pl-aprovacao").addEventListener("click", async (e) => {
     await carregarPiloto();
   } catch (err) { plMsg(err.message, "erro"); }
 });
+
+
+/* ---- Cérebro: o que foi aprendido ---- */
+async function carregarAprendizado() {
+  let a; try { a = await api("/api/cerebro/aprendizado"); } catch (_) { return; }
+  $("#ap-painel").hidden = false;
+  const fases = { sem_dados: "ainda sem retorno do público", aprendendo: "aprendendo", calibrado: "calibrado" };
+  $("#ap-fase").textContent = fases[a.fase] || a.fase;
+  const barra = (titulo, linhas) => linhas.length ? `<div class="ap-bloco"><b>${titulo}</b>${linhas.map((l) => `<div class="ap-linha"><span>${esc(l.rotulo)}</span><i style="--w:${l.taxa}%"></i><small>${l.taxa}% · ${l.tentativas}</small></div>`).join("")}</div>` : "";
+  const p = a.preferencias;
+  $("#ap-publico").innerHTML = a.fase === "sem_dados"
+    ? `<p class="muted">O Cérebro ainda não recebeu retorno do seu público. ${a.rastrear ? "Os cliques das ofertas já estão sendo medidos; em até 24 h ele começa a calibrar." : "No <b>Piloto Automático</b>, ligue <b>Medir cliques</b> (ou use o modo de aprovação): é assim que ele aprende o que o seu público quer."}</p>`
+    : `<p class="mini">${a.cliques.acertos} de ${a.cliques.avaliados} envios avaliados tiveram retorno (${a.cliques.taxa}%).</p>` +
+      barra("Por nicho", p.nicho) + barra("Por busca", p.busca) + barra("Por faixa de preço", p.faixa) + barra("Layout da mensagem", p.variante);
+  const pal = Object.values(a.palavras_aprendidas);
+  $("#ap-palavras").innerHTML = pal.length
+    ? pal.map((n) => `<div class="ap-bloco"><b>${n.emoji} ${esc(n.nome)}</b><div>${n.palavras.map((w) => `<span class="pl-chip">${esc(w)}</span>`).join("")}</div></div>`).join("")
+    : `<p class="muted">Ainda nenhuma. Conforme você busca, o Cérebro aprende que palavras novas indicam cada nicho.</p>`;
+  $("#ap-quedas").innerHTML = a.precos.quedas.length
+    ? a.precos.quedas.map((q) => `<div class="ap-queda"><b>${esc(q.titulo)}</b><small>de ${brl(q.de)} para ${brl(q.para)} · −${q.pct}%</small></div>`).join("")
+    : `<p class="muted">${a.precos.produtos_com_historico ? "Nenhuma queda real nos últimos dias." : "Guardando o preço de cada produto dia a dia: as quedas aparecem aqui."}</p>`;
+}

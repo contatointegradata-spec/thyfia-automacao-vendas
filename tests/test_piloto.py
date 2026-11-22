@@ -73,8 +73,8 @@ class Base(tp.Base):
     def setUp(self):
         super().setUp()
         c = db.conn()
-        for t in ("piloto_envios", "piloto_destinos", "piloto_config", "assinaturas", "config_usuario",
-                  "produtos", "termos"):
+        for t in ("piloto_cliques", "piloto_envios", "piloto_destinos", "piloto_config", "assinaturas", "config_usuario",
+                  "produtos", "termos", "cerebro_bandit", "nicho_busca", "preco_historico", "nb_tokens", "nb_docs"):
             c.execute(f"DELETE FROM {t}")
         c.commit()
         self.g = Gravador().aplicar(self)

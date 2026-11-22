@@ -22,11 +22,11 @@ load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.concurrency import run_in_threadpool
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from . import (piloto, agente_publicacao, auth, automacao, cerebro, configuracoes, db, facebook, imagem_host, instagram,
+from . import (aprendizado, piloto, agente_publicacao, auth, automacao, cerebro, configuracoes, db, facebook, imagem_host, instagram,
                itens, kiwify, motor_ml, planos, tenant, video)
 
 STATIC = Path(__file__).resolve().parent / "static"
@@ -62,6 +62,10 @@ for _nome in ("thyfia.publicacao", "thyfia.instagram", "thyfia.imagem"):
     logging.getLogger(_nome).setLevel(logging.INFO)
 agente_publicacao.iniciar_agendador()
 piloto.iniciar_agendador()  # Piloto Automático (THYFIA_PILOTO=0 desliga)
+try:  # aproveita os preços dos itens já gerados como primeiro histórico (só na primeira vez)
+    aprendizado.reconstruir_precos()
+except Exception:
+    logging.getLogger("thyfia").warning("Não consegui reconstruir o histórico de preços.", exc_info=True)
 
 app = FastAPI(title="ThyfIA", docs_url=None, redoc_url=None)
 
@@ -591,6 +595,12 @@ class PilotoConfig(BaseModel):
     palavras: list[str] | None = None
     estilo: str | None = None
     relatorio: bool | None = None
+    rastrear: bool | None = None
+
+
+class PilotoNichoBusca(BaseModel):
+    busca: str = Field(max_length=120)
+    nicho: str = Field(default="", max_length=20)  # vazio = voltar ao automático
 
 
 class PilotoDestino(BaseModel):
@@ -689,6 +699,16 @@ def piloto_destino_confirmar(did: int, dados: PilotoCodigo, u=Depends(exige("aut
         raise _erro_piloto(e)
 
 
+@app.put("/api/piloto/nicho-busca")
+def piloto_nicho_busca(dados: PilotoNichoBusca, u=Depends(exige("automacao"))):
+    """O cliente corrige o nicho de uma busca; vale para ele e ensina o Cérebro."""
+    try:
+        aprendizado.corrigir_nicho(u["id"], dados.busca, dados.nicho)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    return piloto.status(u["id"])
+
+
 @app.put("/api/piloto/destinos/{did}")
 def piloto_destino_alternar(did: int, dados: PilotoAtivo, u=Depends(exige("automacao"))):
     try:
@@ -769,6 +789,23 @@ def publicacao_cancelar(pub_id: int, u=Depends(exige("agente"))):
 @app.get("/api/cerebro/sugestoes")
 def sugestoes(q: str = "", u=Depends(exige("gerar"))):
     return {"sugestoes": cerebro.sugerir(q[:80]), "relacionados": cerebro.relacionados(q[:80]) if q else []}
+
+
+@app.get("/api/cerebro/aprendizado")
+def cerebro_aprendizado(u=Depends(usuario_atual)):
+    """O que o Cérebro aprendeu: palavras novas por nicho, quedas de preço e o que o público DESTE usuário responde."""
+    return aprendizado.resumo(u["id"])
+
+
+@app.get("/r/{token}")
+def clique_rastreado(token: str, request: Request):
+    """Link curto das ofertas do Piloto (quando o cliente liga a medição de cliques): conta o clique de gente de
+    verdade e leva ao link de afiliado. Atrás de proxy, o IP vem do cabeçalho."""
+    ip = (request.headers.get("x-forwarded-for") or (request.client.host if request.client else "")).split(",")[0].strip()
+    destino = aprendizado.registrar_clique(token[:32], ip, request.headers.get("user-agent", ""))
+    if not destino:
+        raise HTTPException(404, "Link não encontrado.")
+    return RedirectResponse(destino, status_code=302, headers={"Cache-Control": "no-store", "Referrer-Policy": "no-referrer"})
 
 
 @app.get("/api/cerebro/stats")
