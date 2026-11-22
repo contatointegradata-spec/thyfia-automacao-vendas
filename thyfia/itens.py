@@ -100,15 +100,15 @@ def _link_valido(link) -> str | None:
 # --------------------------------------------------------------------------- gravação / leitura
 def salvar_item(job_id: str, busca: str, titulo, preco, url_produto, link_afiliado,
                 criado_em: str | None = None, conn: sqlite3.Connection | None = None,
-                commit: bool = True, imagem: str | None = None) -> bool:
+                commit: bool = True, imagem: str | None = None, processado: int = 1) -> bool:
     """Grava um item da geração. Ignora link de afiliado repetido no mesmo job.
     Retorna True se gravou."""
     c = conn or db.conn()
     cur = c.execute(
         "INSERT OR IGNORE INTO job_itens (job_id, busca, titulo, preco, url_produto, link_afiliado, "
-        "criado_em, imagem) VALUES (?,?,?,?,?,?,?,?)",
+        "criado_em, imagem, processado) VALUES (?,?,?,?,?,?,?,?,?)",
         (job_id, _texto(busca), _texto(titulo), preco_numero(preco), _texto(url_produto),
-         _link_valido(link_afiliado), criado_em or agora_iso(), _link_valido(imagem)),
+         _link_valido(link_afiliado), criado_em or agora_iso(), _link_valido(imagem), processado),
     )
     if commit:
         c.commit()
@@ -128,6 +128,34 @@ def contar(job_id: str) -> tuple[int, int]:
         "SELECT COUNT(*) AS t, COUNT(link_afiliado) AS l FROM job_itens WHERE job_id=?", (job_id,)
     ).fetchone()
     return r["t"], r["l"]
+
+
+def pendentes(job_id: str) -> list[str]:
+    """URLs dos produtos que ainda aguardam o link (geração feita pelo navegador da pessoa)."""
+    rows = db.conn().execute(
+        "SELECT url_produto FROM job_itens WHERE job_id=? AND processado=0 ORDER BY id", (job_id,)).fetchall()
+    return [r["url_produto"] for r in rows]
+
+
+def processados(job_id: str) -> int:
+    return db.conn().execute(
+        "SELECT COUNT(*) AS n FROM job_itens WHERE job_id=? AND processado=1", (job_id,)).fetchone()["n"]
+
+
+def registrar_resultado(job_id: str, url_produto: str, link: str | None) -> bool:
+    """Grava o link que o navegador da pessoa gerou (ou a falta dele) para um produto pendente.
+    Retorna False se o produto não estava pendente (resposta repetida/desconhecida)."""
+    c = db.conn()
+    try:
+        cur = c.execute(
+            "UPDATE job_itens SET link_afiliado=?, processado=1 WHERE job_id=? AND url_produto=? AND processado=0",
+            (_link_valido(link), job_id, _texto(url_produto)))
+    except sqlite3.IntegrityError:  # o mesmo link já está em outro item deste job
+        cur = c.execute(
+            "UPDATE job_itens SET processado=1 WHERE job_id=? AND url_produto=? AND processado=0",
+            (job_id, _texto(url_produto)))
+    c.commit()
+    return cur.rowcount > 0
 
 
 def para_envio(itens: list[dict]) -> list[dict]:

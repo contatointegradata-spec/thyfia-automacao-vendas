@@ -262,7 +262,11 @@ function entrarNoApp(eu, origem) {
   irPara("gerar", true);  // sem plano, o guarda do irPara leva para "Meu plano"
   mostrarTela("#tela-app", origem ? "revelando" : "entrando", origem);
   requestAnimationFrame(moverIndicador);
-  if (eu.job_ativo) { estado.job = eu.job_ativo.id; abrirGerando(eu.job_ativo); }
+  if (eu.job_ativo) {
+    estado.job = eu.job_ativo.id; abrirGerando(eu.job_ativo);
+    // página recarregada no meio da geração: continua de onde parou (os links saem deste navegador)
+    if (eu.job_ativo.status === "gerando" && temExtensao() && extensaoAtende("1.4.0")) gerarNaExtensao(eu.job_ativo.id);
+  }
   if (eu.ml.status === "conectando") abrirModalMl(true);
   if (origem) setTimeout(() => toast(`Que bom te ver, ${primeiro}!`, "ok"), 700);
 }
@@ -566,24 +570,56 @@ $("#form-busca").addEventListener("submit", async (e) => {
   carregando(btn, true);
   try {
     await sincronizarSessao(); // usa a sessão mais recente do ML deste navegador
-    // a busca de produtos roda neste navegador (o ML recusa a busca vinda do IP do servidor)
-    let trechos = null;
-    if (temExtensao() && !extensaoAtende("1.3.0")) {
-      // extensão antiga não sabe buscar (e nem responde ao pedido): não espera à toa
-      toast(`Sua extensão ThyfIA Conector é a v${document.documentElement.dataset.thyfiaExt}; a busca precisa da v1.3.0 ou mais nova. Baixe de novo em Ajuda, troque a pasta e recarregue em chrome://extensions.`, "erro");
-    } else if (temExtensao()) {
-      try { trechos = (await falarComExtensao("buscar", 30000, { termo, limite: estado.limite })).trechos || null; }
-      catch (e) { if (e.message) toast(e.message, "info"); /* o servidor ainda tenta sozinho */ }
+    // a busca e a geração dos links rodam neste navegador (o ML recusa as duas quando vêm do IP do servidor)
+    if (!temExtensao() || !extensaoAtende("1.4.0")) {
+      const v = document.documentElement.dataset.thyfiaExt;
+      throw new Error(v
+        ? `Sua extensão ThyfIA Conector é a v${v}; agora ela precisa ser a v1.4.0 ou mais nova. Baixe de novo em Ajuda, troque a pasta e recarregue em chrome://extensions.`
+        : "Instale a extensão ThyfIA Conector neste navegador (veja em Integrações) para gerar seus links.");
     }
-    const { id } = await api("/api/jobs", { body: { termo, limite: estado.limite, trechos } });
+    let trechos = null;
+    try { trechos = (await falarComExtensao("buscar", 30000, { termo, limite: estado.limite })).trechos || null; }
+    catch (e) { throw new Error(e.message || "Não consegui buscar os produtos neste navegador."); }
+    const { id } = await api("/api/jobs", { body: { termo, limite: estado.limite, trechos, na_extensao: true } });
     estado.job = id;
     await espera(350);
-    abrirGerando({ id, termo, status: "iniciando", total: 0, feitos: 0, ok: 0 });
+    abrirGerando({ id, termo, status: "gerando", total: 0, feitos: 0, ok: 0 });
+    gerarNaExtensao(id);
   } catch (err) {
     toast(err.message, "erro");
     if (err.status === 400) irPara("integracoes");
   } finally { carregando(btn, false); }
 });
+
+/* ------------------------------------------------------------------ GERAÇÃO NO NAVEGADOR (extensão) */
+// Para cada produto, a extensão gera o link no gerador do ML (neste navegador) e a página entrega o
+// resultado à ThyfIA. Se nada sair nos primeiros produtos, para logo em vez de esperar o resto.
+async function gerarNaExtensao(id) {
+  if (estado.gerandoExt === id) return;
+  estado.gerandoExt = id;
+  let ok = 0, seguidas = 0;
+  try {
+    const { urls } = await api(`/api/jobs/${id}/pendentes`);
+    for (const url of urls) {
+      let link = null;
+      try { link = (await falarComExtensao("gerar", 60000, { url })).link || null; }
+      catch (e) { await api(`/api/jobs/${id}/abortar`, { body: { erro: e.message } }).then(atualizarGerando); return; }
+      const job = await api(`/api/jobs/${id}/links`, { body: { url, link } });
+      atualizarGerando(job);
+      if (job.status !== "gerando") return;
+      if (link) { ok++; seguidas = 0; }
+      else if (!ok && ++seguidas >= 4) {
+        const erro = "O gerador de links do Mercado Livre não respondeu neste navegador. Abra o Mercado Livre, entre na sua conta e tente de novo.";
+        return atualizarGerando(await api(`/api/jobs/${id}/abortar`, { body: { erro } }));
+      }
+    }
+  } catch (e) {
+    toast(e.message || "A geração foi interrompida.", "erro");
+  } finally {
+    estado.gerandoExt = null;
+    falarComExtensao("gerar_fim", 4000).catch(() => {});
+  }
+}
 
 /* ------------------------------------------------------------------ GERANDO */
 const FRASES = [
@@ -651,6 +687,8 @@ function pararPolls() {
 }
 
 async function finalizarGerando(job) {
+  if (estado.fimDe === job.id) return;  // o acompanhamento e a geração podem avisar juntos
+  estado.fimDe = job.id;
   pararPolls();
   const barra = $("#prog-barra");
   barra.classList.remove("indeterminado"); barra.style.width = "100%"; $("#liquido").style.height = "90%";

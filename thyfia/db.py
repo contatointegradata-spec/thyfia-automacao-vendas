@@ -202,12 +202,19 @@ def init() -> None:
         # perfil: usuario | admin (o admin é o desenvolvedor/dono da plataforma)
         "ALTER TABLE usuarios ADD COLUMN papel TEXT NOT NULL DEFAULT 'usuario'",
         "ALTER TABLE usuarios ADD COLUMN ativo INTEGER NOT NULL DEFAULT 1",
+        # 0 = item aguardando o link do navegador da pessoa (geração pela extensão); 1 = resolvido
+        "ALTER TABLE job_itens ADD COLUMN processado INTEGER NOT NULL DEFAULT 1",
     )
     for sql in migracoes:
         try:
             c.execute(sql)
         except sqlite3.OperationalError:
             pass  # coluna já existe
+    # uma vez só: falhas de geração causadas pelo bloqueio do ML ao IP do servidor marcaram produtos
+    # como "inelegíveis" sem culpa deles; zera a contagem para voltarem a ser tentados
+    c.execute("CREATE TABLE IF NOT EXISTS migracoes_unicas (nome TEXT PRIMARY KEY)")
+    if c.execute("INSERT OR IGNORE INTO migracoes_unicas (nome) VALUES ('zera_falhas_bloqueio_ip')").rowcount:
+        c.execute("UPDATE produtos SET falhas=0 WHERE gerados=0")
     # envios interrompidos pelo reinício do servidor
     c.execute("UPDATE jobs SET envio_status='erro', envio_erro='Envio interrompido (servidor reiniciado).' "
               "WHERE envio_status='enviando'")

@@ -4,7 +4,7 @@ document.documentElement.dataset.thyfiaExt = chrome.runtime.getManifest().versio
 window.addEventListener("message", (e) => {
   if (e.source !== window || !e.data || e.data.origem !== "thyfia-pagina") return;
   const { id, acao, dados } = e.data;
-  if (!["conectar", "sincronizar", "buscar"].includes(acao)) return;
+  if (!["conectar", "sincronizar", "buscar", "gerar", "gerar_fim"].includes(acao)) return;
   chrome.runtime.sendMessage({ acao, ...(dados || {}) }, (resp) => {
     const erro = chrome.runtime.lastError;
     window.postMessage(
