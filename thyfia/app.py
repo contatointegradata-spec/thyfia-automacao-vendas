@@ -26,7 +26,7 @@ from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from . import (aprendizado, piloto, agente_publicacao, auth, automacao, cerebro, configuracoes, db, facebook, imagem_host, instagram,
+from . import (aprendizado, piloto, agente_publicacao, auth, automacao, cerebro, configuracoes, db, facebook, imagem_host, instagram, emails,
                itens, kiwify, motor_ml, nichos, planos, tenant, video)
 
 STATIC = Path(__file__).resolve().parent / "static"
@@ -200,6 +200,7 @@ def cadastro(dados: Cadastro, resp: Response):
     except ValueError as e:
         raise HTTPException(400, str(e))
     auth.garantir_admin()
+    emails.enviar_em_segundo_plano(dados.nome, dados.email.strip().lower())  # boas-vindas; sem config, não faz nada
     _set_cookie(resp, auth.criar_sessao(uid))
     return _perfil_usuario(auth.autenticar(dados.email, dados.senha))
 
@@ -1049,6 +1050,16 @@ def admin_config_salvar(dados: NovaConfig, request: Request, u=Depends(admin_atu
             continue  # segredo em branco = manter o atual (para apagar, use o botão "limpar")
         configuracoes.definir(k, v)
     return admin_config(request, u)
+
+
+@app.post("/api/admin/config/testar-email")
+def admin_testar_email(u=Depends(admin_atual)):
+    """Manda o e-mail de boas-vindas para o próprio admin, para conferir remetente, senha de app e visual."""
+    try:
+        emails.enviar(emails.montar_mensagem(u["nome"], u["email"]))
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    return {"ok": True, "para": u["email"]}
 
 
 @app.delete("/api/admin/config/{chave}")
