@@ -69,8 +69,19 @@ def emoji_da(busca: str, titulo: str) -> str:
     return "🛍️"
 
 
-def compor(item: dict, estilo: str = "variado", semente: int = 0) -> dict:
-    """item: {titulo, preco, link_afiliado, busca}. Devolve {texto (WhatsApp), html (Telegram), titulo, preco}."""
+def prova_de_preco(item: dict) -> str:
+    """Frase SÓ com o que o histórico de preços da ThyfIA comprova (nunca inventa desconto). Vazio se não houver."""
+    pct, ref = item.get("queda_pct") or 0, item.get("preco_ref")
+    if pct >= 5 and ref:
+        return f"\n📉 Baixou {round(pct)}% (já esteve ~R$ {preco_br(ref)})"
+    if item.get("menor_preco"):
+        return "\n⭐ Menor preço que registramos"
+    return ""
+
+
+def compor(item: dict, estilo: str = "variado", semente: int = 0, variante: str | None = None) -> dict:
+    """item: {titulo, preco, link_afiliado, busca}. Devolve {texto (WhatsApp), html (Telegram), titulo, preco, layout}.
+    `variante` (A/B/C) força o layout que o Cérebro aprendeu que rende mais; vazio = varia sozinho."""
     rnd = random.Random(f"{item.get('id', 0)}-{semente}")
     if estilo == "animado":
         pool = GANCHOS_ANIMADO
@@ -84,16 +95,19 @@ def compor(item: dict, estilo: str = "variado", semente: int = 0) -> dict:
     emoji = emoji_da(item.get("busca", ""), titulo)
     link = (item.get("link_afiliado") or "").strip()
     layout = rnd.choice("ABC")
+    if variante in ("A", "B", "C"):
+        layout = variante
+    prova = prova_de_preco(item)
 
     if layout == "A":
-        wa = f"{gancho}\n\n{emoji} *{titulo}*\n\n💰 Por *R$ {preco}*\n\n_{AVISO}_\n👉 {link}"
+        wa = f"{gancho}\n\n{emoji} *{titulo}*\n\n💰 Por *R$ {preco}*{prova}\n\n_{AVISO}_\n👉 {link}"
     elif layout == "B":
-        wa = f"{gancho}\n\n*{titulo}*\n💰 R$ {preco}\n\n_{AVISO}_\n🛒 Compre aqui: {link}"
+        wa = f"{gancho}\n\n*{titulo}*\n💰 R$ {preco}{prova}\n\n_{AVISO}_\n🛒 Compre aqui: {link}"
     else:
-        wa = f"{emoji} {gancho}\n*{titulo}*\n\nPor apenas *R$ {preco}* 👇\n{link}\n\n_{AVISO}_"
+        wa = f"{emoji} {gancho}\n*{titulo}*\n\nPor apenas *R$ {preco}*{prova} 👇\n{link}\n\n_{AVISO}_"
 
     esc = html.escape
-    corpo = {"A": f"{esc(gancho)}\n\n{emoji} <b>{esc(titulo)}</b>\n\n💰 Por <b>R$ {preco}</b>",
-             "B": f"{esc(gancho)}\n\n<b>{esc(titulo)}</b>\n💰 R$ {preco}",
-             "C": f"{emoji} {esc(gancho)}\n<b>{esc(titulo)}</b>\n\nPor apenas <b>R$ {preco}</b> 👇"}[layout]
-    return {"texto": wa, "html": f"{corpo}\n\n<i>{esc(AVISO)}</i>", "titulo": titulo, "preco": preco}
+    corpo = {"A": f"{esc(gancho)}\n\n{emoji} <b>{esc(titulo)}</b>\n\n💰 Por <b>R$ {preco}</b>{esc(prova)}",
+             "B": f"{esc(gancho)}\n\n<b>{esc(titulo)}</b>\n💰 R$ {preco}{esc(prova)}",
+             "C": f"{emoji} {esc(gancho)}\n<b>{esc(titulo)}</b>\n\nPor apenas <b>R$ {preco}</b>{esc(prova)} 👇"}[layout]
+    return {"texto": wa, "html": f"{corpo}\n\n<i>{esc(AVISO)}</i>", "titulo": titulo, "preco": preco, "layout": layout}

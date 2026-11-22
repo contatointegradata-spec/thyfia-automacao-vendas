@@ -26,7 +26,7 @@ import threading
 import time
 from datetime import datetime, timedelta
 
-from . import cerebro, configuracoes, db, envio_canais, imagem_host, mensagens, nichos, tenant
+from . import aprendizado, cerebro, configuracoes, db, envio_canais, imagem_host, mensagens, nichos, tenant
 from .envio_canais import ErroEnvio
 from .itens import TZ_SP
 
@@ -85,6 +85,7 @@ def config(uid: int) -> dict:
         r["palavras"] = []
     r["ativo"] = bool(r["ativo"])
     r["relatorio"] = bool(r["relatorio"])
+    r["rastrear"] = bool(r.get("rastrear"))
     return r
 
 
@@ -129,12 +130,16 @@ def salvar_config(uid: int, d: dict) -> dict:
     palavras = [re.sub(r"\s+", " ", str(p)).strip() for p in palavras][:30]
     palavras = [p for p in palavras if p]
     ativo = bool(d.get("ativo", atual["ativo"]))
+    rastrear = bool(d.get("rastrear", atual["rastrear"]))
+    if rastrear and not imagem_host.url_base_publica():
+        raise ErroPiloto("A medição de cliques precisa do endereço público da ThyfIA, que ainda não foi configurado. "
+                         "Fale com o suporte.", 503)
     c = db.conn()
     c.execute(
-        "UPDATE piloto_config SET ativo=?, modo=?, hora_ini=?, hora_fim=?, intervalo_min=?, max_dia=?, "
+        "UPDATE piloto_config SET rastrear=?, ativo=?, modo=?, hora_ini=?, hora_fim=?, intervalo_min=?, max_dia=?, "
         "validade_dias=?, preco_min=?, preco_max=?, palavras=?, estilo=?, relatorio=?, "
         "atualizado=datetime('now','localtime') WHERE usuario_id=?",
-        (int(ativo), modo, ini, fim, _num(d.get("intervalo_min", atual["intervalo_min"]), 10, 720, 30),
+        (int(rastrear), int(ativo), modo, ini, fim, _num(d.get("intervalo_min", atual["intervalo_min"]), 10, 720, 30),
          _num(d.get("max_dia", atual["max_dia"]), 1, 60, 12),
          _num(d.get("validade_dias", atual["validade_dias"]), 1, 30, 7), pmin, pmax,
          json.dumps(palavras, ensure_ascii=False), estilo, int(bool(d.get("relatorio", atual["relatorio"]))), uid))
@@ -452,13 +457,14 @@ def candidatos(uid: int, cfg: dict | None = None, agora: datetime | None = None,
         f"WHERE e.usuario_id=? AND e.status IN ({','.join('?' * len(_BLOQ))}) AND e.criado_em >= ?",
         (uid, *_BLOQ, desde)).fetchall()
     ja = {x for r in recentes for x in (r["url_produto"], r["link_afiliado"]) if x}
+    resolvedor = aprendizado.Resolvedor(uid)
     vistos, unicos = set(), []
     for r in rows:  # mesmo produto em várias gerações conta uma vez só
         chave = r["url_produto"] or r["link_afiliado"]
         if chave in vistos or r["url_produto"] in ja or r["link_afiliado"] in ja:
             continue
         vistos.add(chave)
-        r["nicho"] = nichos.classificar(r["busca"], r["titulo"])
+        r["nicho"], r["nicho_origem"] = resolvedor.de(r["busca"], r["titulo"])
         if (nicho and nicho != nichos.GERAL and r["nicho"] != nicho) or r["id"] in (excluir or ()):
             continue
         unicos.append(r)
@@ -477,7 +483,7 @@ def candidatos(uid: int, cfg: dict | None = None, agora: datetime | None = None,
         ult = c.execute("SELECT busca FROM piloto_envios WHERE usuario_id=? AND status<>'pulado' "
                         "ORDER BY id DESC LIMIT 1", (uid,)).fetchone()
     return cerebro.curar_ofertas(unicos, ultima_busca=ult["busca"] if ult else "", envios_por_busca=por_busca,
-                                 validade_dias=cfg["validade_dias"], agora=agora)
+                                 validade_dias=cfg["validade_dias"], agora=agora, uid=uid)
 
 
 # --------------------------------------------------------------------------- planejar e despachar
@@ -563,6 +569,7 @@ def planejar(uid: int, agora: datetime | None = None, forcar: bool = False, host
     if set(faltam) - {nichos.GERAL}:  # parte dos nichos ficou sem oferta: avisa (no máx. 1x por dia)
         _alertar_estoque(uid, agora, [n for n in faltam if n != nichos.GERAL])
     status = "pendente" if cfg["modo"] == "automatico" else "aguardando"
+    base_url = imagem_host.url_base_publica()
     quando, total = agora, 0
     for n, escolhida in escolhas:
         try:
@@ -573,13 +580,18 @@ def planejar(uid: int, agora: datetime | None = None, forcar: bool = False, host
         if n != nichos.GERAL:
             motivo = f"nicho {nichos.nome(n)}; " + motivo
         for d in grupos[n]:
-            m = mensagens.compor(escolhida, cfg["estilo"], d["id"])
+            token = aprendizado.novo_token() if base_url and cfg["rastrear"] else None
+            item = {**escolhida, "link_afiliado": f"{base_url}/r/{token}"} if token else escolhida
+            var = aprendizado.escolher_variante(uid, random.Random(f"v-{escolhida['id']}-{d['id']}"))
+            m = mensagens.compor(item, cfg["estilo"], d["id"], var)
             c.execute(
                 "INSERT INTO piloto_envios (usuario_id, item_id, destino_id, status, busca, titulo, preco, texto, html, "
-                "link, imagem, motivo, pontos, enviar_apos, criado_em) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                "link, imagem, motivo, pontos, enviar_apos, criado_em, token, link_real, nicho, variante) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (uid, escolhida["id"], d["id"], status, escolhida["busca"], m["titulo"], escolhida["preco"], m["texto"],
-                 m["html"], escolhida["link_afiliado"], imagem, motivo, escolhida["pontos"],
-                 _iso(quando) if status == "pendente" else None, _iso(agora)))
+                 m["html"], item["link_afiliado"], imagem, motivo, escolhida["pontos"],
+                 _iso(quando) if status == "pendente" else None, _iso(agora), token,
+                 escolhida["link_afiliado"] if token else None, escolhida.get("nicho"), m["layout"]))
             quando += timedelta(seconds=random.randint(*ESPACO_DESTINOS_S))
             total += 1
     base = cfg["intervalo_min"] * 60
@@ -688,6 +700,7 @@ def aprovar(uid: int, item_id: int, agora: datetime | None = None) -> int:
                                        "AND status='aguardando' ORDER BY id", (uid, item_id))]
     if not ids:
         raise ErroPiloto("Não há nada aguardando aprovação para esta oferta.", 404)
+    _sinal_do_dono(uid, ids[0], True)
     quando = agora
     for i in ids:
         c.execute("UPDATE piloto_envios SET status='pendente', enviar_apos=?, criado_em=? WHERE id=?",
@@ -697,13 +710,25 @@ def aprovar(uid: int, item_id: int, agora: datetime | None = None) -> int:
     return len(ids)
 
 
+def _sinal_do_dono(uid: int, envio_id: int, gostou: bool) -> None:
+    """Aprovar ou pular uma oferta ensina o Cérebro o gosto do dono (evidência menor que um clique medido)."""
+    e = db.conn().execute("SELECT nicho, busca, preco, variante FROM piloto_envios WHERE id=?", (envio_id,)).fetchone()
+    if e:
+        aprendizado.registrar_resultado(uid, e["nicho"], e["busca"], e["preco"], e["variante"], gostou,
+                                        aprendizado.PESO_APROVACAO)
+
+
 def pular(uid: int, item_id: int) -> int:
     c = db.conn()
+    primeiro = c.execute("SELECT id FROM piloto_envios WHERE usuario_id=? AND item_id=? AND status='aguardando' "
+                         "ORDER BY id LIMIT 1", (uid, item_id)).fetchone()
     n = c.execute("UPDATE piloto_envios SET status='pulado', erro='Pulada pelo dono.' "
                   "WHERE usuario_id=? AND item_id=? AND status='aguardando'", (uid, item_id)).rowcount
     if not n:
         raise ErroPiloto("Não há nada aguardando aprovação para esta oferta.", 404)
     c.commit()
+    if primeiro:
+        _sinal_do_dono(uid, primeiro["id"], False)
     return n
 
 
@@ -746,7 +771,8 @@ def status(uid: int) -> dict:
     estoque = candidatos(uid, cfg, agora)
     recentes = [dict(r) for r in c.execute(
         "SELECT e.id, e.item_id, e.status, e.titulo, e.preco, e.busca, e.motivo, e.erro, e.enviado_em, e.criado_em, "
-        "d.nome destino_nome, d.tipo destino_tipo, d.ref destino_ref FROM piloto_envios e "
+        "d.nome destino_nome, d.tipo destino_tipo, d.ref destino_ref, "
+        "(SELECT COUNT(*) FROM piloto_cliques k WHERE k.envio_id=e.id) cliques FROM piloto_envios e "
         "LEFT JOIN piloto_destinos d ON d.id=e.destino_id WHERE e.usuario_id=? ORDER BY e.id DESC LIMIT 15", (uid,))]
     plataforma = {
         "qr": bool(configuracoes.obter("evolution_url") and configuracoes.obter("evolution_apikey")),
@@ -760,7 +786,8 @@ def status(uid: int) -> dict:
             "whatsapp": whatsapp_status(uid),
             "estoque": {"total": len(estoque), "baixo": len(estoque) < ESTOQUE_BAIXO,
                         "proximas": [{"titulo": o["titulo"], "preco": o["preco"], "busca": o["busca"],
-                                      "pontos": o["pontos"], "motivos": o["motivos"], "nicho": o["nicho"]}
+                                      "pontos": o["pontos"], "motivos": o["motivos"], "nicho": o["nicho"],
+                                      "nicho_origem": o.get("nicho_origem", "")}
                                      for o in estoque[:5]]},
             "nichos": nichos.catalogo(), "cobertura": cobertura(uid, estoque),
             "hoje": _resumo_dia(uid, _iso(agora)[:10]), "aprovacao": pendentes_aprovacao(uid),
@@ -813,6 +840,7 @@ def ciclo(agora: datetime | None = None) -> None:
     for r in db.conn().execute("SELECT usuario_id FROM piloto_config WHERE ativo=1").fetchall():
         uid = r["usuario_id"]
         try:
+            aprendizado.maturar(uid, agora)
             planejar(uid, agora)
             despachar(uid, agora)
         except Exception:

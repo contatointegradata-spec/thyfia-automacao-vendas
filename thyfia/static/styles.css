@@ -970,3 +970,17 @@ button { cursor: pointer; background: none; border: 0; }
 .pl-nicho-l { display: inline-flex; align-items: center; gap: 6px; margin-top: 6px; font-size: .8rem; opacity: .9; }
 .pl-grupo .pl-nicho { margin-left: auto; }
 @media (max-width: 520px) { .pl-grupo { flex-wrap: wrap; } .pl-grupo .pl-nicho { margin-left: 0; width: 100%; max-width: none; } }
+
+/* Cérebro — o que foi aprendido */
+.ap-painel { margin-top: 18px; }
+.ap-grade { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 22px; }
+.ap-grade h4 { margin: 0 0 8px; font-size: .95rem; opacity: .9; }
+.ap-bloco { margin-bottom: 12px; }
+.ap-bloco > b { display: block; margin-bottom: 6px; font-size: .85rem; opacity: .85; }
+.ap-linha { display: grid; grid-template-columns: minmax(80px, 1.2fr) 2fr auto; gap: 8px; align-items: center; font-size: .85rem; margin: 3px 0; }
+.ap-linha i { height: 6px; border-radius: 4px; background: var(--superficie); position: relative; overflow: hidden; }
+.ap-linha i::after { content: ""; position: absolute; inset: 0; width: var(--w); background: var(--grad); }
+.ap-linha small { opacity: .7; white-space: nowrap; }
+.ap-bloco .pl-chip { display: inline-block; margin: 0 6px 6px 0; }
+.ap-queda { display: grid; margin-bottom: 8px; }
+.ap-queda small { opacity: .75; }

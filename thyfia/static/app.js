@@ -1421,6 +1421,7 @@ $("#btn-wa-automacao").addEventListener("click", () => irPara("automacao"));
 
 /* ------------------------------------------------------------------ CÉREBRO */
 async function carregarCerebro() {
+  if (typeof carregarAprendizado === "function") carregarAprendizado();
   try {
     const s = await api("/api/cerebro/stats");
     $$("#stats strong").forEach((el) => contar(el, s[el.dataset.k] || 0));
