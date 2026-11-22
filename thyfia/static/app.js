@@ -306,6 +306,7 @@ async function irPara(view, imediato = false) {
   if (view === "ajuda") carregarAjuda();
   if (view === "plano") carregarPlano(falta ? falta : null);
   if (view === "automacao") abrirAutomacao();
+  if (view === "piloto") abrirPiloto();
   if (view === "admin") abrirAdmin();
   if (view === "gerar") atualizarPassos();
   if (view === "gerar") setTimeout(() => !$("#busca-card").classList.contains("liberado") || $("#input-termo").focus({ preventScroll: true }), 500);

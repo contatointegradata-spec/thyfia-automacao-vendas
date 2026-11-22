@@ -24,6 +24,7 @@ CAMPOS: dict[str, tuple[str, bool, str]] = {
     "evolution_url": ("EVOLUTION_URL", False, "URL da Evolution API (WhatsApp)"),
     "evolution_apikey": ("EVOLUTION_APIKEY", True, "Chave da Evolution API"),
     "evolution_instancia": ("EVOLUTION_INSTANCIA", False, "Instância da Evolution que envia as ofertas"),
+    "evolution_numero": ("EVOLUTION_NUMERO", False, "Número de WhatsApp da ThyfIA (o que o cliente adiciona como admin do grupo; só dígitos)"),
     "telegram_bot": ("THYFIA_TELEGRAM_BOT", False, "@ do bot do Telegram da automação"),
     "telegram_bot_token": ("THYFIA_TELEGRAM_BOT_TOKEN", True, "Token do bot do Telegram (só para o teste de envio)"),
     "suporte_whatsapp": ("THYFIA_SUPORTE_WHATSAPP", False, "WhatsApp de suporte (só dígitos)"),

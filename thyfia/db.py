@@ -144,6 +144,69 @@ CREATE TABLE IF NOT EXISTS eventos_pagamento (
     detalhe     TEXT
 );
 
+
+-- ===== Piloto Automático: o Cérebro escolhe, a plataforma escreve e envia para os destinos do cliente =====
+CREATE TABLE IF NOT EXISTS piloto_config (
+    usuario_id      INTEGER PRIMARY KEY REFERENCES usuarios(id) ON DELETE CASCADE,
+    ativo           INTEGER NOT NULL DEFAULT 0,
+    modo            TEXT NOT NULL DEFAULT 'automatico',   -- automatico | aprovar
+    hora_ini        INTEGER NOT NULL DEFAULT 8,
+    hora_fim        INTEGER NOT NULL DEFAULT 21,
+    intervalo_min   INTEGER NOT NULL DEFAULT 30,
+    max_dia         INTEGER NOT NULL DEFAULT 12,          -- ofertas por dia (cada uma vai a todos os destinos)
+    validade_dias   INTEGER NOT NULL DEFAULT 7,           -- oferta mais velha que isso não é divulgada
+    preco_min       REAL,
+    preco_max       REAL,
+    palavras        TEXT NOT NULL DEFAULT '[]',           -- JSON: só estas buscas (vazio = todas)
+    estilo          TEXT NOT NULL DEFAULT 'variado',
+    relatorio       INTEGER NOT NULL DEFAULT 1,           -- resumo diário no WhatsApp do dono
+    proximo_envio   TEXT,
+    ultimo_envio    TEXT,
+    pausa_ate       TEXT,
+    pausa_motivo    TEXT,
+    ultimo_relatorio TEXT,                                -- data (AAAA-MM-DD)
+    alerta_estoque  TEXT,                                 -- data do último aviso de estoque baixo
+    atualizado      TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+);
+
+CREATE TABLE IF NOT EXISTS piloto_destinos (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    usuario_id  INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+    tipo        TEXT NOT NULL,                            -- whatsapp_grupo | whatsapp_canal | telegram
+    ref         TEXT NOT NULL,                            -- JID (…@g.us / …@newsletter) ou @canal do Telegram
+    nome        TEXT NOT NULL DEFAULT '',
+    ativo       INTEGER NOT NULL DEFAULT 1,
+    verificado  INTEGER NOT NULL DEFAULT 0,               -- 1 = o cliente digitou o código recebido no destino
+    codigo      TEXT,
+    tentativas  INTEGER NOT NULL DEFAULT 0,
+    falhas      INTEGER NOT NULL DEFAULT 0,               -- falhas seguidas (3 = desliga o destino)
+    erro        TEXT,
+    criado      TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+    UNIQUE (usuario_id, tipo, ref)
+);
+
+CREATE TABLE IF NOT EXISTS piloto_envios (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    usuario_id  INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+    item_id     INTEGER REFERENCES job_itens(id) ON DELETE SET NULL,
+    destino_id  INTEGER REFERENCES piloto_destinos(id) ON DELETE CASCADE,
+    status      TEXT NOT NULL,                            -- aguardando | pendente | enviado | erro | pulado
+    busca       TEXT NOT NULL DEFAULT '',
+    titulo      TEXT NOT NULL DEFAULT '',
+    preco       REAL,
+    texto       TEXT NOT NULL DEFAULT '',
+    html        TEXT NOT NULL DEFAULT '',
+    link        TEXT NOT NULL DEFAULT '',
+    imagem      TEXT,
+    motivo      TEXT NOT NULL DEFAULT '',                 -- por que o Cérebro escolheu esta oferta
+    pontos      REAL,
+    erro        TEXT,
+    enviar_apos TEXT,
+    criado_em   TEXT NOT NULL,
+    enviado_em  TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_piloto_envios_u ON piloto_envios(usuario_id, status);
+
 -- configurações da plataforma (só o admin edita): Kiwify, n8n, Evolution…
 CREATE TABLE IF NOT EXISTS configuracoes (
     chave      TEXT PRIMARY KEY,

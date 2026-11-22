@@ -897,3 +897,50 @@ button { cursor: pointer; background: none; border: 0; }
 .ig-preview-img video[hidden] { display: none; }
 #reels-msg.ok { color: var(--verde); }
 #reels-msg.erro { color: var(--vermelho); }
+
+/* ---- Piloto Automático ---- */
+.pl-topo { display: flex; flex-wrap: wrap; align-items: center; gap: 18px 28px; }
+.pl-liga { flex: 1 1 260px; min-width: 0; }
+.pl-switch { display: inline-flex; align-items: center; gap: 12px; cursor: pointer; font-size: 17px; }
+.pl-switch input { position: absolute; opacity: 0; pointer-events: none; }
+.pl-trilho { width: 52px; height: 30px; border-radius: 99px; background: rgba(255,255,255,.1); border: 1px solid var(--borda); position: relative; transition: background .25s var(--ease), border-color .25s; flex: none; }
+.pl-trilho::after { content: ""; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: #fff; transition: transform .25s var(--ease-mola); }
+.pl-switch input:checked + .pl-trilho { background: var(--grad); border-color: transparent; }
+.pl-switch input:checked + .pl-trilho::after { transform: translateX(22px); }
+.pl-switch input:focus-visible + .pl-trilho { box-shadow: 0 0 0 4px rgba(139,92,246,.3); }
+.pl-numeros { display: flex; gap: 22px; flex-wrap: wrap; }
+.pl-num { text-align: center; }
+.pl-num strong { display: block; font-size: 26px; line-height: 1.1; }
+.pl-num span { font-size: 12px; color: var(--texto-2); }
+.pl-num.alerta strong { color: var(--amarelo-ml); }
+.pl-aviso { margin: 0 0 12px; padding: 10px 14px; border-radius: 12px; background: rgba(251,191,36,.1); border: 1px solid rgba(251,191,36,.35); font-size: 13.5px; }
+.pl-destino { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; padding: 12px 14px; margin-bottom: 10px; border-radius: 14px; background: rgba(0,0,0,.22); border: 1px solid var(--borda); }
+.pl-destino.off { opacity: .6; }
+.pl-d-info { flex: 1 1 220px; min-width: 0; }
+.pl-d-info b { display: block; overflow-wrap: anywhere; }
+.pl-d-info small { color: var(--texto-2); overflow-wrap: anywhere; }
+.pl-d-erro { color: var(--vermelho); font-size: 12.5px; }
+.pl-tag { font-size: 11.5px; padding: 3px 9px; border-radius: 99px; border: 1px solid var(--borda); color: var(--texto-2); white-space: nowrap; }
+.pl-tag.ok { color: var(--verde); border-color: rgba(52,211,153,.4); }
+.pl-tag.espera { color: var(--amarelo-ml); border-color: rgba(251,191,36,.4); }
+.pl-tag.exp { color: var(--ciano); border-color: rgba(34,211,238,.4); }
+.pl-d-acoes { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.pl-cod { width: 96px; text-align: center; letter-spacing: .25em; font: inherit; font-size: 16px; color: var(--texto); background: rgba(0,0,0,.3); border: 1px solid var(--borda); border-radius: 10px; padding: 7px 8px; }
+.pl-novo { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; margin-top: 14px; }
+.pl-grow { flex: 1 1 260px; }
+.pl-grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px; margin-bottom: 14px; }
+.pl-grade .pub-campo select { min-width: 0; width: 100%; }
+.pl-oferta { padding: 12px 14px; margin-bottom: 10px; border-radius: 14px; background: rgba(0,0,0,.22); border: 1px solid var(--borda); }
+.pl-oferta b { overflow-wrap: anywhere; }
+.pl-oferta small { display: block; color: var(--texto-2); margin-top: 4px; }
+.pl-oferta .pl-pontos { float: right; margin-left: 10px; font-weight: 700; color: var(--ciano); }
+.pl-ap { display: flex; gap: 14px; flex-wrap: wrap; padding: 12px 0; border-top: 1px solid var(--borda); }
+.pl-ap:first-child { border-top: 0; }
+.pl-ap img { width: 84px; height: 84px; object-fit: cover; border-radius: 12px; }
+.pl-ap pre { flex: 1 1 260px; margin: 0; white-space: pre-wrap; font: inherit; font-size: 13.5px; color: var(--texto-2); }
+.pl-ap .pl-d-acoes { align-self: flex-start; }
+.pl-linha { display: flex; gap: 10px; padding: 8px 0; border-top: 1px solid var(--borda); font-size: 13.5px; flex-wrap: wrap; }
+.pl-linha:first-child { border-top: 0; }
+.pl-linha .pl-t { flex: 1 1 200px; min-width: 0; overflow-wrap: anywhere; }
+.pl-linha .pl-q { color: var(--texto-2); font-size: 12.5px; }
+.pl-vazio { color: var(--texto-2); font-size: 14px; margin: 0; }
