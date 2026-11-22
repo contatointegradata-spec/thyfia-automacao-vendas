@@ -28,7 +28,16 @@ async function coletarCookies() {
   return [...vistos.values()];
 }
 
+// Já está logado neste navegador? Então não precisa abrir janelinha: o próprio navegador responde.
+async function jaLogado() {
+  try {
+    const r = await fetch(HUB, { credentials: "include" });
+    return r.ok && logadoUrl(r.url);
+  } catch { return false; }
+}
+
 async function conectar() {
+  if (await jaLogado()) return { ok: true, cookies: await coletarCookies() };
   const win = await chrome.windows.create({
     url: HUB, type: "popup", width: 520, height: 780, focused: true,
   });
