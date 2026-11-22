@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/styles.css?v=6">
+  <link rel="stylesheet" href="/static/styles.css?v=7">
 </head>
 <body>
 
@@ -272,88 +272,7 @@
         <button class="btn btn-fantasma btn-mini" id="btn-ig-atualizar" title="Verificar de novo">↻</button>
       </div>
       <p class="pub-aviso" id="pub-aviso">⏰ <span id="pub-aviso-txt">O ThyfIA precisa estar rodando no horário agendado para publicar.</span></p>
-
-      <div class="painel pub-controles" id="pub-controles">
-        <label class="pub-campo"><span>Palavra-chave</span>
-          <select id="pub-keyword"><option value="">Mais recente</option></select>
-        </label>
-        <label class="pub-campo pub-qtd"><span>Candidatos</span>
-          <input type="number" id="pub-qtd" min="1" max="20" value="5">
-        </label>
-        <button class="btn btn-primario" id="btn-sugerir"><span class="btn-txt">✦ Sugerir melhor item</span><span class="spinner"></span></button>
-        <button class="btn btn-fantasma" id="btn-post-manual" title="Subir uma foto e escrever a legenda que quiser">＋ Post manual com foto</button>
-      </div>
-      <p class="muted pub-info" id="pub-info"></p>
-      <div class="pub-candidatos" id="pub-candidatos"></div>
-
-      <section class="painel pub-editor" id="pub-editor" hidden>
-        <div class="pub-editor-topo">
-          <h3 id="pub-editor-titulo">Revisar post</h3>
-          <button class="btn btn-fantasma btn-mini" id="btn-fechar-editor" title="Fechar">✕</button>
-        </div>
-        <div class="pub-editor-grid">
-          <div class="ig-preview">
-            <div class="ig-preview-topo"><span class="ig-avatar"></span><b id="pv-user">@sua_conta</b></div>
-            <div class="ig-preview-img" id="pv-img-box">
-              <img id="pv-img" alt="Prévia da imagem do post" hidden>
-              <div class="pv-sem-foto" id="pv-sem-foto">Sem foto<br><small>envie uma imagem ao lado</small></div>
-              <span class="pv-contagem" id="pv-contagem" hidden></span>
-            </div>
-            <p class="ig-preview-legenda"><b id="pv-user2">sua_conta</b> <span id="pv-legenda"></span></p>
-          </div>
-          <div class="pub-form">
-            <div class="pub-carrossel" id="pub-carrossel" hidden>
-              <span class="pub-rotulo">Fotos do carrossel <small id="pub-carr-cont">0/10</small></span>
-              <div class="carr-bandeja" id="carr-bandeja"></div>
-              <div class="pub-foto-acoes">
-                <label class="btn btn-fantasma btn-mini pub-upload">⬆ Adicionar fotos
-                  <input type="file" id="pub-arquivos" accept="image/jpeg,image/png,image/webp" multiple hidden>
-                </label>
-              </div>
-              <p class="mini" id="carr-msg">De 2 a 10 fotos. Para incluir produtos, use “Sugerir melhor item” e clique em <b>Adicionar</b>. A primeira foto é a capa; todas ficam quadradas.</p>
-            </div>
-            <div class="pub-foto" id="pub-foto-unica">
-              <span class="pub-rotulo">Foto do post</span>
-              <div class="pub-foto-acoes">
-                <label class="btn btn-fantasma btn-mini pub-upload">⬆ Enviar foto
-                  <input type="file" id="pub-arquivo" accept="image/jpeg,image/png,image/webp" hidden>
-                </label>
-                <button class="btn btn-fantasma btn-mini" id="btn-foto-produto" hidden>Usar foto do produto</button>
-              </div>
-              <p class="mini" id="pub-foto-msg"></p>
-            </div>
-            <label class="pub-campo" id="pub-campo-legenda"><span>Legenda <small id="pub-contador">0/2200</small></span>
-              <textarea id="pub-legenda" rows="9" maxlength="2200" placeholder="Escreva a legenda do post…"></textarea>
-            </label>
-            <p class="mini" id="pub-dica-legenda">O link de afiliado não vai na legenda (no Instagram ele não é clicável): use a bio e os canais.</p>
-            <p class="mini" id="pub-dica-story" hidden>Story não tem legenda: sai só a foto, em tela cheia (9:16) com fundo desfocado. Para levar o público ao produto, mande o link pelos canais.</p>
-            <label class="pub-campo"><span>Data e hora</span>
-              <input type="datetime-local" id="pub-quando">
-            </label>
-            <div class="pub-acoes">
-              <button class="btn btn-primario" id="btn-agendar"><span class="btn-txt">📅 Agendar publicação no Instagram</span><span class="spinner"></span></button>
-              <button class="btn btn-fantasma" id="btn-publicar-agora"><span class="btn-txt">Publicar agora</span><span class="spinner"></span></button>
-            </div>
-            <p class="envio-msg" id="pub-msg" role="status" aria-live="polite"></p>
-          </div>
-        </div>
-      </section>
-
       </div><!-- /pub-ws-instagram -->
-
-      <!-- Instagram Reels (em breve) -->
-      <section class="painel pub-breve" id="pub-ws-reels" hidden>
-        <div class="breve-topo"><h3>Reels</h3><span class="badge-breve">em breve</span></div>
-        <p class="muted">Vídeo vertical curto no Instagram. Vão existir dois jeitos de criar:</p>
-        <div class="reels-modos">
-          <label class="reels-modo"><input type="radio" name="reels-fonte" value="upload" checked disabled>
-            <span><b>Enviar meu vídeo</b><small>Você sobe um MP4 pronto e a ThyfIA publica com a legenda.</small></span></label>
-          <label class="reels-modo"><input type="radio" name="reels-fonte" value="auto" disabled>
-            <span><b>Gerar com as fotos do produto</b><small>A ThyfIA monta um vídeo curto com as fotos, o preço e o título.</small></span></label>
-        </div>
-        <button class="btn btn-primario" disabled>Publicar Reels — em breve</button>
-        <p class="mini">Já está no nosso roteiro: precisa de um passo a mais na publicação (envio de vídeo), por isso ainda não liberamos. Enquanto isso, use Feed, Story ou Carrossel.</p>
-      </section>
 
       <!-- Facebook -->
       <div id="pub-ws-facebook" hidden>
@@ -387,12 +306,99 @@
             </div>
           </form>
         </section>
-        <section class="painel pub-breve" id="fb-breve" hidden>
-          <div class="breve-topo"><h3 id="fb-breve-titulo">Publicar no Facebook</h3><span class="badge-breve">em breve</span></div>
-          <p class="muted" id="fb-breve-txt"></p>
-          <p class="mini">Sua Página já fica conectada e validada — assim que a publicação for liberada, é só usar.</p>
-        </section>
       </div>
+
+      <!-- editor compartilhado: Instagram (feed/story/carrossel/reels) e Facebook -->
+      <div id="pub-ws-editor" hidden>
+      <div class="painel pub-controles" id="pub-controles">
+        <label class="pub-campo"><span>Palavra-chave</span>
+          <select id="pub-keyword"><option value="">Mais recente</option></select>
+        </label>
+        <label class="pub-campo pub-qtd"><span>Candidatos</span>
+          <input type="number" id="pub-qtd" min="1" max="20" value="5">
+        </label>
+        <button class="btn btn-primario" id="btn-sugerir"><span class="btn-txt">✦ Sugerir melhor item</span><span class="spinner"></span></button>
+        <button class="btn btn-fantasma" id="btn-post-manual" title="Subir uma foto e escrever a legenda que quiser">＋ Post manual com foto</button>
+      </div>
+      <p class="muted pub-info" id="pub-info"></p>
+      <div class="pub-candidatos" id="pub-candidatos"></div>
+
+      <section class="painel pub-editor" id="pub-editor" hidden>
+        <div class="pub-editor-topo">
+          <h3 id="pub-editor-titulo">Revisar post</h3>
+          <button class="btn btn-fantasma btn-mini" id="btn-fechar-editor" title="Fechar">✕</button>
+        </div>
+        <div class="pub-editor-grid">
+          <div class="ig-preview">
+            <div class="ig-preview-topo"><span class="ig-avatar"></span><b id="pv-user">@sua_conta</b></div>
+            <div class="ig-preview-img" id="pv-img-box">
+              <img id="pv-img" alt="Prévia da imagem do post" hidden>
+              <video id="pv-video" controls muted loop playsinline preload="metadata" hidden></video>
+              <div class="pv-sem-foto" id="pv-sem-foto">Sem foto<br><small>envie uma imagem ao lado</small></div>
+              <span class="pv-contagem" id="pv-contagem" hidden></span>
+            </div>
+            <p class="ig-preview-legenda"><b id="pv-user2">sua_conta</b> <span id="pv-legenda"></span></p>
+          </div>
+          <div class="pub-form">
+            <div class="pub-reels" id="pub-reels" hidden>
+              <span class="pub-rotulo">Vídeo do Reels <small id="reels-duracao"></small></span>
+              <div class="reels-fonte" id="reels-fonte">
+                <label><input type="radio" name="reels-fonte" value="upload" checked> Enviar meu vídeo</label>
+                <label><input type="radio" name="reels-fonte" value="auto"> Gerar com as fotos do produto</label>
+              </div>
+              <div id="reels-upload">
+                <label class="btn btn-fantasma btn-mini pub-upload">⬆ Escolher vídeo (MP4 ou MOV)
+                  <input type="file" id="pub-video-arquivo" accept="video/mp4,video/quicktime,video/*" hidden>
+                </label>
+                <p class="mini">De 3 a 90 segundos, até 100 MB. Qualquer proporção: a ThyfIA converte para 9:16 (tela cheia) com fundo desfocado.</p>
+              </div>
+              <div id="reels-auto" hidden>
+                <button class="btn btn-fantasma btn-mini" id="btn-gerar-video" type="button"><span class="btn-txt">🎬 Gerar vídeo com as fotos</span><span class="spinner"></span></button>
+                <label class="reels-preco"><input type="checkbox" id="reels-com-preco" checked> Mostrar título e preço no vídeo</label>
+              </div>
+              <p class="mini" id="reels-msg" role="status" aria-live="polite"></p>
+            </div>
+            <div class="pub-carrossel" id="pub-carrossel" hidden>
+              <span class="pub-rotulo"><b id="carr-rotulo">Fotos do carrossel</b> <small id="pub-carr-cont">0/10</small></span>
+              <div class="carr-bandeja" id="carr-bandeja"></div>
+              <div class="pub-foto-acoes">
+                <label class="btn btn-fantasma btn-mini pub-upload">⬆ Adicionar fotos
+                  <input type="file" id="pub-arquivos" accept="image/jpeg,image/png,image/webp" multiple hidden>
+                </label>
+              </div>
+              <p class="mini" id="carr-msg">De 2 a 10 fotos. Para incluir produtos, use “Sugerir melhor item” e clique em <b>Adicionar</b>. A primeira foto é a capa; todas ficam quadradas.</p>
+            </div>
+            <div class="pub-foto" id="pub-foto-unica">
+              <span class="pub-rotulo">Foto do post</span>
+              <div class="pub-foto-acoes">
+                <label class="btn btn-fantasma btn-mini pub-upload">⬆ Enviar foto
+                  <input type="file" id="pub-arquivo" accept="image/jpeg,image/png,image/webp" hidden>
+                </label>
+                <button class="btn btn-fantasma btn-mini" id="btn-foto-produto" hidden>Usar foto do produto</button>
+              </div>
+              <p class="mini" id="pub-foto-msg"></p>
+            </div>
+            <label class="pub-campo" id="pub-campo-link" hidden><span>Link do produto</span>
+              <input type="url" id="pub-link" placeholder="https://meli.la/…" autocomplete="off">
+            </label>
+            <label class="pub-campo" id="pub-campo-legenda"><span><b id="pub-rotulo-legenda">Legenda</b> <small id="pub-contador">0/2200</small></span>
+              <textarea id="pub-legenda" rows="9" maxlength="2200" placeholder="Escreva a legenda do post…"></textarea>
+            </label>
+            <p class="mini" id="pub-dica-legenda">O link de afiliado não vai na legenda (no Instagram ele não é clicável): use a bio e os canais.</p>
+            <p class="mini" id="pub-dica-story" hidden>Story não tem legenda: sai só a foto, em tela cheia (9:16) com fundo desfocado. Para levar o público ao produto, mande o link pelos canais.</p>
+            <label class="pub-campo"><span>Data e hora</span>
+              <input type="datetime-local" id="pub-quando">
+            </label>
+            <div class="pub-acoes">
+              <button class="btn btn-primario" id="btn-agendar"><span class="btn-txt">📅 Agendar publicação no Instagram</span><span class="spinner"></span></button>
+              <button class="btn btn-fantasma" id="btn-publicar-agora"><span class="btn-txt">Publicar agora</span><span class="spinner"></span></button>
+            </div>
+            <p class="envio-msg" id="pub-msg" role="status" aria-live="polite"></p>
+          </div>
+        </div>
+      </section>
+
+      </div><!-- /pub-ws-editor -->
 
       <!-- WhatsApp -->
       <section class="painel pub-whats" id="pub-ws-whatsapp" hidden>
@@ -717,7 +723,7 @@
   </defs>
 </svg>
 
-<script src="/static/app.js?v=11"></script>
+<script src="/static/app.js?v=13"></script>
 <script src="/static/planos.js?v=6"></script>
 </body>
 </html>

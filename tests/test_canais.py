@@ -182,8 +182,7 @@ class TestCarrossel(BaseCanais):
 
 class TestFormatosEmBreve(BaseCanais):
     def test_formatos_sem_publicacao_ainda_sao_recusados_com_clareza(self):
-        for canal, formato in (("instagram", "reels"), ("facebook", "feed"), ("facebook", "story"),
-                               ("facebook", "publicacao"), ("whatsapp", "story"), ("whatsapp", "grupo")):
+        for canal, formato in (("whatsapp", "story"), ("whatsapp", "grupo"), ("whatsapp", "canal")):
             with self.assertRaises(ag.ErroPublicacao, msg=(canal, formato)) as ctx:
                 ag.agendar(1, None, "x", tp.JPG, self.futuro, canal, formato)
             self.assertIn("está chegando", str(ctx.exception))
@@ -192,7 +191,7 @@ class TestFormatosEmBreve(BaseCanais):
 
     def test_rota_devolve_400_para_formato_em_breve(self):
         n = app_mod.NovaPublicacao(legenda="x", image_url=tp.JPG, agendado_para=self.futuro,
-                                   canal="facebook", formato="feed")
+                                   canal="whatsapp", formato="grupo")
         with self.assertRaises(HTTPException) as ctx:
             app_mod.publicacao_agendar(n, u=self.u)
         self.assertEqual(ctx.exception.status_code, 400)
@@ -211,7 +210,8 @@ class TestCanais(BaseCanais):
         self.assertEqual(set(r["formatos"]), {"instagram", "facebook", "whatsapp"})
         self.assertEqual(r["formatos"]["instagram"], ["feed", "story", "carrossel", "reels"])
         self.assertIn("instagram/story", r["publicaveis"])
-        self.assertNotIn("instagram/reels", r["publicaveis"])
+        self.assertIn("instagram/reels", r["publicaveis"])
+        self.assertNotIn("whatsapp/story", r["publicaveis"])
         self.assertFalse(r["facebook"]["configurado"])
 
 

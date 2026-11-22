@@ -844,7 +844,8 @@ async function carregarHistorico() {
       if (j.status === "concluido") renderEnvioHist($(".h-envio", el), j);
       box.appendChild(el);
     });
-  } catch (e) { box.innerHTML = ""; toast(e.message, "erro"); }
+    return lista;
+  } catch (e) { if (!silencioso) { box.innerHTML = ""; toast(e.message, "erro"); } return null; }
 }
 
 function renderEnvioHist(box, j) {
@@ -871,7 +872,7 @@ function renderEnvioHist(box, j) {
 
 /* ------------------------------------------------------------------ AGENTE DE PUBLICAÇÃO */
 const pub = { item: null, editando: null, foto: "", fotoLocal: "", fotoProduto: "", user: "sua_conta", ig: null,
-  canal: null, formato: null, fotos: [], legendaEditada: false, canais: null };
+  canal: null, formato: null, fotos: [], legendaEditada: false, canais: null, video: null, reelsFonte: "upload", fbNome: "" };
 const MAX_CARROSSEL = 10;
 /* catálogo da navegação: canal → formatos. "breve" = só a tela, ainda não publica */
 const CANAIS_PUB = {
@@ -879,19 +880,22 @@ const CANAIS_PUB = {
     feed: { nome: "Feed", icone: "▣", desc: "Foto com legenda no seu perfil." },
     story: { nome: "Story", icone: "◔", desc: "Foto em tela cheia por 24 h, sem legenda." },
     carrossel: { nome: "Carrossel", icone: "▤", desc: "De 2 a 10 fotos que o público desliza." },
-    reels: { nome: "Reels", icone: "▶", desc: "Vídeo vertical curto: seu MP4 ou gerado das fotos.", breve: true } } },
+    reels: { nome: "Reels", icone: "▶", desc: "Vídeo vertical curto: seu MP4 ou gerado das fotos." } } },
   facebook: { nome: "Facebook", icone: "f", cor: "fb", desc: "Publique na sua Página do Facebook.", formatos: {
-    feed: { nome: "Feed", icone: "▣", desc: "Foto com texto na linha do tempo da Página.", breve: true },
-    story: { nome: "Story", icone: "◔", desc: "Story da Página, em tela cheia.", breve: true },
-    publicacao: { nome: "Publicação com link", icone: "⛓", desc: "Post normal com o link do produto.", breve: true } } },
+    feed: { nome: "Feed", icone: "▣", desc: "Foto com texto na linha do tempo da Página." },
+    story: { nome: "Story", icone: "◔", desc: "Story da Página, em tela cheia." },
+    publicacao: { nome: "Publicação com link", icone: "⛓", desc: "Post normal com o link do produto (clicável)." } } },
   whatsapp: { nome: "WhatsApp", icone: "✆", cor: "wa", desc: "Grupo, canal ou story — pela automação.", formatos: {
     grupo: { nome: "Grupo", icone: "☷", desc: "A oferta cai no seu grupo via automação.", via: true },
     canal: { nome: "Canal", icone: "☍", desc: "A oferta cai no seu canal via automação.", via: true },
     story: { nome: "Story (Status)", icone: "◔", desc: "Status do WhatsApp com a foto da oferta.", breve: true } } },
 };
-const PUBLICAVEL_PADRAO = ["instagram/feed", "instagram/story", "instagram/carrossel"];
+const PUBLICAVEL_PADRAO = ["instagram/feed", "instagram/story", "instagram/carrossel", "instagram/reels", "facebook/feed", "facebook/story", "facebook/publicacao"];
+const usaBandeja = () => pub.canal === "instagram" && (pub.formato === "carrossel" || (pub.formato === "reels" && pub.reelsFonte === "auto"));
+const nomeConta = () => (pub.canal === "facebook" ? `a Página ${pub.fbNome || "do Facebook"}` : `o Instagram @${pub.user}`);
 const ehPublicavel = (c, f) => (pub.canais?.publicaveis || PUBLICAVEL_PADRAO).includes(`${c}/${f}`);
-const ROTULO_FORMATO = { feed: "Feed", story: "Story", carrossel: "Carrossel", reels: "Reels", publicacao: "Publicação", grupo: "Grupo", canal: "Canal" };
+const ROTULO_FORMATO = { feed: "Feed", story: "Story", carrossel: "Carrossel", reels: "Reels", publicacao: "Publicação com link", grupo: "Grupo", canal: "Canal" };
+const ROTULO_CANAL = { instagram: "Instagram", facebook: "Facebook", whatsapp: "WhatsApp" };
 const ROTULO_PUB = { rascunho: "rascunho", agendado: "agendado", publicando: "publicando…", publicado: "publicado", erro: "erro", cancelado: "cancelado" };
 
 async function abrirPublicacao() {
@@ -903,14 +907,15 @@ async function abrirPublicacao() {
 /* ---- navegação: canais → formatos → tela de trabalho ---- */
 function escolherCanal(c) { pub.canal = c; pub.formato = null; fecharEditorPub(); mostrarNivelPub(); }
 function escolherFormato(f) {
-  pub.formato = f; fecharEditorPub(); mostrarNivelPub();
+  pub.formato = f; pub.reelsFonte = "upload"; $('input[name="reels-fonte"][value="upload"]').checked = true;
+  fecharEditorPub(); mostrarNivelPub();
   $(".conteudo").scrollTo({ top: 0, behavior: REDUZIR ? "auto" : "smooth" });
 }
 function voltarPub(nivel) {
   if (nivel === 0) { pub.canal = null; pub.formato = null; } else pub.formato = null;
   fecharEditorPub(); mostrarNivelPub();
 }
-function fecharEditorPub() { $("#pub-editor").hidden = true; pub.item = null; pub.fotos = []; modoEdicao(null); }
+function fecharEditorPub() { $("#pub-editor").hidden = true; pub.item = null; pub.fotos = []; pub.video = null; modoEdicao(null); }
 
 function cartaoNav(icone, cor, nome, desc, selo, onclick, i) {
   const b = document.createElement("button");
@@ -953,25 +958,41 @@ function mostrarNivelPub() {
   }
   // nível 2: tela de trabalho
   const ws = (id, on) => { $("#" + id).hidden = !on; };
-  const ig = canal === "instagram" && ["feed", "story", "carrossel"].includes(formato);
+  const ig = canal === "instagram" && !!formato, fb = canal === "facebook" && !!formato;
   ws("pub-ws-instagram", ig);
-  ws("pub-ws-reels", canal === "instagram" && formato === "reels");
-  ws("pub-ws-facebook", canal === "facebook" && !!formato);
+  ws("pub-ws-facebook", fb);
+  ws("pub-ws-editor", ig || (fb && !!pub.canais?.facebook?.configurado));
   ws("pub-ws-whatsapp", canal === "whatsapp" && !!formato);
   if (ig) { adaptarTelaFormato(); statusInstagram(); carregarPalavras(); }
-  if (canal === "facebook" && formato) abrirFacebook();
+  if (fb) { adaptarTelaFormato(); abrirFacebook(); }
   if (canal === "whatsapp" && formato) abrirWhatsapp();
 }
 
 /* textos e campos que mudam conforme o formato (feed / story / carrossel) */
-function adaptarTelaFormato() {
-  const fm = pub.formato, story = fm === "story", carr = fm === "carrossel";
-  $("#pub-campo-legenda").hidden = story; $("#pub-dica-legenda").hidden = story; $("#pub-dica-story").hidden = !story;
-  $("#pub-carrossel").hidden = !carr; $("#pub-foto-unica").hidden = carr;
-  $("#pv-img-box").classList.toggle("story", story); $(".ig-preview").classList.toggle("story", story);
-  $("#btn-post-manual").textContent = story ? "＋ Story manual com foto" : carr ? "＋ Carrossel manual com fotos" : "＋ Post manual com foto";
-  $("#btn-sugerir .btn-txt").textContent = carr ? "✦ Sugerir itens para o carrossel" : "✦ Sugerir melhor item";
-  $("#pub-info").textContent = ""; $("#pub-candidatos").innerHTML = "";
+function adaptarTelaFormato(manterSugestoes = false) {
+  const { canal, formato: fm } = pub, fb = canal === "facebook";
+  const story = fm === "story", reels = fm === "reels", link = fb && fm === "publicacao", bandeja = usaBandeja();
+  $("#pub-campo-legenda").hidden = story;
+  $("#pub-rotulo-legenda").textContent = link ? "Texto da publicação" : "Legenda";
+  $("#pub-dica-legenda").hidden = story || link;
+  $("#pub-dica-legenda").textContent = fb ? "No Facebook o link é clicável: você pode colar o link do produto no texto." : "O link de afiliado não vai na legenda (no Instagram ele não é clicável): use a bio e os canais.";
+  $("#pub-dica-story").hidden = !story;
+  $("#pub-campo-link").hidden = !link;
+  $("#pub-reels").hidden = !reels;
+  $("#pub-carrossel").hidden = !bandeja;
+  $("#pub-foto-unica").hidden = bandeja || reels || link;
+  $("#reels-upload").hidden = pub.reelsFonte !== "upload"; $("#reels-auto").hidden = pub.reelsFonte !== "auto";
+  $("#reels-fonte").hidden = !!pub.editando;
+  $("#pub-legenda").placeholder = link ? "Escreva o texto que vai acima do link…" : "Escreva a legenda do post…";
+  const vertical = story || reels;
+  $("#pv-img-box").classList.toggle("story", vertical); $(".ig-preview").classList.toggle("story", vertical);
+  $("#carr-rotulo").textContent = reels ? "Fotos do vídeo" : "Fotos do carrossel";
+  $("#carr-msg").innerHTML = reels ? "De 1 a 10 fotos, 3 segundos cada. Para incluir produtos, use “Sugerir” e clique em <b>Adicionar</b>."
+    : "De 2 a 10 fotos. Para incluir produtos, use “Sugerir melhor item” e clique em <b>Adicionar</b>. A primeira foto é a capa; todas ficam quadradas.";
+  $("#btn-post-manual").textContent = { story: "＋ Story manual com foto", carrossel: "＋ Carrossel manual com fotos", reels: "＋ Reels manual" }[fm] || (link ? "＋ Publicação manual com link" : "＋ Post manual com foto");
+  $("#btn-sugerir .btn-txt").textContent = fm === "carrossel" || (reels && pub.reelsFonte === "auto") ? "✦ Sugerir itens" : "✦ Sugerir melhor item";
+  if (!manterSugestoes) { $("#pub-info").textContent = ""; $("#pub-candidatos").innerHTML = ""; }
+  $("#pv-user").textContent = "@" + (fb ? (pub.fbNome || "sua_pagina") : pub.user); $("#pv-user2").textContent = fb ? (pub.fbNome || "sua_pagina") : pub.user;
   modoEdicao(pub.editando ? { id: pub.editando } : null);
 }
 
@@ -1001,7 +1022,7 @@ $("#btn-ig-atualizar").addEventListener("click", () => statusInstagram(true));
 
 async function carregarPalavras() {
   try {
-    const { palavras } = await api("/api/publicacao/palavras");
+    const { palavras } = await api("/api/publicacao/palavras?canal=" + (pub.canal || "instagram"));
     const sel = $("#pub-keyword"), atual = sel.value;
     sel.innerHTML = '<option value="">Mais recente</option>';
     palavras.forEach((p) => { const o = document.createElement("option"); o.value = o.textContent = p; sel.appendChild(o); });
@@ -1013,7 +1034,7 @@ $("#btn-sugerir").addEventListener("click", async (e) => {
   const btn = e.currentTarget, box = $("#pub-candidatos"), info = $("#pub-info");
   carregando(btn, true); box.innerHTML = '<div class="skeleton"></div>'.repeat(3); info.textContent = "";
   try {
-    const r = await api("/api/publicacao/sugerir", { body: { keyword: $("#pub-keyword").value || null, quantidade: +$("#pub-qtd").value || 5 } });
+    const r = await api("/api/publicacao/sugerir", { body: { keyword: $("#pub-keyword").value || null, quantidade: +$("#pub-qtd").value || 5, canal: pub.canal || "instagram" } });
     box.innerHTML = "";
     if (!r.candidatos.length) {
       info.textContent = r.total_elegiveis ? "Nenhum candidato agora." :
@@ -1028,13 +1049,14 @@ $("#btn-sugerir").addEventListener("click", async (e) => {
       el.innerHTML = `<div class="pub-card-img"></div><div class="pub-card-corpo">
         ${k === 0 ? '<span class="selo-melhor">★ melhor escolha</span>' : ""}
         <strong></strong><b class="pub-preco"></b><small class="pub-motivo"></small>
-        <button class="btn btn-fantasma btn-mini">${pub.formato === "carrossel" ? "＋ Adicionar" : "Escolher"}</button></div>`;
+        <button class="btn btn-fantasma btn-mini">${usaBandeja() ? "＋ Adicionar" : "Escolher"}</button></div>`;
       const img = $(".pub-card-img", el);
       if (c.image_url) { const i = new Image(); i.src = c.image_url; i.alt = ""; i.loading = "lazy"; img.appendChild(i); }
       else img.innerHTML = '<span class="sem-foto">sem foto<br><small>envie uma</small></span>';
       $("strong", el).textContent = c.titulo; $(".pub-preco", el).textContent = c.preco_fmt;
       $(".pub-motivo", el).textContent = c.motivo;
       $("button", el).addEventListener("click", () => abrirEditor(c));
+      el._c = c;
       box.appendChild(el);
     });
   } catch (err) { box.innerHTML = ""; toast(err.message, "erro"); }
@@ -1054,21 +1076,25 @@ function isoParaLocal(iso) {
 
 function modoEdicao(p) {
   pub.editando = p ? p.id : null;
-  const nome = { story: "story", carrossel: "carrossel" }[pub.formato] || "publicação";
-  $("#btn-agendar .btn-txt").textContent = p ? "💾 Salvar alterações" : `📅 Agendar ${nome} no Instagram`;
+  const nome = { story: "story", carrossel: "carrossel", reels: "Reels" }[pub.formato] || "publicação";
+  $("#btn-agendar .btn-txt").textContent = p ? "💾 Salvar alterações" : `📅 Agendar ${nome} no ${ROTULO_CANAL[pub.canal] || "Instagram"}`;
   $("#btn-publicar-agora").hidden = !!p;
 }
 
 function editarAgendada(p) {
-  if (pub.canal !== "instagram" || pub.formato !== p.formato) { pub.canal = "instagram"; pub.formato = p.formato; mostrarNivelPub(); }
+  if (pub.canal !== p.canal || pub.formato !== p.formato) { pub.canal = p.canal; pub.formato = p.formato; mostrarNivelPub(); }
   abrirEditor(null);
   modoEdicao(p);
   pub.foto = p.image_url || ""; pub.fotoLocal = p.image_url && p.image_url.startsWith("/midia/") ? p.image_url : "";
   if (p.formato === "carrossel") pub.fotos = (p.midias || []).map((m) => ({ url: m.url, local: m.url.startsWith("/midia/") ? m.url : "", item_id: m.item_id ?? null }));
+  if (p.formato === "reels") { pub.video = { video_url: p.video_url, capa_url: p.image_url }; mostrarVideo(); }
+  $("#pub-link").value = p.link || "";
   $("#pub-editor-titulo").textContent = "Alterar publicação agendada";
   $("#pub-legenda").value = p.legenda || ""; pub.legendaEditada = true;
   $("#pub-quando").value = isoParaLocal(p.agendado_para);
-  $("#pub-foto-msg").textContent = "Para trocar a foto, envie outra.";
+  $("#pub-foto-msg").textContent = p.formato === "reels" ? "" : "Para trocar a foto, envie outra.";
+  $("#reels-msg").textContent = p.formato === "reels" ? "O vídeo não pode ser trocado: para outro vídeo, cancele e crie um novo Reels." : "";
+  adaptarTelaFormato(); modoEdicao(p);
   atualizarPreview();
 }
 
@@ -1095,7 +1121,7 @@ function renderBandeja() {
 }
 /* legenda automática do carrossel: lista os produtos escolhidos, até o usuário editar à mão */
 function legendaDoCarrossel() {
-  if (pub.formato !== "carrossel" || pub.legendaEditada) return;
+  if (!usaBandeja() || pub.legendaEditada) return;
   const itens = pub.fotos.filter((f) => f.titulo);
   if (!itens.length) return;
   $("#pub-legenda").value = ("🔥 Achados com preço bom!\n\n" + itens.map((f) => `• ${f.titulo.slice(0, 70)} — ${f.preco_fmt}`).join("\n") +
@@ -1120,27 +1146,31 @@ $("#pub-arquivos").addEventListener("change", async (e) => {
 });
 
 function abrirEditor(c) {
-  const carr = pub.formato === "carrossel", acumula = carr && !$("#pub-editor").hidden && !pub.editando && c;
+  const carr = usaBandeja(), acumula = carr && !$("#pub-editor").hidden && !pub.editando && c;
   modoEdicao(null);
   pub.item = carr ? null : c;
   pub.fotoProduto = c?.image_url || "";
   pub.foto = pub.fotoProduto; pub.fotoLocal = "";
+  if (!acumula) { pub.video = null; $("#reels-msg").textContent = ""; $("#reels-duracao").textContent = ""; $("#pub-link").value = ""; }
   if (carr) {
     if (!acumula) { pub.fotos = []; pub.legendaEditada = false; }
     if (c) {
       if (!c.image_url) { toast("Este produto está sem foto: envie uma foto pelo botão “Adicionar fotos”.", "erro"); }
-      else if (pub.fotos.some((f) => f.item_id === c.item_id)) toast("Este produto já está no carrossel.", "erro");
+      else if (pub.fotos.some((f) => f.item_id === c.item_id)) toast("Este produto já está no vídeo/carrossel.", "erro");
       else adicionarFoto({ url: c.image_url, local: "", item_id: c.item_id, titulo: c.titulo, preco_fmt: c.preco_fmt });
     }
     renderBandeja();
   }
-  $("#pub-editor-titulo").textContent = { story: c ? "Revisar story" : "Story manual", carrossel: "Montar carrossel" }[pub.formato] || (c ? "Revisar post" : "Post manual");
+  if (c && pub.canal === "facebook" && pub.formato === "publicacao") $("#pub-link").value = c.link_afiliado || "";
+  $("#pub-editor-titulo").textContent = { story: c ? "Revisar story" : "Story manual", carrossel: "Montar carrossel", reels: "Montar Reels" }[pub.formato]
+    || (pub.formato === "publicacao" ? "Publicação com link" : c ? "Revisar post" : "Post manual");
   if (!acumula) { $("#pub-legenda").value = c && !carr ? c.legenda : ""; pub.legendaEditada = false; if (carr) legendaDoCarrossel(); }
   if (!acumula) $("#pub-quando").value = horaPadrao();
   $("#pub-msg").textContent = ""; $("#pub-msg").className = "envio-msg";
   $("#pub-foto-msg").textContent = c && !c.image_url ? "Não consegui a foto deste produto pelo link. Envie uma foto." : "";
   $("#btn-foto-produto").hidden = true;
   $("#pub-arquivo").value = "";
+  adaptarTelaFormato(true);
   atualizarPreview();
   const ed = $("#pub-editor"); ed.hidden = false;
   ed.scrollIntoView({ behavior: REDUZIR ? "auto" : "smooth", block: "start" });
@@ -1149,12 +1179,23 @@ function abrirEditor(c) {
 $("#btn-post-manual").addEventListener("click", () => abrirEditor(null));
 $("#btn-fechar-editor").addEventListener("click", fecharEditorPub);
 
+function mostrarVideo() {
+  const v = $("#pv-video"), url = pub.video?.video_url;
+  if (url) { if (v.getAttribute("src") !== url) v.src = url; } else { v.pause?.(); v.removeAttribute("src"); v.load?.(); }
+  $("#reels-duracao").textContent = pub.video?.duracao ? `· ${pub.video.duracao}s` : "";
+}
 function atualizarPreview() {
-  const carr = pub.formato === "carrossel";
-  const src = carr ? (pub.fotos[0] && (pub.fotos[0].local || pub.fotos[0].url)) : (pub.fotoLocal || pub.foto), img = $("#pv-img");
-  img.hidden = !src; $("#pv-sem-foto").hidden = !!src;
+  const carr = usaBandeja(), reels = pub.formato === "reels", img = $("#pv-img");
+  const src = reels ? "" : carr ? (pub.fotos[0] && (pub.fotos[0].local || pub.fotos[0].url)) : (pub.fotoLocal || pub.foto);
+  const temVideo = reels && !!pub.video;
+  if (reels) mostrarVideo();
+  $("#pv-video").hidden = !temVideo;
+  img.hidden = !src; $("#pv-sem-foto").hidden = temVideo || !!src;
   if (src) img.src = src; else img.removeAttribute("src");
-  const cont = $("#pv-contagem"); cont.hidden = !(carr && pub.fotos.length); cont.textContent = `1/${pub.fotos.length}`;
+  const link = pub.canal === "facebook" && pub.formato === "publicacao";
+  $("#pv-sem-foto").innerHTML = reels ? "Sem vídeo<br><small>envie ou gere o vídeo ao lado</small>"
+    : link ? "🔗 O Facebook monta a prévia<br><small>com a foto e o título do link</small>" : "Sem foto<br><small>envie uma imagem ao lado</small>";
+  const cont = $("#pv-contagem"); cont.hidden = !(pub.formato === "carrossel" && pub.fotos.length); cont.textContent = `1/${pub.fotos.length}`;
   const leg = $("#pub-legenda").value;
   $("#pv-legenda").textContent = pub.formato === "story" ? "" : leg;
   atualizarContador();
@@ -1182,18 +1223,53 @@ $("#btn-foto-produto").addEventListener("click", () => {
   pub.foto = pub.fotoProduto; pub.fotoLocal = ""; $("#pub-foto-msg").textContent = ""; $("#btn-foto-produto").hidden = true; $("#pub-arquivo").value = ""; atualizarPreview();
 });
 
+function msgReels(t, tipo) { const m = $("#reels-msg"); m.textContent = t; m.className = "mini" + (tipo ? " " + tipo : ""); }
+$$('input[name="reels-fonte"]').forEach((r) => r.addEventListener("change", () => {
+  pub.reelsFonte = r.value; pub.video = null; pub.fotos = []; pub.legendaEditada = false; renderBandeja(); adaptarTelaFormato(true); atualizarPreview();
+}));
+$("#pub-video-arquivo").addEventListener("change", async (e) => {
+  const f = e.target.files[0]; e.target.value = "";
+  if (!f) return;
+  if (f.size > 100 * 1024 * 1024) { msgReels("O vídeo passa de 100 MB.", "erro"); return; }
+  msgReels("Enviando e preparando o vídeo… (pode levar até um minuto)");
+  try {
+    const r = await fetch("/api/publicacao/video", { method: "POST", body: f, headers: { "Content-Type": f.type || "application/octet-stream" }, credentials: "same-origin" });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.detail || "Não consegui enviar o vídeo.");
+    pub.video = d; msgReels("Vídeo pronto! Confira a prévia ao lado.", "ok"); atualizarPreview();
+  } catch (err) { msgReels(err.message, "erro"); }
+});
+$("#btn-gerar-video").addEventListener("click", async (e) => {
+  if (!pub.fotos.length) { msgReels("Escolha pelo menos 1 foto (use “Sugerir” e clique em Adicionar, ou envie fotos).", "erro"); return; }
+  const btn = e.currentTarget; carregando(btn, true); msgReels("Montando o vídeo…");
+  try {
+    pub.video = await api("/api/publicacao/reels/gerar", { body: { midias: pub.fotos.map((f) => ({ url: f.url, item_id: f.item_id })), com_preco: $("#reels-com-preco").checked } });
+    msgReels("Vídeo pronto! Confira a prévia ao lado.", "ok"); atualizarPreview();
+  } catch (err) { msgReels(err.message, "erro"); }
+  finally { carregando(btn, false); }
+});
+
 function dadosPost() {
-  const base = { canal: "instagram", formato: pub.formato || "feed", item_id: pub.item ? pub.item.item_id : null };
-  if (pub.formato === "carrossel") return { ...base, item_id: null, legenda: $("#pub-legenda").value, image_url: "", midias: pub.fotos.map((f) => ({ url: f.url, item_id: f.item_id })) };
-  if (pub.formato === "story") return { ...base, legenda: "", image_url: pub.foto };
-  return { ...base, legenda: $("#pub-legenda").value, image_url: pub.foto };
+  const canal = pub.canal || "instagram", formato = pub.formato || "feed";
+  const base = { canal, formato, item_id: pub.item ? pub.item.item_id : null };
+  const legenda = $("#pub-legenda").value;
+  if (canal === "instagram" && formato === "carrossel") return { ...base, item_id: null, legenda, image_url: "", midias: pub.fotos.map((f) => ({ url: f.url, item_id: f.item_id })) };
+  if (formato === "reels") return { ...base, legenda, image_url: pub.video?.capa_url || "", video_url: pub.video?.video_url };
+  if (formato === "story") return { ...base, legenda: "", image_url: pub.foto };
+  if (canal === "facebook" && formato === "publicacao") return { ...base, legenda, image_url: "", link: $("#pub-link").value.trim() };
+  return { ...base, legenda, image_url: pub.foto };
 }
 function msgPub(texto, tipo) { const m = $("#pub-msg"); m.textContent = texto; m.className = "envio-msg " + (tipo || ""); }
 function validarPost() {
-  if (pub.formato === "carrossel") {
+  const { canal, formato } = pub;
+  if (formato === "reels") {
+    if (!pub.video) { msgPub(pub.reelsFonte === "auto" ? "Gere o vídeo com as fotos antes de publicar." : "Envie o vídeo antes de publicar.", "erro"); return false; }
+  } else if (canal === "instagram" && formato === "carrossel") {
     if (pub.fotos.length < 2) { msgPub("O carrossel precisa de pelo menos 2 fotos.", "erro"); return false; }
+  } else if (canal === "facebook" && formato === "publicacao") {
+    if (!/^https?:\/\/\S{4,}/.test($("#pub-link").value.trim())) { msgPub("Informe o link do produto (começando com https://).", "erro"); return false; }
   } else if (!pub.foto) { msgPub("Escolha uma foto: envie uma imagem.", "erro"); return false; }
-  if (pub.formato !== "story" && !$("#pub-legenda").value.trim()) { msgPub("Escreva a legenda.", "erro"); return false; }
+  if (formato !== "story" && !$("#pub-legenda").value.trim()) { msgPub("Escreva o texto da publicação.", "erro"); return false; }
   return true;
 }
 
@@ -1220,23 +1296,38 @@ $("#btn-agendar").addEventListener("click", async (e) => {
 
 $("#btn-publicar-agora").addEventListener("click", async (e) => {
   if (!validarPost()) return;
-  const oque = { story: "O story", carrossel: "O carrossel" }[pub.formato] || "O post";
-  if (!confirm(`Publicar AGORA no Instagram @${pub.user}?\n\n${oque} sai imediatamente e fica visível para todos.`)) return;
-  const btn = e.currentTarget; carregando(btn, true); msgPub(pub.formato === "carrossel" ? "Publicando o carrossel… (cada foto é processada; pode levar alguns minutos)" : "Publicando… (o Instagram pode levar até 1 minuto)");
+  const oque = { story: "O story", carrossel: "O carrossel", reels: "O Reels" }[pub.formato] || "O post";
+  if (!confirm(`Publicar AGORA n${nomeConta()}?\n\n${oque} sai imediatamente e fica visível para todos.`)) return;
+  const btn = e.currentTarget; carregando(btn, true);
+  msgPub(pub.formato === "reels" ? "Enviando o Reels…" : pub.formato === "carrossel" ? "Publicando o carrossel… (cada foto é processada; pode levar alguns minutos)" : "Publicando… (pode levar até 1 minuto)");
   try {
     const p = await api("/api/publicacao/publicar-agora", { body: { ...dadosPost(), confirmar: true } });
-    if (p.status === "publicado") { msgPub("Publicado no Instagram! 🎉", "ok"); toast("Post publicado! 🎉", "ok"); confete(90); fecharEditorPub(); $("#pub-candidatos").innerHTML = ""; }
+    if (p.status === "publicado") { msgPub(`Publicado com sucesso! 🎉`, "ok"); toast("Publicado! 🎉", "ok"); confete(90); fecharEditorPub(); $("#pub-candidatos").innerHTML = ""; }
+    else if (p.status === "publicando") { toast("Reels enviado! O Instagram está processando o vídeo — acompanhe em Publicações.", "ok"); fecharEditorPub(); $("#pub-candidatos").innerHTML = ""; }
     else msgPub(p.erro || "Não foi possível publicar.", "erro");
-    carregarPublicacoes(); statusInstagram(true);
+    carregarPublicacoes(); if (pub.canal === "instagram") statusInstagram(true);
   } catch (err) { msgPub(err.message, "erro"); }
   finally { carregando(btn, false); }
 });
 
-async function carregarPublicacoes() {
+/* acompanha publicações em andamento (Reels leva minutos): atualiza a lista até terminarem */
+let pubPoll = null;
+function acompanharPublicando() {
+  if (pubPoll) return;
+  let n = 0;
+  pubPoll = setInterval(async () => {
+    n++;
+    const lista = await carregarPublicacoes(true);
+    if (estado.view !== "publicacao" || n > 120 || !(lista || []).some((x) => x.status === "publicando")) { clearInterval(pubPoll); pubPoll = null; }
+  }, 5000);
+}
+
+async function carregarPublicacoes(silencioso = false) {
   const box = $("#pub-lista");
   try {
     const lista = await api("/api/publicacao");
-    if (!lista.length) { box.innerHTML = '<p class="muted">Nenhuma publicação ainda.</p>'; return; }
+    if (lista.some((x) => x.status === "publicando")) acompanharPublicando();
+    if (!lista.length) { box.innerHTML = '<p class="muted">Nenhuma publicação ainda.</p>'; return lista; }
     box.innerHTML = "";
     lista.forEach((p) => {
       const el = document.createElement("div");
@@ -1244,9 +1335,10 @@ async function carregarPublicacoes() {
       el.innerHTML = `<div class="pub-thumb"></div><div class="pub-linha-txt"><strong></strong><small></small></div>
         <span class="selo ${p.status}"></span><span class="pub-linha-acao"></span>`;
       if (p.image_url) { const i = new Image(); i.src = p.image_url; i.alt = ""; i.loading = "lazy"; $(".pub-thumb", el).appendChild(i); }
+      const resumo = p.titulo || (p.legenda || "").split("\n")[0] || "Post manual";
       $("strong", el).textContent = p.formato === "story" ? "Story" + (p.titulo ? " · " + p.titulo : "")
-        : p.formato === "carrossel" ? `Carrossel de ${(p.midias || []).length} fotos` : (p.titulo || (p.legenda || "Post manual").split("\n")[0]);
-      const onde = `Instagram ${ROTULO_FORMATO[p.formato] || "Feed"} · `;
+        : p.formato === "carrossel" ? `Carrossel de ${(p.midias || []).length} fotos` : p.formato === "reels" ? "Reels · " + resumo : resumo;
+      const onde = `${ROTULO_CANAL[p.canal] || "Instagram"} ${ROTULO_FORMATO[p.formato] || "Feed"} · `;
       const quando = onde + (p.status === "publicado" ? "publicado " + dataBR(p.publicado_em) : p.agendado_para ? "para " + dataBR(p.agendado_para) : dataBR(p.criado_em));
       const det = $("small", el); det.textContent = quando + (p.erro ? " · " + p.erro : ""); det.title = det.textContent;
       $(".selo", el).textContent = ROTULO_PUB[p.status] || p.status;
@@ -1270,10 +1362,6 @@ async function carregarPublicacoes() {
 
 /* ---- Facebook: conectar a Página (ID + token da Página) ---- */
 async function abrirFacebook() {
-  const f = CANAIS_PUB.facebook.formatos[pub.formato];
-  $("#fb-breve").hidden = !f?.breve;
-  $("#fb-breve-titulo").textContent = `Publicar no Facebook · ${f.nome}`;
-  $("#fb-breve-txt").textContent = { feed: "Foto com texto direto na linha do tempo da sua Página.", story: "Story da Página, em tela cheia, com a foto da oferta.", publicacao: "Post normal da Página com o link do produto — no Facebook o link é clicável." }[pub.formato];
   try { renderFacebook((await api("/api/publicacao/canais")).facebook); } catch (e) { $("#fb-detalhe").textContent = e.message; }
 }
 function renderFacebook(s) {
@@ -1281,7 +1369,13 @@ function renderFacebook(s) {
   $("#fb-conta").textContent = s.configurado ? (s.nome || "Página conectada") : "Facebook não conectado";
   $("#fb-detalhe").textContent = s.configurado ? "Página validada pelo Facebook. O token está guardado criptografado." : "Conecte a sua Página para publicar nela.";
   $("#fb-conectar").hidden = !!s.configurado; $("#btn-fb-trocar").hidden = !s.configurado; $("#btn-fb-remover").hidden = !s.configurado;
+  pub.fbNome = s.nome || "";
   if (pub.canais) pub.canais.facebook = { configurado: s.configurado, nome: s.nome || "" };
+  if (pub.canal === "facebook" && pub.formato) {
+    const editor = $("#pub-ws-editor"), era = editor.hidden;
+    editor.hidden = !s.configurado;
+    if (s.configurado) { ["pub-controles", "pub-info", "pub-candidatos"].forEach((id) => ($("#" + id).hidden = false)); if (era) { adaptarTelaFormato(); carregarPalavras(); } }
+  }
 }
 $("#btn-fb-trocar").addEventListener("click", () => { $("#fb-conectar").hidden = false; $("#btn-fb-trocar").hidden = true; $("#btn-fb-remover").hidden = false; $("#fb-in-id").focus(); });
 $("#fb-olho").addEventListener("click", () => { const i = $("#fb-in-token"); i.type = i.type === "password" ? "text" : "password"; });

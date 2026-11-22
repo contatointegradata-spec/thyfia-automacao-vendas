@@ -248,6 +248,23 @@ def publicar_carrossel(image_urls: list[str], caption: str, dormir=None) -> str:
     return publicar(cid)
 
 
+ESPERA_VIDEO = 300  # o Instagram leva mais tempo para processar vídeo do que foto
+
+
+def publicar_reel(video_url: str, caption: str, compartilhar_no_feed: bool = True, dormir=None) -> str:
+    """Reels: container REELS (video_url) → aguardar o processamento → publish. Retorna o id da mídia."""
+    params = {"media_type": "REELS", "video_url": video_url,
+              "share_to_feed": "true" if compartilhar_no_feed else "false"}
+    if caption:
+        params["caption"] = caption
+    d = _req("POST", f"{config()['user_id']}/media", params)
+    if not d.get("id"):
+        raise ErroInstagram("O Instagram não devolveu o id do container do Reels.", "container")
+    cid = str(d["id"])
+    aguardar_container(cid, intervalo=5, maximo=ESPERA_VIDEO, dormir=dormir)
+    return publicar(cid)
+
+
 if __name__ == "__main__":  # teste manual: só valida a conta (não publica)
     from pathlib import Path
 

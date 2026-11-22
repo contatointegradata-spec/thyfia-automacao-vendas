@@ -886,3 +886,14 @@ button { cursor: pointer; background: none; border: 0; }
 .carr-acoes button { font-size: 11px; color: #fff; background: rgba(255,255,255,.18); border: 0; border-radius: 7px; padding: 4px 7px; cursor: pointer; }
 .carr-acoes button:hover { background: rgba(251,113,133,.7); }
 @media (hover: none) { .carr-acoes { opacity: 1; } }
+
+/* ---------- Reels e Facebook no editor ---------- */
+.pub-reels { margin-bottom: 14px; }
+.reels-fonte { display: flex; flex-wrap: wrap; gap: 8px 18px; margin: 8px 0 12px; }
+.reels-fonte label, .reels-preco { display: flex; align-items: center; gap: 8px; font-size: 14px; cursor: pointer; }
+.reels-preco { margin-top: 10px; color: var(--texto-3); }
+#pub-ws-editor[hidden], #pub-ws-instagram[hidden], #pub-ws-facebook[hidden] { display: none; }
+.ig-preview-img video { width: 100%; height: 100%; object-fit: contain; background: #000; display: block; }
+.ig-preview-img video[hidden] { display: none; }
+#reels-msg.ok { color: var(--verde); }
+#reels-msg.erro { color: var(--vermelho); }

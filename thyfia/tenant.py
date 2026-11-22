@@ -225,6 +225,15 @@ def facebook_salvar(uid: int, page_id: str, token: str) -> dict:
     return publica(uid)["facebook"]
 
 
+def facebook_credenciais(uid: int) -> tuple[str, str] | None:
+    """(ID da Página, token) deste cliente, ou None se não conectou. Só para uso interno (publicação)."""
+    r = db.conn().execute("SELECT fb_page_id, fb_token_cifrado FROM config_usuario WHERE usuario_id=?", (uid,)).fetchone()
+    if not r or not r["fb_page_id"] or not r["fb_token_cifrado"]:
+        return None
+    token = cofre.abrir(r["fb_token_cifrado"])
+    return (r["fb_page_id"], token) if token else None
+
+
 def facebook_remover(uid: int) -> dict:
     _linha(uid)
     c = db.conn()

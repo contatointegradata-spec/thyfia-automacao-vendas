@@ -208,6 +208,8 @@ def init() -> None:
         "ALTER TABLE publicacoes_instagram ADD COLUMN canal TEXT NOT NULL DEFAULT 'instagram'",
         "ALTER TABLE publicacoes_instagram ADD COLUMN formato TEXT NOT NULL DEFAULT 'feed'",
         "ALTER TABLE publicacoes_instagram ADD COLUMN midias TEXT",  # JSON [{url, item_id}] (carrossel)
+        "ALTER TABLE publicacoes_instagram ADD COLUMN video_url TEXT",  # reels: /midia/<nome>.mp4
+        "ALTER TABLE publicacoes_instagram ADD COLUMN link TEXT",  # facebook "publicação com link"
         # Página do Facebook do cliente (token cifrado, igual ao do Instagram)
         "ALTER TABLE config_usuario ADD COLUMN fb_page_id TEXT",
         "ALTER TABLE config_usuario ADD COLUMN fb_token_cifrado TEXT",

@@ -209,8 +209,9 @@ def preparar_jpeg(dados: bytes) -> bytes:
     return _jpeg(img)
 
 
-def preparar_story(dados: bytes) -> bytes:
-    """Foto → JPEG 1080×1920 (9:16): a foto inteira no centro, sobre ela mesma ampliada e desfocada."""
+def preparar_story(dados: bytes, caixa: tuple[int, int] = (980, 1500), centro_y: int | None = None) -> bytes:
+    """Foto → JPEG 1080×1920 (9:16): a foto inteira no centro, sobre ela mesma ampliada e desfocada.
+    `caixa` limita o tamanho da foto e `centro_y` sobe/desce o centro dela (ex.: abrir espaço para uma faixa)."""
     from PIL import Image, ImageEnhance, ImageFilter
 
     img = _abrir_imagem(dados)
@@ -221,8 +222,9 @@ def preparar_story(dados: bytes) -> bytes:
                         (fundo.width - W) // 2 + W, (fundo.height - H) // 2 + H))
     fundo = ImageEnhance.Brightness(fundo.filter(ImageFilter.GaussianBlur(40))).enhance(0.6)
     frente = img.copy()
-    frente.thumbnail((980, 1500))
-    fundo.paste(frente, ((W - frente.width) // 2, (H - frente.height) // 2))
+    frente.thumbnail(caixa)
+    cy = H // 2 if centro_y is None else centro_y
+    fundo.paste(frente, ((W - frente.width) // 2, cy - frente.height // 2))
     return _jpeg(fundo)
 
 
@@ -300,23 +302,59 @@ def arquivo_local(url: str, pasta):
     return arq if arq.is_file() else None
 
 
-def subir_temporario(arq) -> str:
-    """Envia o JPEG para o link público temporário e devolve a URL validada."""
+def subir_temporario(arq, video: bool = False) -> str:
+    """Envia o arquivo para o link público temporário e devolve a URL validada."""
     from pathlib import Path
 
+    oque = "do vídeo" if video else "da foto"
     try:
         with open(arq, "rb") as f:
             r = requests.post(HOST_TEMP_URL, data={"reqtype": "fileupload", "time": TEMPO_TEMP},
-                              files={"fileToUpload": (Path(arq).name, f, "image/jpeg")},
-                              headers={"User-Agent": "ThyfIA/1.0"}, timeout=90)
+                              files={"fileToUpload": (Path(arq).name, f, "video/mp4" if video else "image/jpeg")},
+                              headers={"User-Agent": "ThyfIA/1.0"}, timeout=300 if video else 90)
     except (requests.RequestException, OSError) as e:
-        raise ErroImagem(f"Não consegui gerar o link público da foto ({type(e).__name__}). Tente de novo.") from None
+        raise ErroImagem(f"Não consegui gerar o link público {oque} ({type(e).__name__}). Tente de novo.") from None
     url = (r.text or "").strip()
     if r.status_code != 200 or not url.startswith("https://") or len(url) > 300:
-        raise ErroImagem(f"O serviço de link temporário da foto falhou (HTTP {r.status_code}). Tente de novo.")
-    if not validar_jpeg(url):
-        raise ErroImagem("O link temporário da foto não respondeu como JPEG. Tente de novo.")
+        raise ErroImagem(f"O serviço de link temporário {oque} falhou (HTTP {r.status_code}). Tente de novo.")
+    if not (validar_video(url) if video else validar_jpeg(url)):
+        raise ErroImagem(f"O link temporário {oque} não respondeu como esperado. Tente de novo.")
     return url
+
+
+def validar_video(url: str) -> bool:
+    """HTTP 200 e conteúdo de vídeo (sem baixar o arquivo inteiro)."""
+    try:
+        r = requests.get(url, stream=True, timeout=TIMEOUT, headers={"User-Agent": UA})
+        try:
+            tipo = (r.headers.get("Content-Type") or "").lower()
+            return r.status_code == 200 and (tipo.startswith("video/") or "octet-stream" in tipo)
+        finally:
+            r.close()
+    except requests.RequestException:
+        return False
+
+
+def arquivo_video(url: str, pasta):
+    """'/midia/abc.mp4' → caminho em dados/midia (sem permitir sair da pasta)."""
+    from pathlib import Path
+
+    nome = Path(url or "").name
+    if not (url or "").startswith("/midia/") or not re.fullmatch(r"[\w-]+\.mp4", nome):
+        return None
+    arq = Path(pasta) / nome
+    return arq if arq.is_file() else None
+
+
+def url_video_para_instagram(video_url: str, pasta) -> str:
+    """URL que o Instagram/Facebook conseguem buscar. Vídeo local vira link público (o do próprio ThyfIA, se houver)."""
+    arq = arquivo_video(video_url, pasta)
+    if not arq:
+        raise ErroImagem("O vídeo não foi encontrado no ThyfIA. Gere ou envie de novo.")
+    base = url_base_publica()
+    if base and url_publica(base + "/x"):
+        return f"{base}/midia/{arq.name}"
+    return subir_temporario(arq, video=True)
 
 
 def url_para_instagram(image_url: str, pasta) -> str:

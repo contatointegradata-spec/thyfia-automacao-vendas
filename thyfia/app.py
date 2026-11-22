@@ -21,12 +21,13 @@ from dotenv import load_dotenv
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from . import (agente_publicacao, auth, automacao, cerebro, configuracoes, db, imagem_host, instagram, itens,
-               kiwify, motor_ml, planos, tenant)
+from . import (agente_publicacao, auth, automacao, cerebro, configuracoes, db, facebook, imagem_host, instagram,
+               itens, kiwify, motor_ml, planos, tenant, video)
 
 STATIC = Path(__file__).resolve().parent / "static"
 COOKIE = "thyfia_sessao"
@@ -413,8 +414,10 @@ _cache_ig: dict = {"em": 0.0, "dados": None, "uid": None}  # cache de 60 s, por 
 def _erro_pub(e: Exception):
     if isinstance(e, agente_publicacao.ErroPublicacao):
         return HTTPException(e.status, str(e))
-    if isinstance(e, imagem_host.ErroImagem):
+    if isinstance(e, (imagem_host.ErroImagem, video.ErroVideo)):
         return HTTPException(400, str(e))
+    if isinstance(e, facebook.ErroFacebook):
+        return HTTPException(502, str(e))
     if isinstance(e, instagram.ErroInstagram):
         return HTTPException(503 if e.codigo == "config" else 502, str(e))
     raise e
@@ -456,6 +459,7 @@ class Sugerir(BaseModel):
     keyword: str | None = Field(default=None, max_length=80)
     job_id: str | None = Field(default=None, max_length=32)
     quantidade: int = Field(default=5, ge=1, le=20)
+    canal: str = Field(default="instagram", max_length=20)
 
 
 class FotoCarrossel(BaseModel):
@@ -472,6 +476,8 @@ class NovaPublicacao(BaseModel):
     canal: str = Field(default="instagram", max_length=20)
     formato: str = Field(default="feed", max_length=20)
     midias: list[FotoCarrossel] | None = Field(default=None, max_length=10)  # carrossel: 2 a 10 fotos
+    video_url: str | None = Field(default=None, max_length=300)  # reels: /midia/<nome>.mp4 (já enviado/gerado)
+    link: str | None = Field(default=None, max_length=500)  # facebook "publicação com link"
 
     def fotos(self) -> list[dict] | None:
         return [m.model_dump() for m in self.midias] if self.midias is not None else None
@@ -479,7 +485,8 @@ class NovaPublicacao(BaseModel):
 
 @app.post("/api/publicacao/sugerir")
 def publicacao_sugerir(dados: Sugerir, u=Depends(exige("agente"))):
-    return agente_publicacao.sugerir(u["id"], dados.keyword, dados.job_id, dados.quantidade)
+    canal = dados.canal if dados.canal in agente_publicacao.CANAIS else "instagram"
+    return agente_publicacao.sugerir(u["id"], dados.keyword, dados.job_id, dados.quantidade, canal=canal)
 
 
 @app.get("/api/publicacao/canais")
@@ -497,8 +504,8 @@ def publicacao_canais(u=Depends(exige("agente"))):
 
 
 @app.get("/api/publicacao/palavras")
-def publicacao_palavras(u=Depends(exige("agente"))):
-    return {"palavras": agente_publicacao.palavras_chave(u["id"])}
+def publicacao_palavras(canal: str = "instagram", u=Depends(exige("agente"))):
+    return {"palavras": agente_publicacao.palavras_chave(u["id"], canal if canal in agente_publicacao.CANAIS else "instagram")}
 
 
 @app.post("/api/publicacao/imagem")
@@ -511,13 +518,47 @@ async def publicacao_imagem(request: Request, u=Depends(exige("agente"))):
         raise _erro_pub(e)
 
 
+@app.post("/api/publicacao/video")
+async def publicacao_video(request: Request, u=Depends(exige("agente"))):
+    """Vídeo enviado pela pessoa (corpo = bytes do arquivo) → MP4 9:16 pronto para Reels."""
+    corpo = await request.body()
+    try:
+        return await run_in_threadpool(video.salvar_upload, corpo, db.MIDIA)
+    except video.ErroVideo as e:
+        raise _erro_pub(e)
+
+
+class GerarReels(BaseModel):
+    midias: list[FotoCarrossel] = Field(max_length=10)
+    com_preco: bool = True
+
+
+@app.post("/api/publicacao/reels/gerar")
+def publicacao_reels_gerar(dados: GerarReels, u=Depends(exige("agente"))):
+    """Monta um vídeo (3 s por foto, com título e preço) a partir das fotos escolhidas."""
+    fotos = []
+    try:
+        for m in dados.midias:
+            titulo = preco = None
+            if m.item_id is not None and dados.com_preco:
+                it = db.conn().execute("SELECT i.titulo, i.preco FROM job_itens i JOIN jobs j ON j.id=i.job_id "
+                                       "WHERE i.id=? AND j.usuario_id=?", (m.item_id, u["id"])).fetchone()
+                if not it:
+                    raise HTTPException(404, "Item não encontrado.")
+                titulo, preco = it["titulo"], agente_publicacao.preco_br(it["preco"]) if it["preco"] else None
+            fotos.append({"bytes": imagem_host._bytes_da_imagem(m.url, db.MIDIA), "titulo": titulo, "preco": preco})
+        return video.gerar_de_fotos(fotos, db.MIDIA)
+    except Exception as e:
+        raise _erro_pub(e)
+
+
 @app.post("/api/publicacao/agendar")
 def publicacao_agendar(dados: NovaPublicacao, u=Depends(exige("agente"))):
     if not dados.agendado_para:
         raise HTTPException(400, "Escolha a data e a hora da publicação.")
     try:
         return agente_publicacao.agendar(u["id"], dados.item_id, dados.legenda, dados.image_url, dados.agendado_para,
-                                         dados.canal, dados.formato, dados.fotos())
+                                         dados.canal, dados.formato, dados.fotos(), dados.video_url, dados.link)
     except Exception as e:
         raise _erro_pub(e)
 
@@ -527,7 +568,8 @@ def publicacao_publicar_agora(dados: NovaPublicacao, u=Depends(exige("agente")))
     try:
         with tenant.ig_ctx(u["id"]):
             pub = agente_publicacao.publicar_agora(u["id"], dados.item_id, dados.legenda, dados.image_url,
-                                                   dados.confirmar, dados.canal, dados.formato, dados.fotos())
+                                                   dados.confirmar, dados.canal, dados.formato, dados.fotos(),
+                                                   dados.video_url, dados.link)
     except Exception as e:
         raise _erro_pub(e)
     _cache_ig["em"] = 0  # o limite mudou
@@ -546,7 +588,7 @@ def publicacao_editar(pub_id: int, dados: NovaPublicacao, u=Depends(exige("agent
         raise HTTPException(400, "Escolha a data e a hora da publicação.")
     try:
         return agente_publicacao.editar(u["id"], pub_id, dados.legenda, dados.image_url, dados.agendado_para,
-                                        dados.fotos())
+                                        dados.fotos(), dados.link)
     except Exception as e:
         raise _erro_pub(e)
 
