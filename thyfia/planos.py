@@ -14,7 +14,7 @@ from . import db
 
 PLANOS: dict[str, dict] = {
     "plus": {
-        "id": "plus", "nome": "Plus", "preco": 59.90, "nivel": 1, "destaque": False,
+        "id": "plus", "nome": "Plus", "preco": 19.90, "nivel": 1, "destaque": False,
         "resumo": "Gere links de afiliado em escala e baixe a planilha.",
         "recursos": [
             "Gerador de links do Mercado Livre",
@@ -26,7 +26,7 @@ PLANOS: dict[str, dict] = {
         "nao_inclui": ["Envio automático para o WhatsApp/Telegram", "Agente de Publicação no Instagram"],
     },
     "pro": {
-        "id": "pro", "nome": "Pro", "preco": 89.90, "nivel": 2, "destaque": True,
+        "id": "pro", "nome": "Pro", "preco": 39.90, "nivel": 2, "destaque": True,
         "resumo": "Tudo do Plus + a automação que divulga as ofertas por você.",
         "recursos": [
             "Tudo do plano Plus",
@@ -40,7 +40,7 @@ PLANOS: dict[str, dict] = {
         "nao_inclui": ["Agente de Publicação no Instagram"],
     },
     "premium": {
-        "id": "premium", "nome": "Premium", "preco": 129.90, "nivel": 3, "destaque": False,
+        "id": "premium", "nome": "Premium", "preco": 69.90, "nivel": 3, "destaque": False,
         "resumo": "Tudo do Pro + o Agente de Publicação no Instagram.",
         "recursos": [
             "Tudo do plano Pro",

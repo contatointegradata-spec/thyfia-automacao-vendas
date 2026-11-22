@@ -90,7 +90,7 @@ class TestPlanos(Base):
         self.assertEqual(dep(u=self.u)["id"], self.u["id"])
 
     def test_precos(self):
-        self.assertEqual([p["preco"] for p in planos.catalogo()], [59.90, 89.90, 129.90])
+        self.assertEqual([p["preco"] for p in planos.catalogo()], [19.90, 39.90, 69.90])
 
 
 class TestRotasPorPlano(Base):
@@ -415,7 +415,7 @@ class TestAdmin(Base):
         planos.conceder("b@t.test", "premium", 31)
         r = app_mod.admin_resumo(u=self.adm)
         self.assertEqual(r["assinantes"], {"plus": 1, "pro": 0, "premium": 1})
-        self.assertEqual(r["receita_mensal"], 189.80)
+        self.assertEqual(r["receita_mensal"], 89.80)
 
     def test_desativar_derruba_a_sessao_e_nao_pode_a_si_mesmo(self):
         tok = auth.criar_sessao(self.u["id"])
