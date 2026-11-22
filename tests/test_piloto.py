@@ -11,7 +11,7 @@ from fastapi import HTTPException
 
 from tests import test_publicacao as tp
 from thyfia import app as app_mod
-from thyfia import cerebro, configuracoes, db, envio_canais, mensagens, piloto, planos
+from thyfia import cerebro, configuracoes, db, envio_canais, mensagens, nichos, piloto, planos
 from thyfia.envio_canais import ErroEnvio
 from thyfia.itens import TZ_SP
 
@@ -660,3 +660,174 @@ class TestEvolutionRespostas(unittest.TestCase):
                  {"id": "x@s.whatsapp.net", "subject": "não é grupo"}])):
             g = envio_canais.wa_grupos("x")
         self.assertEqual([x["nome"] for x in g], ["Alfa", "beta"])
+
+
+G4 = "120363000000000005@g.us"
+G5 = "120363000000000006@g.us"
+
+
+class TestClassificarNichos(unittest.TestCase):
+    def test_busca_e_titulo(self):
+        c = nichos.classificar
+        self.assertEqual(c("whey protein", "Whey Protein Concentrado 900g"), "fit")
+        self.assertEqual(c("fone bluetooth"), "tech")
+        self.assertEqual(c("air fryer"), "casa")
+        self.assertEqual(c("capacete moto"), "auto")
+        self.assertEqual(c("perfume masculino"), "beleza")
+        self.assertEqual(c("racao cachorro"), "pet")
+        self.assertEqual(c("fraldas"), "bebe")  # plural
+        self.assertEqual(c("furadeira"), "ferramentas")
+
+    def test_frase_e_busca_pesam_mais_que_o_titulo(self):
+        self.assertEqual(nichos.classificar("carregador veicular", "Carregador Turbo 65W"), "auto")
+        self.assertEqual(nichos.classificar("carregador", "Carregador Turbo 65W"), "tech")
+        # o termo que o cliente buscou manda; o título só desempata
+        self.assertEqual(nichos.classificar("garrafa termica", "Garrafa Térmica Academia Treino"), "casa")
+
+    def test_empate_segue_a_ordem_do_catalogo_e_sem_pista_nao_tem_nicho(self):
+        self.assertEqual(nichos.classificar("tenis corrida"), "fit")
+        self.assertIsNone(nichos.classificar("xyz qwerty"))
+        self.assertIsNone(nichos.classificar(""))
+
+    def test_catalogo(self):
+        self.assertEqual(nichos.catalogo()[0]["slug"], "geral")
+        self.assertTrue(nichos.valido("fit") and not nichos.valido("outro"))
+
+
+class TestRoteamentoPorNicho(Base):
+    """Um número, cinco grupos: 2 fit, 1 tech, 1 casa, 1 auto. Cada oferta vai só ao grupo do nicho dela."""
+
+    def setUp(self):
+        super().setUp()
+        self.ev = EvolutionFalsa().aplicar(self)
+        self.ev.grupos += [{"jid": G4, "nome": "Auto Clube", "tamanho": 80}, {"jid": G5, "nome": "Fit 2", "tamanho": 60}]
+        piloto.whatsapp_conectar(1)
+        self.ev.estado = "conectado"
+        self.nichos = {GRUPO: "fit", G5: "fit", G3: "tech", G2: "casa", G4: "auto"}
+        piloto.salvar_grupos(1, list(self.nichos), self.nichos)
+        self.n = 0
+
+    def of(self, titulo, busca, preco=99.9):
+        self.n += 1
+        return self.oferta(titulo, preco, self.n, busca=busca)
+
+    def todas(self):
+        self.of("Whey Protein 900g", "whey protein")
+        self.of("Fone Bluetooth TWS", "fone bluetooth")
+        self.of("Air Fryer 4L", "air fryer")
+        self.of("Capacete Moto Fechado", "capacete moto")
+
+    def por_grupo(self):
+        saida = {}
+        for r in db.conn().execute("SELECT d.ref, e.titulo FROM piloto_envios e JOIN piloto_destinos d ON d.id=e.destino_id"):
+            saida.setdefault(r["ref"], []).append(r["titulo"])
+        return saida
+
+    def test_cada_oferta_vai_so_para_o_nicho_dela(self):
+        self.todas()
+        self.ligar()
+        r = self.ciclo()
+        self.assertEqual((r["acao"], r["destinos"], len(r["ofertas"])), ("planejou", 5, 4))
+        g = self.por_grupo()
+        self.assertEqual(g[GRUPO], g[G5])  # os dois grupos fit recebem a mesma oferta fit
+        self.assertIn("Whey", g[GRUPO][0])
+        self.assertIn("Fone", g[G3][0])
+        self.assertIn("Air Fryer", g[G2][0])
+        self.assertIn("Capacete", g[G4][0])
+        self.assertTrue(all(len(v) == 1 for v in g.values()))  # um por grupo no ciclo
+
+    def test_nicho_sem_oferta_e_pulado_e_avisa_uma_vez(self):
+        self.of("Whey Protein 900g", "whey protein")
+        self.of("Fone Bluetooth TWS", "fone bluetooth")
+        db.conn().execute("UPDATE config_usuario SET whatsapp_numero='5534999990000' WHERE usuario_id=1")
+        db.conn().commit()
+        self.ligar()
+        r = self.ciclo()
+        self.assertEqual(set(r["faltam"]), {"casa", "auto"})
+        self.assertEqual(set(self.por_grupo()), {GRUPO, G5, G3})
+        avisos = [w for w in self.g.whats if w[0].startswith("privado")]
+        self.assertEqual(len(avisos), 1)
+        self.assertIn("Casa e cozinha", avisos[0][1])
+        self.assertIn("Automóveis", avisos[0][1])
+
+    def test_sem_oferta_em_nenhum_nicho_e_sem_estoque(self):
+        self.of("Coisa Qualquer", "xyz qwerty")  # sem nicho: só serviria a grupo "geral"
+        self.ligar()
+        r = self.ciclo()
+        self.assertEqual(r["acao"], "sem_estoque")
+
+    def test_grupo_geral_recebe_a_melhor_das_que_sobraram(self):
+        self.of("Coisa Qualquer", "xyz qwerty", 10)
+        self.todas()
+        piloto.salvar_grupos(1, [*self.nichos, "999@g.us"][:5], self.nichos)  # sem mudança
+        self.ev.grupos.append({"jid": "120363000000000009@g.us", "nome": "Achadinhos", "tamanho": 10})
+        piloto.salvar_grupos(1, [*self.nichos, "120363000000000009@g.us"], self.nichos)
+        self.ligar()
+        r = self.ciclo()
+        self.assertEqual(r["destinos"], 6)
+        self.assertEqual(self.por_grupo()["120363000000000009@g.us"], ["Coisa Qualquer"])
+
+    def test_sem_nichos_continua_mandando_tudo_para_todos(self):
+        db.conn().execute("UPDATE piloto_destinos SET nicho='geral'")
+        db.conn().commit()
+        self.todas()
+        self.ligar()
+        r = self.ciclo()
+        self.assertEqual(len(r["ofertas"]), 1)  # uma oferta só, para todos os grupos (comportamento de antes)
+        self.assertEqual(r["destinos"], 5)
+
+    def test_modo_aprovar_mostra_uma_oferta_por_nicho(self):
+        self.todas()
+        self.ligar(modo="aprovar")
+        self.ciclo()
+        ap = piloto.pendentes_aprovacao(1)
+        self.assertEqual(len(ap), 4)
+        self.assertEqual(sum(a["destinos"] for a in ap), 5)
+
+    def test_limite_diario_vale_por_grupo(self):
+        self.todas()
+        self.ligar(max_dia=1)
+        self.assertEqual(self.ciclo()["acao"], "planejou")
+        db.conn().execute("UPDATE piloto_envios SET status='enviado'")
+        db.conn().execute("UPDATE piloto_config SET proximo_envio=NULL")
+        db.conn().commit()
+        self.assertEqual(self.ciclo(AGORA + timedelta(minutes=30))["acao"], "limite_do_dia")
+
+    def test_mudar_nicho_do_grupo(self):
+        did = next(d["id"] for d in piloto.listar_destinos(1) if d["ref"] == G2)
+        self.assertEqual(piloto.definir_nicho(1, did, "tech")["nicho"], "tech")
+        with self.assertRaises(piloto.ErroPiloto):
+            piloto.definir_nicho(1, did, "inexistente")
+        with self.assertRaises(piloto.ErroPiloto):
+            piloto.definir_nicho(1, 9999, "fit")
+
+    def test_resalvar_grupos_mantem_o_nicho(self):
+        piloto.salvar_grupos(1, list(self.nichos))  # sem mandar nichos
+        atual = {d["ref"]: d["nicho"] for d in piloto.listar_destinos(1)}
+        self.assertEqual(atual, self.nichos)
+        lista = {g["jid"]: g["nicho"] for g in piloto.grupos_whatsapp(1)}
+        self.assertEqual(lista[G3], "tech")
+        with self.assertRaises(piloto.ErroPiloto):
+            piloto.salvar_grupos(1, [GRUPO], {GRUPO: "naoexiste"})
+
+    def test_cobertura_e_relatorio_por_nicho(self):
+        self.of("Whey Protein 900g", "whey protein")
+        cob = {x["nicho"]: (x["grupos"], x["ofertas"]) for x in piloto.cobertura(1)}
+        self.assertEqual(cob, {"fit": (2, 1), "tech": (1, 0), "casa": (1, 0), "auto": (1, 0)})
+        txt = piloto.relatorio_texto(1, AGORA)
+        self.assertIn("Por nicho", txt)
+        self.assertIn("Fit e saúde 1", txt)
+        self.assertIn("Tecnologia 0 ⚠️", txt)
+
+    def test_status_traz_catalogo_e_nicho_das_ofertas(self):
+        self.of("Whey Protein 900g", "whey protein")
+        st = piloto.status(1)
+        self.assertEqual(st["estoque"]["proximas"][0]["nicho"], "fit")
+        self.assertIn("fit", [n["slug"] for n in st["nichos"]])
+        self.assertTrue(all("nicho" in d for d in st["destinos"]))
+
+    def test_destino_telegram_com_nicho(self):
+        d = piloto.adicionar_destino(1, "telegram", "@fitofertas", nicho="fit")
+        self.assertEqual(d["nicho"], "fit")
+        with self.assertRaises(piloto.ErroPiloto):
+            piloto.adicionar_destino(1, "telegram", "@outro", nicho="zzz")

@@ -8,8 +8,11 @@ Fluxo (sem o cliente tocar no WhatsApp):
         ──► WhatsApp (grupo/canal, pelo número da ThyfIA) e Telegram (bot da ThyfIA)
         ──► relatório diário e alertas para o dono, no WhatsApp dele.
 
-O cliente só (1) liga o Piloto, (2) adiciona o número/bot da ThyfIA como admin do grupo/canal e
-(3) digita o código de confirmação que chega lá. Nada de QR code, nada de conectar conta.
+Nichos: cada destino tem um nicho (fit, tech, casa, auto…; "geral" recebe tudo). A cada ciclo o Cérebro escolhe a
+melhor oferta DE CADA NICHO que tem grupo e a manda só para os grupos daquele nicho.
+
+O cliente (1) liga o Piloto, (2) conecta o WhatsApp dele por QR code e escolhe os grupos (ou adiciona o número/bot da
+ThyfIA como admin e digita o código de confirmação) e (3) define o nicho de cada grupo.
 """
 
 from __future__ import annotations
@@ -23,7 +26,7 @@ import threading
 import time
 from datetime import datetime, timedelta
 
-from . import cerebro, configuracoes, db, envio_canais, imagem_host, mensagens, tenant
+from . import cerebro, configuracoes, db, envio_canais, imagem_host, mensagens, nichos, tenant
 from .envio_canais import ErroEnvio
 from .itens import TZ_SP
 
@@ -146,7 +149,8 @@ def salvar_config(uid: int, d: dict) -> dict:
 def _destino_publico(r) -> dict:
     return {"id": r["id"], "tipo": r["tipo"], "ref": r["ref"], "nome": r["nome"], "ativo": bool(r["ativo"]),
             "verificado": bool(r["verificado"]), "falhas": r["falhas"], "erro": r["erro"] or "",
-            "experimental": r["tipo"] == "whatsapp_canal", "proprio": bool(r["instancia"])}
+            "experimental": r["tipo"] == "whatsapp_canal", "proprio": bool(r["instancia"]),
+            "nicho": r["nicho"] or nichos.GERAL}
 
 
 def listar_destinos(uid: int) -> list[dict]:
@@ -161,9 +165,11 @@ def _enviar_teste(tipo: str, ref: str, texto: str) -> None:
         envio_canais.whatsapp_enviar(ref, texto)
 
 
-def adicionar_destino(uid: int, tipo: str, entrada: str, nome: str = "", meu_numero: bool = False) -> dict:
+def adicionar_destino(uid: int, tipo: str, entrada: str, nome: str = "", meu_numero: bool = False,
+                      nicho: str = nichos.GERAL) -> dict:
     if tipo not in TIPOS:
         raise ErroPiloto("Tipo de destino inválido.")
+    nicho = _nicho_ou_erro(nicho)
     entrada = (entrada or "").strip()
     if not entrada:
         raise ErroPiloto("Informe o destino.")
@@ -193,9 +199,9 @@ def adicionar_destino(uid: int, tipo: str, entrada: str, nome: str = "", meu_num
 
     if meu_numero and tipo == "whatsapp_canal":
         inst = _exigir_conectado(uid)
-        c.execute("INSERT INTO piloto_destinos (usuario_id, tipo, ref, nome, verificado, instancia) VALUES (?,?,?,?,1,?) "
-                  "ON CONFLICT(usuario_id, tipo, ref) DO UPDATE SET verificado=1, instancia=excluded.instancia, ativo=1",
-                  (uid, tipo, ref, nome[:80], inst))
+        c.execute("INSERT INTO piloto_destinos (usuario_id, tipo, ref, nome, verificado, instancia, nicho) "
+                  "VALUES (?,?,?,?,1,?,?) ON CONFLICT(usuario_id, tipo, ref) DO UPDATE SET verificado=1, "
+                  "instancia=excluded.instancia, ativo=1, nicho=excluded.nicho", (uid, tipo, ref, nome[:80], inst, nicho))
         c.commit()
         return _destino_publico(c.execute("SELECT * FROM piloto_destinos WHERE usuario_id=? AND tipo=? AND ref=?",
                                           (uid, tipo, ref)).fetchone())
@@ -216,11 +222,11 @@ def adicionar_destino(uid: int, tipo: str, entrada: str, nome: str = "", meu_num
         raise ErroPiloto(msg, 502 if e.tipo in ("conexao", "config") else 400)
     if existente:
         c.execute("UPDATE piloto_destinos SET codigo=?, tentativas=0, nome=COALESCE(NULLIF(?,''),nome), "
-                  "ativo=1 WHERE id=?", (codigo, nome, existente["id"]))
+                  "ativo=1, nicho=? WHERE id=?", (codigo, nome, nicho, existente["id"]))
         did = existente["id"]
     else:
-        did = c.execute("INSERT INTO piloto_destinos (usuario_id, tipo, ref, nome, codigo) VALUES (?,?,?,?,?)",
-                        (uid, tipo, ref, nome[:80], codigo)).lastrowid
+        did = c.execute("INSERT INTO piloto_destinos (usuario_id, tipo, ref, nome, codigo, nicho) VALUES (?,?,?,?,?,?)",
+                        (uid, tipo, ref, nome[:80], codigo, nicho)).lastrowid
     c.commit()
     return _destino_publico(c.execute("SELECT * FROM piloto_destinos WHERE id=?", (did,)).fetchone())
 
@@ -256,6 +262,26 @@ def alternar_destino(uid: int, did: int, ativo: bool) -> dict:
                     (int(ativo), did, uid))
     if not cur.rowcount:
         raise ErroPiloto("Destino não encontrado.", 404)
+    c.commit()
+    return _destino_publico(c.execute("SELECT * FROM piloto_destinos WHERE id=?", (did,)).fetchone())
+
+
+def _nicho_ou_erro(nicho: str | None) -> str:
+    nicho = (nicho or nichos.GERAL).strip().lower()
+    if not nichos.valido(nicho):
+        raise ErroPiloto("Nicho inválido.")
+    return nicho
+
+
+def definir_nicho(uid: int, did: int, nicho: str) -> dict:
+    """Muda o nicho de um destino (as próximas ofertas já seguem o novo nicho)."""
+    nicho = _nicho_ou_erro(nicho)
+    c = db.conn()
+    if not c.execute("UPDATE piloto_destinos SET nicho=? WHERE id=? AND usuario_id=?", (nicho, did, uid)).rowcount:
+        raise ErroPiloto("Destino não encontrado.", 404)
+    # o que ainda não saiu e é de outro nicho deixa de fazer sentido neste destino
+    c.execute("UPDATE piloto_envios SET status='pulado', erro='Nicho do destino mudou.' WHERE destino_id=? "
+              "AND status IN ('pendente','aguardando')", (did,))
     c.commit()
     return _destino_publico(c.execute("SELECT * FROM piloto_destinos WHERE id=?", (did,)).fetchone())
 
@@ -355,13 +381,16 @@ def grupos_whatsapp(uid: int) -> list[dict]:
     except ErroEnvio as e:
         raise ErroPiloto(str(e), 502)
     sel = {r["ref"]: r for r in db.conn().execute(
-        "SELECT ref, ativo FROM piloto_destinos WHERE usuario_id=? AND tipo='whatsapp_grupo' AND instancia=?",
+        "SELECT ref, ativo, nicho FROM piloto_destinos WHERE usuario_id=? AND tipo='whatsapp_grupo' AND instancia=?",
         (uid, inst))}
-    return [{**g, "selecionado": g["jid"] in sel} for g in grupos]
+    return [{**g, "selecionado": g["jid"] in sel, "nicho": sel[g["jid"]]["nicho"] if g["jid"] in sel else nichos.GERAL}
+            for g in grupos]
 
 
-def salvar_grupos(uid: int, jids: list[str]) -> list[dict]:
-    """Define EXATAMENTE quais grupos do WhatsApp do cliente o Piloto usa (adiciona e remove)."""
+def salvar_grupos(uid: int, jids: list[str], nichos_por_grupo: dict[str, str] | None = None) -> list[dict]:
+    """Define EXATAMENTE quais grupos do WhatsApp do cliente o Piloto usa (adiciona e remove) e o nicho de cada um.
+    Grupo que já estava salvo mantém o nicho se o cliente não mandar outro."""
+    nichos_por_grupo = {j: _nicho_ou_erro(n) for j, n in (nichos_por_grupo or {}).items()}
     inst = _exigir_conectado(uid)
     try:
         todos = {g["jid"]: g["nome"] for g in envio_canais.wa_grupos(inst)}
@@ -380,9 +409,11 @@ def salvar_grupos(uid: int, jids: list[str]) -> list[dict]:
     c.execute(f"DELETE FROM piloto_destinos WHERE usuario_id=? AND tipo='whatsapp_grupo' AND instancia=? "
               f"AND ref NOT IN ({marcas})", (uid, inst, *jids))
     for j in jids:  # o grupo é do WhatsApp do cliente: dispensa o código de confirmação
-        c.execute("INSERT INTO piloto_destinos (usuario_id, tipo, ref, nome, verificado, instancia) "
-                  "VALUES (?,?,?,?,1,?) ON CONFLICT(usuario_id, tipo, ref) DO UPDATE SET nome=excluded.nome, "
-                  "verificado=1, instancia=excluded.instancia", (uid, "whatsapp_grupo", j, todos[j][:80], inst))
+        c.execute("INSERT INTO piloto_destinos (usuario_id, tipo, ref, nome, verificado, instancia, nicho) "
+                  "VALUES (?,?,?,?,1,?,?) ON CONFLICT(usuario_id, tipo, ref) DO UPDATE SET nome=excluded.nome, "
+                  "verificado=1, instancia=excluded.instancia, nicho=CASE WHEN ? THEN excluded.nicho "
+                  "ELSE nicho END", (uid, "whatsapp_grupo", j, todos[j][:80], inst, nichos_por_grupo.get(j, nichos.GERAL),
+                                    int(j in nichos_por_grupo)))
     c.commit()
     return listar_destinos(uid)
 
@@ -398,8 +429,10 @@ def _bate_palavras(busca: str, palavras: list[str]) -> bool:
     return any(cerebro.normalizar(p) and (cerebro.normalizar(p) in b or b in cerebro.normalizar(p)) for p in palavras)
 
 
-def candidatos(uid: int, cfg: dict | None = None, agora: datetime | None = None) -> list[dict]:
-    """Ofertas do cliente que podem sair agora, já ranqueadas pelo Cérebro."""
+def candidatos(uid: int, cfg: dict | None = None, agora: datetime | None = None, nicho: str | None = None,
+               excluir: set[int] | None = None) -> list[dict]:
+    """Ofertas do cliente que podem sair agora, já ranqueadas pelo Cérebro e marcadas com o nicho de cada uma.
+    `nicho` restringe a um nicho (a diversificação de categorias então olha só o que saiu para esse nicho)."""
     cfg = cfg or config(uid)
     agora = agora or _agora()
     c = db.conn()
@@ -425,6 +458,9 @@ def candidatos(uid: int, cfg: dict | None = None, agora: datetime | None = None)
         if chave in vistos or r["url_produto"] in ja or r["link_afiliado"] in ja:
             continue
         vistos.add(chave)
+        r["nicho"] = nichos.classificar(r["busca"], r["titulo"])
+        if (nicho and nicho != nichos.GERAL and r["nicho"] != nicho) or r["id"] in (excluir or ()):
+            continue
         unicos.append(r)
 
     por_busca: dict[str, int] = {}
@@ -433,17 +469,25 @@ def candidatos(uid: int, cfg: dict | None = None, agora: datetime | None = None)
         f"({','.join('?' * len(_BLOQ))}) AND criado_em >= ? GROUP BY busca", (uid, *_BLOQ, _iso(agora - timedelta(days=7)))):
         k = cerebro.normalizar(r["busca"])
         por_busca[k] = por_busca.get(k, 0) + r["n"]
-    ult = c.execute("SELECT busca FROM piloto_envios WHERE usuario_id=? AND status<>'pulado' "
-                    "ORDER BY id DESC LIMIT 1", (uid,)).fetchone()
+    if nicho and nicho != nichos.GERAL:
+        ult = c.execute("SELECT e.busca FROM piloto_envios e JOIN piloto_destinos d ON d.id=e.destino_id "
+                        "WHERE e.usuario_id=? AND d.nicho=? AND e.status<>'pulado' ORDER BY e.id DESC LIMIT 1",
+                        (uid, nicho)).fetchone()
+    else:
+        ult = c.execute("SELECT busca FROM piloto_envios WHERE usuario_id=? AND status<>'pulado' "
+                        "ORDER BY id DESC LIMIT 1", (uid,)).fetchone()
     return cerebro.curar_ofertas(unicos, ultima_busca=ult["busca"] if ult else "", envios_por_busca=por_busca,
                                  validade_dias=cfg["validade_dias"], agora=agora)
 
 
 # --------------------------------------------------------------------------- planejar e despachar
 def _enviados_hoje(uid: int, agora: datetime) -> int:
-    return db.conn().execute(
-        "SELECT COUNT(DISTINCT item_id) FROM piloto_envios WHERE usuario_id=? AND status IN "
-        "('enviado','pendente','aguardando') AND substr(criado_em,1,10)=?", (uid, _iso(agora)[:10])).fetchone()[0]
+    """Ofertas de hoje do destino que mais recebeu: o limite diário vale POR GRUPO (cada nicho tem o seu fluxo)."""
+    r = db.conn().execute(
+        "SELECT MAX(n) FROM (SELECT COUNT(DISTINCT item_id) n FROM piloto_envios WHERE usuario_id=? AND status IN "
+        "('enviado','pendente','aguardando') AND substr(criado_em,1,10)=? GROUP BY destino_id)",
+        (uid, _iso(agora)[:10])).fetchone()
+    return r[0] or 0
 
 
 def _avisar(uid: int, texto: str) -> None:
@@ -457,15 +501,17 @@ def _avisar(uid: int, texto: str) -> None:
         log.warning("Piloto: não consegui avisar o cliente %s.", uid)
 
 
-def _alertar_estoque(uid: int, agora: datetime) -> None:
+def _alertar_estoque(uid: int, agora: datetime, faltam: list[str] | None = None) -> None:
     hoje = _iso(agora)[:10]
     c = db.conn()
     if c.execute("SELECT alerta_estoque FROM piloto_config WHERE usuario_id=?", (uid,)).fetchone()[0] == hoje:
         return
     c.execute("UPDATE piloto_config SET alerta_estoque=? WHERE usuario_id=?", (hoje, uid))
     c.commit()
-    _avisar(uid, "📦 ThyfIA — Piloto Automático: acabaram as ofertas novas para divulgar. "
-                 "Gere mais links no painel para o Piloto continuar enviando.")
+    quais = ", ".join(nichos.nome(n) for n in faltam or ())
+    _avisar(uid, "📦 ThyfIA — Piloto Automático: acabaram as ofertas novas "
+                 + (f"de {quais}" if quais else "para divulgar")
+                 + ". Gere mais links no painel para o Piloto continuar enviando.")
 
 
 def planejar(uid: int, agora: datetime | None = None, forcar: bool = False, host=None) -> dict:
@@ -493,36 +539,58 @@ def planejar(uid: int, agora: datetime | None = None, forcar: bool = False, host
     if _enviados_hoje(uid, agora) >= cfg["max_dia"] and not forcar:
         return {"acao": "limite_do_dia"}
 
-    ranque = candidatos(uid, cfg, agora)
-    if not ranque:
-        _alertar_estoque(uid, agora)
+    # O Cérebro escolhe a melhor oferta de cada nicho que tem grupo; "geral" fica com a melhor das que sobraram.
+    grupos: dict[str, list] = {}
+    for d in destinos:
+        grupos.setdefault(d["nicho"] or nichos.GERAL, []).append(d)
+    ordem = [n for n in grupos if n != nichos.GERAL] + ([nichos.GERAL] if nichos.GERAL in grupos else [])
+    escolhas, usadas, faltam = [], set(), []
+    for n in ordem:
+        pool = candidatos(uid, cfg, agora, nichos.GERAL if n == nichos.GERAL else n, usadas)
+        if n == nichos.GERAL and not pool:
+            pool = candidatos(uid, cfg, agora)  # nada sobrou: repete uma das já escolhidas para o grupo geral
+        if not pool:
+            faltam.append(n)
+            continue
+        escolhas.append((n, pool[0]))
+        usadas.add(pool[0]["id"])
+    if not escolhas:
+        _alertar_estoque(uid, agora, faltam if set(faltam) - {nichos.GERAL} else None)
         c.execute("UPDATE piloto_config SET proximo_envio=? WHERE usuario_id=?",
                   (_iso(agora + timedelta(minutes=30)), uid))
         c.commit()
-        return {"acao": "sem_estoque"}
-    escolhida = ranque[0]
-    try:
-        imagem = (host or imagem_host.obter()).obter_url(escolhida)
-    except Exception:
-        imagem = None
-    motivo = "; ".join(escolhida["motivos"]) or "melhor pontuação entre as ofertas disponíveis"
+        return {"acao": "sem_estoque", "faltam": faltam}
+    if set(faltam) - {nichos.GERAL}:  # parte dos nichos ficou sem oferta: avisa (no máx. 1x por dia)
+        _alertar_estoque(uid, agora, [n for n in faltam if n != nichos.GERAL])
     status = "pendente" if cfg["modo"] == "automatico" else "aguardando"
-    quando = agora
-    for d in destinos:
-        m = mensagens.compor(escolhida, cfg["estilo"], d["id"])
-        c.execute(
-            "INSERT INTO piloto_envios (usuario_id, item_id, destino_id, status, busca, titulo, preco, texto, html, "
-            "link, imagem, motivo, pontos, enviar_apos, criado_em) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-            (uid, escolhida["id"], d["id"], status, escolhida["busca"], m["titulo"], escolhida["preco"], m["texto"],
-             m["html"], escolhida["link_afiliado"], imagem, motivo, escolhida["pontos"],
-             _iso(quando) if status == "pendente" else None, _iso(agora)))
-        quando += timedelta(seconds=random.randint(*ESPACO_DESTINOS_S))
+    quando, total = agora, 0
+    for n, escolhida in escolhas:
+        try:
+            imagem = (host or imagem_host.obter()).obter_url(escolhida)
+        except Exception:
+            imagem = None
+        motivo = "; ".join(escolhida["motivos"]) or "melhor pontuação entre as ofertas disponíveis"
+        if n != nichos.GERAL:
+            motivo = f"nicho {nichos.nome(n)}; " + motivo
+        for d in grupos[n]:
+            m = mensagens.compor(escolhida, cfg["estilo"], d["id"])
+            c.execute(
+                "INSERT INTO piloto_envios (usuario_id, item_id, destino_id, status, busca, titulo, preco, texto, html, "
+                "link, imagem, motivo, pontos, enviar_apos, criado_em) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                (uid, escolhida["id"], d["id"], status, escolhida["busca"], m["titulo"], escolhida["preco"], m["texto"],
+                 m["html"], escolhida["link_afiliado"], imagem, motivo, escolhida["pontos"],
+                 _iso(quando) if status == "pendente" else None, _iso(agora)))
+            quando += timedelta(seconds=random.randint(*ESPACO_DESTINOS_S))
+            total += 1
     base = cfg["intervalo_min"] * 60
     prox = agora + timedelta(seconds=int(base * random.uniform(0.85, 1.15)))
     c.execute("UPDATE piloto_config SET proximo_envio=? WHERE usuario_id=?", (_iso(prox), uid))
     c.commit()
-    return {"acao": "planejou" if status == "pendente" else "aguardando_aprovacao", "item_id": escolhida["id"],
-            "titulo": escolhida["titulo"], "motivo": motivo, "destinos": len(destinos)}
+    primeira = escolhas[0][1]
+    return {"acao": "planejou" if status == "pendente" else "aguardando_aprovacao", "item_id": primeira["id"],
+            "titulo": primeira["titulo"], "motivo": "; ".join(primeira["motivos"]), "destinos": total,
+            "ofertas": [{"nicho": n, "item_id": o["id"], "titulo": o["titulo"]} for n, o in escolhas],
+            "faltam": faltam}
 
 
 def _pausar(uid: int, agora: datetime, minutos: int, motivo: str) -> None:
@@ -653,6 +721,24 @@ def _resumo_dia(uid: int, dia: str) -> dict:
     }
 
 
+def cobertura(uid: int, estoque: list[dict] | None = None) -> list[dict]:
+    """Por nicho que tem grupo: quantos grupos e quantas ofertas prontas — mostra onde falta oferta."""
+    estoque = candidatos(uid) if estoque is None else estoque
+    por_nicho: dict[str, int] = {}
+    for o in estoque:
+        por_nicho[o["nicho"] or ""] = por_nicho.get(o["nicho"] or "", 0) + 1
+    quant: dict[str, int] = {}
+    for d in _destinos_prontos(uid):
+        quant[d["nicho"] or nichos.GERAL] = quant.get(d["nicho"] or nichos.GERAL, 0) + 1
+    saida = []
+    for n in nichos.NICHOS:
+        if n in quant:
+            ofertas = len(estoque) if n == nichos.GERAL else por_nicho.get(n, 0)
+            saida.append({"nicho": n, "nome": nichos.nome(n), "emoji": nichos.emoji(n), "grupos": quant[n],
+                          "ofertas": ofertas})
+    return saida
+
+
 def status(uid: int) -> dict:
     agora = _agora()
     cfg = config(uid)
@@ -674,7 +760,9 @@ def status(uid: int) -> dict:
             "whatsapp": whatsapp_status(uid),
             "estoque": {"total": len(estoque), "baixo": len(estoque) < ESTOQUE_BAIXO,
                         "proximas": [{"titulo": o["titulo"], "preco": o["preco"], "busca": o["busca"],
-                                      "pontos": o["pontos"], "motivos": o["motivos"]} for o in estoque[:5]]},
+                                      "pontos": o["pontos"], "motivos": o["motivos"], "nicho": o["nicho"]}
+                                     for o in estoque[:5]]},
+            "nichos": nichos.catalogo(), "cobertura": cobertura(uid, estoque),
             "hoje": _resumo_dia(uid, _iso(agora)[:10]), "aprovacao": pendentes_aprovacao(uid),
             "recentes": recentes, "agora": _iso(agora)}
 
@@ -694,6 +782,10 @@ def relatorio_texto(uid: int, agora: datetime | None = None) -> str:
     if top:
         linhas.append(f"🏆 Categoria que mais saiu: {top['busca']}")
     linhas.append(f"📦 Estoque: {len(estoque)} oferta(s) prontas para os próximos dias")
+    cob = [x for x in cobertura(uid, estoque) if x["nicho"] != nichos.GERAL]
+    if cob:
+        linhas.append("🗂️ Por nicho: " + " · ".join(
+            f"{x['emoji']} {x['nome']} {x['ofertas']}" + (" ⚠️" if x["ofertas"] < 2 else "") for x in cob))
     if len(estoque) < ESTOQUE_BAIXO:
         linhas.append("👉 Estoque baixo: gere novos links para o Piloto não ficar parado.")
     return "\n".join(linhas)

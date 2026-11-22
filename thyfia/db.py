@@ -280,6 +280,8 @@ def init() -> None:
         "ALTER TABLE config_usuario ADD COLUMN fb_validado_em TEXT",
         # Piloto: NULL = envia pelo número da ThyfIA; preenchido = instância do próprio cliente (QR code)
         "ALTER TABLE piloto_destinos ADD COLUMN instancia TEXT",
+        # Nicho do destino: 'geral' recebe tudo; outro slug (fit, tech, casa…) só recebe ofertas daquele nicho
+        "ALTER TABLE piloto_destinos ADD COLUMN nicho TEXT NOT NULL DEFAULT 'geral'",
     )
     for sql in migracoes:
         try:
