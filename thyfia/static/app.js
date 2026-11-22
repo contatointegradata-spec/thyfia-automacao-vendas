@@ -568,9 +568,9 @@ $("#form-busca").addEventListener("submit", async (e) => {
     await sincronizarSessao(); // usa a sessão mais recente do ML deste navegador
     // a busca de produtos roda neste navegador (o ML recusa a busca vinda do IP do servidor)
     let trechos = null;
-    if (temExtensao() && !extensaoAtende("1.2.1")) {
+    if (temExtensao() && !extensaoAtende("1.3.0")) {
       // extensão antiga não sabe buscar (e nem responde ao pedido): não espera à toa
-      toast(`Sua extensão ThyfIA Conector é a v${document.documentElement.dataset.thyfiaExt}; a busca precisa da v1.2.1 ou mais nova. Baixe de novo em Ajuda, troque a pasta e recarregue em chrome://extensions.`, "erro");
+      toast(`Sua extensão ThyfIA Conector é a v${document.documentElement.dataset.thyfiaExt}; a busca precisa da v1.3.0 ou mais nova. Baixe de novo em Ajuda, troque a pasta e recarregue em chrome://extensions.`, "erro");
     } else if (temExtensao()) {
       try { trechos = (await falarComExtensao("buscar", 30000, { termo, limite: estado.limite })).trechos || null; }
       catch (e) { if (e.message) toast(e.message, "info"); /* o servidor ainda tenta sozinho */ }
