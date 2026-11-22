@@ -5,6 +5,8 @@ const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 const espera = (ms) => new Promise((r) => setTimeout(r, ms));
 const REDUZIR = matchMedia("(prefers-reduced-motion: reduce)").matches;
+/* ícone do sprite do index.html (traço de 2px; a cor vem do texto ao redor) */
+const ic = (nome) => `<svg class="ic" aria-hidden="true"><use href="#i-${nome}"/></svg>`;
 
 const estado = {
   usuario: null,
@@ -41,76 +43,20 @@ async function api(caminho, opcoes = {}) {
 function toast(msg, tipo = "info") {
   const el = document.createElement("div");
   el.className = `toast ${tipo}`;
-  el.textContent = msg;
+  el.innerHTML = ic(tipo === "ok" ? "check" : tipo === "erro" ? "alert" : "info") + "<span></span>";
+  $("span", el).textContent = msg;
   $("#toasts").appendChild(el);
   setTimeout(() => { el.classList.add("sai"); el.addEventListener("animationend", () => el.remove()); }, 3800);
 }
 
-/* ------------------------------------------------------------------ ripple nos botões */
-document.addEventListener("pointerdown", (e) => {
-  const b = e.target.closest(".btn");
-  if (!b || REDUZIR) return;
-  const r = b.getBoundingClientRect();
-  const s = Math.max(r.width, r.height);
-  const c = document.createElement("span");
-  c.className = "ripple";
-  c.style.cssText = `width:${s}px;height:${s}px;left:${e.clientX - r.left - s / 2}px;top:${e.clientY - r.top - s / 2}px`;
-  b.appendChild(c);
-  c.addEventListener("animationend", () => c.remove());
-});
-
 function carregando(btn, sim) { btn.classList.toggle("carregando", sim); btn.disabled = sim; }
-
-/* ------------------------------------------------------------------ partículas de fundo */
-(function particulas() {
-  const cv = $("#particulas"), ctx = cv.getContext("2d");
-  const DPR = Math.min(devicePixelRatio || 1, 1.5);  // tela retina não precisa de 2x aqui
-  let pts = [], w, h, ultimo = 0;
-  const redim = () => {
-    w = cv.width = innerWidth * DPR; h = cv.height = innerHeight * DPR;
-    cv.style.width = innerWidth + "px"; cv.style.height = innerHeight + "px";
-    const n = Math.min(70, Math.floor(innerWidth / 22));
-    pts = Array.from({ length: n }, () => ({
-      x: Math.random() * w, y: Math.random() * h,
-      vx: (Math.random() - .5) * .25 * DPR, vy: (Math.random() - .5) * .25 * DPR,
-      r: (Math.random() * 1.4 + .4) * DPR,
-    }));
-  };
-  let parado = false;
-  redim(); addEventListener("resize", () => { redim(); parado = false; });  // dentro do app as partículas ficam paradas (1 quadro); no login animam a ~30 fps
-  const passo = (t = 0) => {
-    if (!REDUZIR) requestAnimationFrame(passo);
-    const noApp = !$("#tela-app").hidden;
-    if (noApp && parado) return;
-    if (document.hidden || (!noApp && t - ultimo < 33)) return;
-    parado = noApp; ultimo = t;
-    ctx.clearRect(0, 0, w, h);
-    const lim = 120 * DPR;
-    for (const p of pts) {
-      p.x += p.vx; p.y += p.vy;
-      if (p.x < 0 || p.x > w) p.vx *= -1;
-      if (p.y < 0 || p.y > h) p.vy *= -1;
-      ctx.fillStyle = "rgba(167,139,250,.55)";
-      ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, 7); ctx.fill();
-    }
-    for (let i = 0; i < pts.length; i++) for (let j = i + 1; j < pts.length; j++) {
-      const a = pts[i], b = pts[j], d = Math.hypot(a.x - b.x, a.y - b.y);
-      if (d < lim) {
-        ctx.strokeStyle = `rgba(34,211,238,${(1 - d / lim) * .14})`;
-        ctx.lineWidth = DPR * .6;
-        ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
-      }
-    }
-  };
-  passo();
-})();
 
 /* ------------------------------------------------------------------ confete */
 function confete(qtd = 140) {
   if (REDUZIR) return;
   const cv = $("#confete"), ctx = cv.getContext("2d");
   cv.width = innerWidth; cv.height = innerHeight;
-  const cores = ["#8b5cf6", "#22d3ee", "#a78bfa", "#34d399", "#ffe600", "#f472b6"];
+  const cores = ["#7B4DEF", "#22D3EE", "#A78BFA", "#34D399", "#F2F1FB", "#B9A9FA"];
   const ps = Array.from({ length: qtd }, () => ({
     x: innerWidth / 2 + (Math.random() - .5) * 200, y: innerHeight / 2 - 40,
     vx: (Math.random() - .5) * 16, vy: Math.random() * -15 - 4,
@@ -195,14 +141,14 @@ $$(".auth-tab").forEach((t) => t.addEventListener("click", () => trocarAba(t.dat
 $$(".olho").forEach((b) => b.addEventListener("click", () => {
   const i = b.previousElementSibling.previousElementSibling;
   i.type = i.type === "password" ? "text" : "password";
-  b.textContent = i.type === "password" ? "👁" : "🙈";
+  b.innerHTML = ic(i.type === "password" ? "eye" : "eye-off");
 }));
 
 $("#form-cadastro [name=senha]").addEventListener("input", (e) => {
   const v = e.target.value;
   let p = 0;
   if (v.length >= 6) p++; if (v.length >= 10) p++; if (/[A-Z]/.test(v) && /[a-z]/.test(v)) p++; if (/\d/.test(v) && /\W/.test(v)) p++;
-  const cores = ["#fb7185", "#fb7185", "#fbbf24", "#22d3ee", "#34d399"];
+  const cores = ["var(--danger)", "var(--danger)", "var(--brand-text)", "var(--accent)", "var(--success)"];
   const s = $(".forca span");
   s.style.width = v ? `${Math.max(12, p * 25)}%` : "0"; s.style.background = cores[p];
 });
@@ -252,7 +198,7 @@ function entrarNoApp(eu, origem) {
   $("#usuario-nome").textContent = eu.nome;
   $("#usuario-email").textContent = eu.email;
   $("#avatar").textContent = primeiro[0].toUpperCase();
-  $("#saudacao").textContent = `${saudacao()}, ${primeiro}! ✦`;
+  $("#saudacao").textContent = `${saudacao()}, ${primeiro}!`;
   aplicarPlano(eu);
   aplicarStatusMl(eu.ml);
   aplicarPreferencias(eu.preferencias);
@@ -468,7 +414,7 @@ document.addEventListener("click", async (e) => {
   if (!b) return;
   const texto = b.dataset.copiar || $("#ext-pasta").textContent;
   try { await navigator.clipboard.writeText(texto); } catch { return toast("Não consegui copiar.", "erro"); }
-  b.textContent = "copiado ✓"; b.classList.add("ok");
+  b.textContent = "copiado"; b.classList.add("ok");
   setTimeout(() => { b.textContent = "copiar"; b.classList.remove("ok"); }, 1600);
 });
 ["#btn-fechar-modal", "#btn-fechar-modal2"].forEach((s) => $(s).addEventListener("click", () => {
@@ -521,14 +467,14 @@ async function sugerirNicho() {
     if (seq !== nichoSeq) return;  // chegou uma resposta mais nova
     const sel = $("#sel-nicho"), atual = sel.value;
     if (sel.options.length !== r.catalogo.length + 1) {
-      sel.innerHTML = `<option value="">Automático</option>` + r.catalogo.map((n) => `<option value="${esc(n.slug)}">${n.emoji} ${esc(n.nome)}</option>`).join("");
+      sel.innerHTML = `<option value="">Automático</option>` + r.catalogo.map((n) => `<option value="${esc(n.slug)}">${esc(n.nome)}</option>`).join("");
       sel.value = atual;
     }
-    sel.options[0].textContent = r.nicho ? `Automático (${r.emoji} ${r.nome})` : "Automático";
+    sel.options[0].textContent = r.nicho ? `Automático (${r.nome})` : "Automático";
     const dica = $("#nicho-dica");
     dica.classList.toggle("alerta", !!q && !r.nicho && !sel.value);
     dica.textContent = !q ? "" : sel.value ? "A oferta desta busca vai só para os grupos desse nicho."
-      : r.nicho ? `O Cérebro entendeu esta busca como ${r.emoji} ${r.nome} e manda só para os grupos desse nicho.`
+      : r.nicho ? `O Cérebro entendeu esta busca como ${r.nome} e manda só para os grupos desse nicho.`
       : "Não reconheci o nicho desta busca. Escolha um para ela não ir só aos grupos “Todos os nichos”.";
     linha.hidden = false;
   } catch { /* silencioso: o campo é opcional */ }
@@ -550,7 +496,7 @@ async function buscarSugestoes() {
       itens.forEach((s, k) => {
         const li = document.createElement("li");
         li.style.animationDelay = k * 35 + "ms";
-        li.innerHTML = `<span class="s-ic">✦</span><span></span><small>${s.buscas} busca${s.buscas > 1 ? "s" : ""}${s.taxa != null ? ` · ${s.taxa}% ok` : ""}</small>`;
+        li.innerHTML = `<span class="s-ic">${ic("spark")}</span><span></span><small>${s.buscas} busca${s.buscas > 1 ? "s" : ""}${s.taxa != null ? ` · ${s.taxa}% ok` : ""}</small>`;
         li.children[1].textContent = s.termo;
         li.addEventListener("mousedown", (e) => { e.preventDefault(); escolher(s.termo); });
         lista.appendChild(li);
@@ -652,7 +598,7 @@ async function gerarNaExtensao(id) {
 
 /* ------------------------------------------------------------------ GERANDO */
 const FRASES = [
-  "Um café coado leva uns 4 minutos. Vamos ver quem termina primeiro ☕",
+  "Um café coado leva uns 4 minutos. Vamos ver quem termina primeiro",
   "A ThyfIA está garimpando os produtos mais relevantes pra você.",
   "Cada busca deixa a ThyfIA mais esperta — para você e para a comunidade.",
   "Produtos que não aceitam afiliados ficam de fora. Só link que funciona!",
@@ -674,7 +620,6 @@ function abrirGerando(job) {
   const ov = $("#overlay-gerando");
   ov.hidden = false; ov.classList.remove("fechando");
   estadoGerando("estado-progresso");
-  $("#liquido").style.height = "8%";
   $("#prog-barra").style.width = "3%";
   // frases rotativas
   let i = 0;
@@ -698,7 +643,6 @@ function atualizarGerando(job) {
     const pct = Math.max(4, Math.round((job.feitos / job.total) * 100));
     barra.classList.remove("indeterminado");
     barra.style.width = pct + "%";
-    $("#liquido").style.height = 8 + pct * 0.82 + "%";
     $("#prog-num").textContent = `${job.feitos} de ${job.total}`;
   } else if (job.status in FASES) {
     barra.classList.add("indeterminado");
@@ -720,7 +664,7 @@ async function finalizarGerando(job) {
   estado.fimDe = job.id;
   pararPolls();
   const barra = $("#prog-barra");
-  barra.classList.remove("indeterminado"); barra.style.width = "100%"; $("#liquido").style.height = "90%";
+  barra.classList.remove("indeterminado"); barra.style.width = "100%";
   await espera(REDUZIR ? 0 : 900);
   estadoGerando("estado-fim");
   $("#fim-resumo").textContent = `Busca: “${job.termo}”`;
@@ -756,7 +700,7 @@ function confirmaReenvio(job) {
 async function enviarJob(job) {
   try {
     const atualizado = await api(`/api/jobs/${job.id}/enviar`, { body: {} });
-    toast(`Enviado para a automação: ${resumoEnvio(atualizado)} ✔`, "ok");
+    toast(`Enviado para a automação: ${resumoEnvio(atualizado)}`, "ok");
     return atualizado;
   } catch (err) {
     toast(err.message, "erro");
@@ -770,8 +714,8 @@ function renderEnvioFim(job) {
   carregando(btn, job.envio_status === "enviando");
   btn.disabled = semLinks || job.envio_status === "enviando";
   $(".btn-txt", btn).textContent =
-    job.envio_status === "erro" ? "↻ Tentar de novo" :
-    job.envio_status === "enviado" ? "↻ Reenviar para automação" : "➜ Enviar para automação";
+    job.envio_status === "erro" ? "Tentar de novo" :
+    job.envio_status === "enviado" ? "Reenviar para automação" : "Enviar para automação";
   msg.className = "envio-msg" + (job.envio_status === "enviado" ? " ok" : job.envio_status === "erro" ? " erro" : "");
   msg.textContent = semLinks ? "Geração sem links para enviar."
     : job.envio_status === "nao_enviado" ? "" : resumoEnvio(job);
@@ -794,7 +738,7 @@ async function acompanharEnvioAuto(id) {
       const j = await api(`/api/jobs/${id}`);
       if (j.envio_status !== "enviando") {
         estado.jobFim = j; renderEnvioFim(j);
-        toast(j.envio_status === "enviado" ? `Enviado automaticamente: ${resumoEnvio(j)} ✔` : j.envio_erro || "Falha no envio.",
+        toast(j.envio_status === "enviado" ? `Enviado automaticamente: ${resumoEnvio(j)}` : j.envio_erro || "Falha no envio.",
           j.envio_status === "enviado" ? "ok" : "erro");
         return;
       }
@@ -832,7 +776,7 @@ function erroGerando(job) {
   if ((job.erro || "").includes("Mercado Livre")) api("/api/ml/status").then(aplicarStatusMl).catch(() => {});
 }
 
-$("#btn-baixar").addEventListener("click", () => toast("Download iniciado! 📊", "ok"));
+$("#btn-baixar").addEventListener("click", () => toast("Download iniciado!", "ok"));
 $("#btn-nova").addEventListener("click", async () => {
   await fecharOverlay($("#overlay-gerando"));
   input.value = ""; $("#relacionados").innerHTML = "";
@@ -854,20 +798,20 @@ async function carregarHistorico() {
   try {
     const [jobs] = await Promise.all([api("/api/jobs"), espera(REDUZIR ? 0 : 450)]);
     if (!jobs.length) {
-      box.innerHTML = '<div class="vazio"><div>☕</div>Nenhuma geração ainda. Que tal a primeira?<br><br><button class="btn btn-primario" data-ir="gerar">Gerar links</button></div>';
+      box.innerHTML = '<div class="vazio"><img src="/static/marca/mascote-dormindo.svg" alt="Thyf dormindo">Nenhuma geração ainda. Que tal a primeira?<br><br><button class="btn btn-primario" data-ir="gerar">Gerar links</button></div>';
       return;
     }
     box.innerHTML = "";
     jobs.forEach((j, k) => {
-      const icone = { concluido: "✅", erro: "⚠️" }[j.status] || "⏳";
+      const [icone, tom] = { concluido: [ic("check"), "ok"], erro: [ic("alert"), "erro"] }[j.status] || [ic("clock"), ""];
       const el = document.createElement("div");
       el.className = "h-item"; el.style.setProperty("--i", k);
       el.innerHTML = `
-        <div class="h-ic">${icone}</div>
+        <div class="h-ic ${tom}">${icone}</div>
         <div><strong></strong><small>${dataBR(j.criado)}${j.status === "erro" ? " · " + (j.erro || "erro") : ""}</small></div>
         <div class="h-num">${j.ok}/${j.total}<small>links</small></div>
         <div class="h-envio"></div>
-        <a class="h-baixar ${j.planilha ? "" : "off"}" href="/api/jobs/${j.id}/planilha" title="Baixar planilha" download>⬇</a>`;
+        <a class="h-baixar ${j.planilha ? "" : "off"}" href="/api/jobs/${j.id}/planilha" title="Baixar planilha" aria-label="Baixar planilha" download>${ic("download")}</a>`;
       $("strong", el).textContent = j.termo;
       $("small", el).title = j.erro || "";
       if (j.status === "concluido") renderEnvioHist($(".h-envio", el), j);
@@ -887,8 +831,8 @@ function renderEnvioHist(box, j) {
   det.title = det.textContent;
   const btn = $("button", box);
   if (estado.liberados && !estado.liberados.automacao) { btn.hidden = true; $(".selo", box).hidden = true; }
-  btn.textContent = j.envio_status === "erro" ? "↻ Tentar de novo"
-    : j.envio_status === "enviado" ? "↻ Reenviar" : "➜ Enviar para automação";
+  btn.innerHTML = j.envio_status === "erro" ? ic("refresh") + " Tentar de novo"
+    : j.envio_status === "enviado" ? ic("refresh") + " Reenviar" : ic("arrow") + " Enviar para automação";
   const semLinks = !(j.links ?? j.ok);  // links salvos no banco
   btn.disabled = semLinks || j.envio_status === "enviando";
   if (semLinks) btn.title = "Geração sem links";
@@ -906,18 +850,18 @@ const MAX_CARROSSEL = 10;
 /* catálogo da navegação: canal → formatos. "breve" = só a tela, ainda não publica */
 const CANAIS_PUB = {
   instagram: { nome: "Instagram", icone: "IG", cor: "ig", desc: "Publique na sua conta comercial do Instagram.", formatos: {
-    feed: { nome: "Feed", icone: "▣", desc: "Foto com legenda no seu perfil." },
-    story: { nome: "Story", icone: "◔", desc: "Foto em tela cheia por 24 h, sem legenda." },
-    carrossel: { nome: "Carrossel", icone: "▤", desc: "De 2 a 10 fotos que o público desliza." },
-    reels: { nome: "Reels", icone: "▶", desc: "Vídeo vertical curto: seu MP4 ou gerado das fotos." } } },
+    feed: { nome: "Feed", icone: "image", desc: "Foto com legenda no seu perfil." },
+    story: { nome: "Story", icone: "smartphone", desc: "Foto em tela cheia por 24 h, sem legenda." },
+    carrossel: { nome: "Carrossel", icone: "layers", desc: "De 2 a 10 fotos que o público desliza." },
+    reels: { nome: "Reels", icone: "video", desc: "Vídeo vertical curto: seu MP4 ou gerado das fotos." } } },
   facebook: { nome: "Facebook", icone: "f", cor: "fb", desc: "Publique na sua Página do Facebook.", formatos: {
-    feed: { nome: "Feed", icone: "▣", desc: "Foto com texto na linha do tempo da Página." },
-    story: { nome: "Story", icone: "◔", desc: "Story da Página, em tela cheia." },
-    publicacao: { nome: "Publicação com link", icone: "⛓", desc: "Post normal com o link do produto (clicável)." } } },
-  whatsapp: { nome: "WhatsApp", icone: "✆", cor: "wa", desc: "Grupo, canal ou story — pela automação.", formatos: {
-    grupo: { nome: "Grupo", icone: "☷", desc: "A oferta cai no seu grupo via automação.", via: true },
-    canal: { nome: "Canal", icone: "☍", desc: "A oferta cai no seu canal via automação.", via: true },
-    story: { nome: "Story (Status)", icone: "◔", desc: "Status do WhatsApp com a foto da oferta.", breve: true } } },
+    feed: { nome: "Feed", icone: "image", desc: "Foto com texto na linha do tempo da Página." },
+    story: { nome: "Story", icone: "smartphone", desc: "Story da Página, em tela cheia." },
+    publicacao: { nome: "Publicação com link", icone: "link", desc: "Post normal com o link do produto (clicável)." } } },
+  whatsapp: { nome: "WhatsApp", icone: "msg", cor: "wa", desc: "Grupo, canal ou story — pela automação.", formatos: {
+    grupo: { nome: "Grupo", icone: "users", desc: "A oferta cai no seu grupo via automação.", via: true },
+    canal: { nome: "Canal", icone: "megaphone", desc: "A oferta cai no seu canal via automação.", via: true },
+    story: { nome: "Story (Status)", icone: "smartphone", desc: "Status do WhatsApp com a foto da oferta.", breve: true } } },
 };
 const PUBLICAVEL_PADRAO = ["instagram/feed", "instagram/story", "instagram/carrossel", "instagram/reels", "facebook/feed", "facebook/story", "facebook/publicacao"];
 const usaBandeja = () => pub.canal === "instagram" && (pub.formato === "carrossel" || (pub.formato === "reels" && pub.reelsFonte === "auto"));
@@ -950,7 +894,7 @@ function cartaoNav(icone, cor, nome, desc, selo, onclick, i) {
   const b = document.createElement("button");
   b.type = "button"; b.className = "canal-card" + (cor ? " " + cor : ""); b.style.setProperty("--i", i);
   b.innerHTML = `<span class="canal-icone"></span><span class="canal-txt"><strong></strong><small></small></span><span class="canal-selo"></span>`;
-  $(".canal-icone", b).textContent = icone; $("strong", b).textContent = nome; $("small", b).textContent = desc;
+  { const bi = $(".canal-icone", b); if (/^[a-z-]{3,}$/.test(icone)) bi.innerHTML = ic(icone); else bi.textContent = icone; } $("strong", b).textContent = nome; $("small", b).textContent = desc;
   const sl = $(".canal-selo", b);
   if (selo) { sl.textContent = selo.txt; sl.classList.add(selo.cls); } else sl.remove();
   b.addEventListener("click", onclick);
@@ -1019,7 +963,7 @@ function adaptarTelaFormato(manterSugestoes = false) {
   $("#carr-msg").innerHTML = reels ? "De 1 a 10 fotos, 3 segundos cada. Para incluir produtos, use “Sugerir” e clique em <b>Adicionar</b>."
     : "De 2 a 10 fotos. Para incluir produtos, use “Sugerir melhor item” e clique em <b>Adicionar</b>. A primeira foto é a capa; todas ficam quadradas.";
   $("#btn-post-manual").textContent = { story: "＋ Story manual com foto", carrossel: "＋ Carrossel manual com fotos", reels: "＋ Reels manual" }[fm] || (link ? "＋ Publicação manual com link" : "＋ Post manual com foto");
-  $("#btn-sugerir .btn-txt").textContent = fm === "carrossel" || (reels && pub.reelsFonte === "auto") ? "✦ Sugerir itens" : "✦ Sugerir melhor item";
+  $("#btn-sugerir .btn-txt").innerHTML = fm === "carrossel" || (reels && pub.reelsFonte === "auto") ? ic("spark") + " Sugerir itens" : ic("spark") + " Sugerir melhor item";
   if (!manterSugestoes) { $("#pub-info").textContent = ""; $("#pub-candidatos").innerHTML = ""; }
   $("#pv-user").textContent = "@" + (fb ? (pub.fbNome || "sua_pagina") : pub.user); $("#pv-user2").textContent = fb ? (pub.fbNome || "sua_pagina") : pub.user;
   modoEdicao(pub.editando ? { id: pub.editando } : null);
@@ -1076,7 +1020,7 @@ $("#btn-sugerir").addEventListener("click", async (e) => {
       const el = document.createElement("article");
       el.className = "pub-card" + (k === 0 ? " melhor" : ""); el.style.setProperty("--i", k);
       el.innerHTML = `<div class="pub-card-img"></div><div class="pub-card-corpo">
-        ${k === 0 ? '<span class="selo-melhor">★ melhor escolha</span>' : ""}
+        ${k === 0 ? '<span class="selo-melhor">' + ic("star") + ' melhor escolha</span>' : ""}
         <strong></strong><b class="pub-preco"></b><small class="pub-motivo"></small>
         <button class="btn btn-fantasma btn-mini">${usaBandeja() ? "＋ Adicionar" : "Escolher"}</button></div>`;
       const img = $(".pub-card-img", el);
@@ -1106,7 +1050,7 @@ function isoParaLocal(iso) {
 function modoEdicao(p) {
   pub.editando = p ? p.id : null;
   const nome = { story: "story", carrossel: "carrossel", reels: "Reels" }[pub.formato] || "publicação";
-  $("#btn-agendar .btn-txt").textContent = p ? "💾 Salvar alterações" : `📅 Agendar ${nome} no ${ROTULO_CANAL[pub.canal] || "Instagram"}`;
+  $("#btn-agendar .btn-txt").innerHTML = p ? ic("save") + " Salvar alterações" : `${ic("calendar")} Agendar ${nome} no ${ROTULO_CANAL[pub.canal] || "Instagram"}`;
   $("#btn-publicar-agora").hidden = !!p;
 }
 
@@ -1137,7 +1081,7 @@ function renderBandeja() {
   const box = $("#carr-bandeja"); box.innerHTML = "";
   pub.fotos.forEach((f, i) => {
     const el = document.createElement("div"); el.className = "carr-foto";
-    el.innerHTML = `<img alt=""><span class="carr-n"></span><span class="carr-acoes"><button type="button" data-a="e" aria-label="Mover para a esquerda">◀</button><button type="button" data-a="d" aria-label="Mover para a direita">▶</button><button type="button" data-a="x" aria-label="Remover foto">✕</button></span>`;
+    el.innerHTML = `<img alt=""><span class="carr-n"></span><span class="carr-acoes"><button type="button" data-a="e" aria-label="Mover para a esquerda">←</button><button type="button" data-a="d" aria-label="Mover para a direita">→</button><button type="button" data-a="x" aria-label="Remover foto">${ic("x")}</button></span>`;
     $("img", el).src = f.local || f.url; $(".carr-n", el).textContent = i === 0 ? "capa" : i + 1;
     el.addEventListener("click", (e) => {
       const a = e.target.closest("button")?.dataset.a; if (!a) return;
@@ -1223,7 +1167,7 @@ function atualizarPreview() {
   if (src) img.src = src; else img.removeAttribute("src");
   const link = pub.canal === "facebook" && pub.formato === "publicacao";
   $("#pv-sem-foto").innerHTML = reels ? "Sem vídeo<br><small>envie ou gere o vídeo ao lado</small>"
-    : link ? "🔗 O Facebook monta a prévia<br><small>com a foto e o título do link</small>" : "Sem foto<br><small>envie uma imagem ao lado</small>";
+    : link ? ic("link") + " O Facebook monta a prévia<br><small>com a foto e o título do link</small>" : "Sem foto<br><small>envie uma imagem ao lado</small>";
   const cont = $("#pv-contagem"); cont.hidden = !(pub.formato === "carrossel" && pub.fotos.length); cont.textContent = `1/${pub.fotos.length}`;
   const leg = $("#pub-legenda").value;
   $("#pv-legenda").textContent = pub.formato === "story" ? "" : leg;
@@ -1310,11 +1254,11 @@ $("#btn-agendar").addEventListener("click", async (e) => {
   try {
     if (pub.editando) {
       await api(`/api/publicacao/${pub.editando}`, { method: "PUT", body: { ...dadosPost(), item_id: null, agendado_para: quando } });
-      toast("Publicação alterada! ✏️", "ok");
+      toast("Publicação alterada!", "ok");
       modoEdicao(null);
     } else {
       await api("/api/publicacao/agendar", { body: { ...dadosPost(), agendado_para: quando } });
-      toast("Publicação agendada! 📅", "ok");
+      toast("Publicação agendada!", "ok");
     }
     msgPub(`Agendado para ${dataBR(quando)}. Deixe o ThyfIA rodando nesse horário.`, "ok");
     fecharEditorPub(); $("#pub-candidatos").innerHTML = ""; $("#pub-info").textContent = "";
@@ -1331,7 +1275,7 @@ $("#btn-publicar-agora").addEventListener("click", async (e) => {
   msgPub(pub.formato === "reels" ? "Enviando o Reels…" : pub.formato === "carrossel" ? "Publicando o carrossel… (cada foto é processada; pode levar alguns minutos)" : "Publicando… (pode levar até 1 minuto)");
   try {
     const p = await api("/api/publicacao/publicar-agora", { body: { ...dadosPost(), confirmar: true } });
-    if (p.status === "publicado") { msgPub(`Publicado com sucesso! 🎉`, "ok"); toast("Publicado! 🎉", "ok"); confete(90); fecharEditorPub(); $("#pub-candidatos").innerHTML = ""; }
+    if (p.status === "publicado") { msgPub(`Publicado com sucesso!`, "ok"); toast("Publicado!", "ok"); confete(90); fecharEditorPub(); $("#pub-candidatos").innerHTML = ""; }
     else if (p.status === "publicando") { toast("Reels enviado! O Instagram está processando o vídeo — acompanhe em Publicações.", "ok"); fecharEditorPub(); $("#pub-candidatos").innerHTML = ""; }
     else msgPub(p.erro || "Não foi possível publicar.", "erro");
     carregarPublicacoes(); if (pub.canal === "instagram") statusInstagram(true);
@@ -1417,7 +1361,7 @@ $("#form-fb").addEventListener("submit", async (e) => {
   try {
     const r = await api("/api/conta/facebook", { method: "PUT", body: { page_id: id, token } });
     $("#fb-in-token").value = ""; msg.textContent = "";
-    renderFacebook(r); toast("Página do Facebook conectada! ✓", "ok");
+    renderFacebook(r); toast("Página do Facebook conectada!", "ok");
   } catch (err) { msg.textContent = err.message; msg.classList.add("erro"); }
   finally { carregando(btn, false); }
 });
@@ -1440,7 +1384,7 @@ function abrirWhatsapp() {
   $("#wa-txt").textContent = pub.formato === "grupo"
     ? "Cada oferta com link gerado é enviada automaticamente para o seu grupo de WhatsApp. Você não publica à mão: a automação cuida do envio no ritmo que você configurar."
     : "Cada oferta com link gerado é enviada automaticamente para o seu canal de WhatsApp. Você não publica à mão: a automação cuida do envio no ritmo que você configurar.";
-  const li = (ok, txt) => { const p = document.createElement("p"); p.className = "wa-linha " + (ok ? "ok" : "off"); p.textContent = (ok ? "✓ " : "• ") + txt; info.appendChild(p); };
+  const li = (ok, txt) => { const p = document.createElement("p"); p.className = "wa-linha " + (ok ? "ok" : "off"); p.innerHTML = (ok ? ic("check") : "•") + " "; p.appendChild(document.createTextNode(txt)); info.appendChild(p); };
   li(!!w.automacao_pronta, w.automacao_pronta ? "Automação pronta para enviar." : "Automação ainda não configurada — abra a Automação e preencha o destino.");
   li(!!w.numero, w.numero ? `WhatsApp de destino: ${w.numero}` : "Nenhum número/grupo de destino informado.");
   if (w.telegram) li(true, `Telegram: ${w.telegram}`);

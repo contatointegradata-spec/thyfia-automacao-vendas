@@ -5,51 +5,35 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>ThyfIA</title>
   <meta name="description" content="ThyfIA — gere links de afiliado em segundos.">
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%238B5CF6'/%3E%3Cstop offset='1' stop-color='%2322D3EE'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='18' fill='url(%23g)'/%3E%3Cpath d='M18 22h28M32 22v24' stroke='white' stroke-width='6' stroke-linecap='round'/%3E%3Ccircle cx='46' cy='44' r='4' fill='white'/%3E%3C/svg%3E">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/styles.css?v=13">
+  <meta name="theme-color" content="#0B0B17">
+  <link rel="icon" href="/static/marca/icone-app.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/static/marca/apple-touch-icon.png">
+  <link rel="preload" href="/static/fonts/fredoka-latin-700-normal.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/static/fonts/dm-sans-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/static/tokens.css?v=1">
+  <link rel="stylesheet" href="/static/styles.css?v=14">
 </head>
 <body>
 
-<!-- ======================= Fundo animado (aurora) ======================= -->
-<div class="aurora" aria-hidden="true">
-  <span class="blob b1"></span><span class="blob b2"></span><span class="blob b3"></span>
-  <div class="grade"></div>
-</div>
-<canvas id="particulas" aria-hidden="true"></canvas>
-
 <!-- ======================= Splash ======================= -->
 <div id="splash">
-  <div class="splash-logo">
-    <svg viewBox="0 0 64 64" class="logo-mark grande">
-      <defs><linearGradient id="lg-s" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8B5CF6"/><stop offset="1" stop-color="#22D3EE"/></linearGradient></defs>
-      <rect class="lm-bg" width="64" height="64" rx="18" fill="url(#lg-s)"/>
-      <path class="lm-t" d="M18 22h28M32 22v24" stroke="#fff" stroke-width="6" stroke-linecap="round" fill="none"/>
-      <circle class="lm-dot" cx="46" cy="44" r="4" fill="#fff"/>
-    </svg>
-    <div class="splash-nome">Thyf<span class="ia">IA</span></div>
-  </div>
+  <div class="splash-logo"><img src="/static/marca/logo-horizontal-escuro.svg" alt="ThyfIA"></div>
   <div class="splash-barra"><span></span></div>
 </div>
 
 <!-- ======================= Tela de autenticação ======================= -->
 <section id="tela-auth" class="tela" hidden>
   <div class="auth-lado">
-    <div class="marca">
-      <svg viewBox="0 0 64 64" class="logo-mark"><use href="#logo-simbolo"/></svg>
-      <span class="marca-nome">Thyf<span class="ia">IA</span></span>
-    </div>
+    <div class="marca"><img src="/static/marca/logo-horizontal-escuro.svg" alt="ThyfIA"></div>
     <h1 class="auth-titulo">
       <span class="linha">Links de afiliado</span>
       <span class="linha">no tempo de <span class="grad">um café.</span></span>
     </h1>
     <p class="auth-sub">Digite o produto, a ThyfIA encontra, gera e organiza todos os seus links numa planilha pronta pra divulgar.</p>
     <ul class="auth-features">
-      <li style="--i:0"><span class="fi">⚡</span> Dezenas de links em minutos</li>
-      <li style="--i:1"><span class="fi">🧠</span> Aprende com cada busca da comunidade</li>
-      <li style="--i:2"><span class="fi">📊</span> Planilha pronta para baixar</li>
+      <li style="--i:0"><span class="fi"><svg class="ic" aria-hidden="true"><use href="#i-bolt"/></svg></span> Dezenas de links em minutos</li>
+      <li style="--i:1"><span class="fi"><svg class="ic" aria-hidden="true"><use href="#i-bulb"/></svg></span> Aprende com cada busca da comunidade</li>
+      <li style="--i:2"><span class="fi"><svg class="ic" aria-hidden="true"><use href="#i-chart"/></svg></span> Planilha pronta para baixar</li>
     </ul>
   </div>
 
@@ -63,7 +47,7 @@
     <div class="auth-trilho">
       <!-- Entrar -->
       <form id="form-login" class="auth-form" autocomplete="on" novalidate>
-        <h2>Bem-vindo de volta 👋</h2>
+        <h2>Bem-vindo de volta</h2>
         <p class="muted">Entre para continuar gerando seus links.</p>
         <label class="campo">
           <input type="email" name="email" required placeholder=" " autocomplete="email">
@@ -72,7 +56,7 @@
         <label class="campo">
           <input type="password" name="senha" required placeholder=" " autocomplete="current-password">
           <span>Senha</span>
-          <button type="button" class="olho" aria-label="Mostrar senha">👁</button>
+          <button type="button" class="olho" aria-label="Mostrar senha"><svg class="ic" aria-hidden="true"><use href="#i-eye"/></svg></button>
         </label>
         <p class="erro-form" aria-live="polite"></p>
         <button class="btn btn-primario btn-grande" type="submit">
@@ -82,7 +66,7 @@
 
       <!-- Criar conta -->
       <form id="form-cadastro" class="auth-form" autocomplete="on" novalidate>
-        <h2>Crie sua conta ✨</h2>
+        <h2>Crie sua conta</h2>
         <p class="muted">Leva menos de 30 segundos.</p>
         <label class="campo">
           <input type="text" name="nome" required placeholder=" " autocomplete="name">
@@ -95,7 +79,7 @@
         <label class="campo">
           <input type="password" name="senha" required placeholder=" " autocomplete="new-password" minlength="6">
           <span>Senha (mín. 6 caracteres)</span>
-          <button type="button" class="olho" aria-label="Mostrar senha">👁</button>
+          <button type="button" class="olho" aria-label="Mostrar senha"><svg class="ic" aria-hidden="true"><use href="#i-eye"/></svg></button>
         </label>
         <div class="forca"><span></span></div>
         <p class="erro-form" aria-live="polite"></p>
@@ -110,22 +94,19 @@
 <!-- ======================= Aplicação ======================= -->
 <section id="tela-app" class="tela" hidden>
   <aside class="sidebar">
-    <div class="marca">
-      <svg viewBox="0 0 64 64" class="logo-mark"><use href="#logo-simbolo"/></svg>
-      <span class="marca-nome">Thyf<span class="ia">IA</span></span>
-    </div>
+    <div class="marca"><img src="/static/marca/logo-horizontal-escuro.svg" alt="ThyfIA"></div>
     <nav class="menu" id="menu">
       <span class="menu-ind"></span>
-      <button class="menu-item ativo" data-view="gerar"><span class="mi">✦</span><span>Gerar links</span><span class="cadeado" aria-hidden="true">🔒</span></button>
-      <button class="menu-item" data-view="integracoes"><span class="mi">⌁</span><span>Integrações</span><span class="dot-status" id="dot-ml"></span><span class="cadeado" aria-hidden="true">🔒</span></button>
-      <button class="menu-item" data-view="automacao"><span class="mi">⚡</span><span>Automação</span><span class="selo-plano">Pro</span><span class="cadeado" aria-hidden="true">🔒</span></button>
-      <button class="menu-item" data-view="piloto"><span class="mi">✈</span><span>Piloto Automático</span><span class="selo-plano">Pro</span><span class="cadeado" aria-hidden="true">🔒</span></button>
-      <button class="menu-item" data-view="publicacao"><span class="mi">◈</span><span>Agente de Publicação</span><span class="selo-plano">Premium</span><span class="cadeado" aria-hidden="true">🔒</span></button>
-      <button class="menu-item" data-view="historico"><span class="mi">◷</span><span>Histórico</span><span class="cadeado" aria-hidden="true">🔒</span></button>
-      <button class="menu-item" data-view="cerebro"><span class="mi">◉</span><span>Cérebro</span><span class="cadeado" aria-hidden="true">🔒</span></button>
-      <button class="menu-item" data-view="plano"><span class="mi">★</span><span>Meu plano</span><span class="dot-status" id="dot-plano"></span></button>
-      <button class="menu-item" data-view="ajuda"><span class="mi">?</span><span>Ajuda</span></button>
-      <button class="menu-item" data-view="admin" id="menu-admin" hidden><span class="mi">⚙</span><span>Administração</span></button>
+      <button class="menu-item ativo" data-view="gerar"><span class="mi"><svg class="ic" aria-hidden="true"><use href="#i-spark"/></svg></span><span>Gerar links</span><span class="cadeado" aria-hidden="true"><svg class="ic" aria-hidden="true"><use href="#i-lock"/></svg></span></button>
+      <button class="menu-item" data-view="integracoes"><span class="mi"><svg class="ic" aria-hidden="true"><use href="#i-plug"/></svg></span><span>Integrações</span><span class="dot-status" id="dot-ml"></span><span class="cadeado" aria-hidden="true"><svg class="ic" aria-hidden="true"><use href="#i-lock"/></svg></span></button>
+      <button class="menu-item" data-view="automacao"><span class="mi"><svg class="ic" aria-hidden="true"><use href="#i-bolt"/></svg></span><span>Automação</span><span class="selo-plano">Pro</span><span class="cadeado" aria-hidden="true"><svg class="ic" aria-hidden="true"><use href="#i-lock"/></svg></span></button>
+      <button class="menu-item" data-view="piloto"><span class="mi"><svg class="ic" aria-hidden="true"><use href="#i-send"/></svg></span><span>Piloto Automático</span><span class="selo-plano">Pro</span><span class="cadeado" aria-hidden="true"><svg class="ic" aria-hidden="true"><use href="#i-lock"/></svg></span></button>
+      <button class="menu-item" data-view="publicacao"><span class="mi"><svg class="ic" aria-hidden="true"><use href="#i-megaphone"/></svg></span><span>Agente de Publicação</span><span class="selo-plano">Premium</span><span class="cadeado" aria-hidden="true"><svg class="ic" aria-hidden="true"><use href="#i-lock"/></svg></span></button>
+      <button class="menu-item" data-view="historico"><span class="mi"><svg class="ic" aria-hidden="true"><use href="#i-clock"/></svg></span><span>Histórico</span><span class="cadeado" aria-hidden="true"><svg class="ic" aria-hidden="true"><use href="#i-lock"/></svg></span></button>
+      <button class="menu-item" data-view="cerebro"><span class="mi"><svg class="ic" aria-hidden="true"><use href="#i-bulb"/></svg></span><span>Cérebro</span><span class="cadeado" aria-hidden="true"><svg class="ic" aria-hidden="true"><use href="#i-lock"/></svg></span></button>
+      <button class="menu-item" data-view="plano"><span class="mi"><svg class="ic" aria-hidden="true"><use href="#i-star"/></svg></span><span>Meu plano</span><span class="dot-status" id="dot-plano"></span></button>
+      <button class="menu-item" data-view="ajuda"><span class="mi"><svg class="ic" aria-hidden="true"><use href="#i-help"/></svg></span><span>Ajuda</span></button>
+      <button class="menu-item" data-view="admin" id="menu-admin" hidden><span class="mi"><svg class="ic" aria-hidden="true"><use href="#i-sliders"/></svg></span><span>Administração</span></button>
     </nav>
     <div class="sidebar-rodape">
       <button class="plano-chip" id="plano-chip" data-ir="plano" title="Ver meu plano"><span class="pc-nome" id="pc-nome">Sem plano</span><span class="pc-sub" id="pc-sub">Escolha um plano</span></button>
@@ -133,7 +114,7 @@
         <div class="avatar" id="avatar">K</div>
         <div class="usuario-info"><strong id="usuario-nome">—</strong><small id="usuario-email">—</small></div>
       </div>
-      <button class="btn btn-fantasma btn-sair" id="btn-sair" title="Sair">⎋ <span>Sair</span></button>
+      <button class="btn btn-fantasma btn-sair" id="btn-sair" title="Sair"><svg class="ic" aria-hidden="true"><use href="#i-logout"/></svg> <span>Sair</span></button>
     </div>
   </aside>
 
@@ -154,20 +135,20 @@
 
       <div class="busca-card" id="busca-card">
         <div class="bloqueio" id="bloqueio-ml">
-          <div class="bloqueio-icone">🔌</div>
+          <div class="bloqueio-icone"><img class="" src="/static/marca/mascote-neutro.svg" alt="Thyf, o gato da ThyfIA"></div>
           <h3>Conecte seu Mercado Livre</h3>
           <p class="muted">Para gerar links com a sua etiqueta de afiliado, a ThyfIA precisa da sua conta conectada.</p>
-          <button class="btn btn-ml" data-ir="integracoes">Conectar agora</button>
+          <button class="btn btn-primario" data-ir="integracoes">Conectar agora</button>
         </div>
 
         <form id="form-busca" autocomplete="off">
           <div class="plataforma-chip"><span class="ml-badge">ML</span> Mercado Livre <span class="ok-pill">conectado</span></div>
           <div class="busca-wrap">
-            <span class="busca-icone">⌕</span>
+            <span class="busca-icone"><svg class="ic" aria-hidden="true"><use href="#i-search"/></svg></span>
             <input id="input-termo" name="termo" maxlength="80" required placeholder=" ">
             <span class="busca-ph" id="busca-ph"></span>
             <button class="btn btn-primario btn-gerar" type="submit">
-              <span class="btn-txt">Gerar links ✨</span><span class="spinner"></span>
+              <span class="btn-txt">Gerar links</span><span class="spinner"></span>
             </button>
             <ul class="sugestoes" id="sugestoes" role="listbox"></ul>
           </div>
@@ -220,7 +201,7 @@
           </div>
           <p class="int-desc" id="ml-desc">Conecte sua conta para gerar links com a sua etiqueta de afiliado.</p>
           <div class="int-acoes">
-            <button class="btn btn-ml" id="btn-conectar-ml">Conectar Mercado Livre</button>
+            <button class="btn btn-primario" id="btn-conectar-ml">Conectar Mercado Livre</button>
             <button class="btn btn-fantasma" id="btn-desconectar-ml" hidden>Desconectar</button>
           </div>
         </article>
@@ -248,7 +229,7 @@
             <h3>Conectar seu Instagram / Meta</h3>
             <p class="muted">Você cria um app seu na Meta (grátis, ~10 minutos) e cola aqui o token. Assim os posts saem da <b>sua</b> conta — a ThyfIA nunca vê a sua senha.</p>
           </div>
-          <button class="btn btn-fantasma btn-mini" id="btn-wz-fechar" title="Fechar" hidden>✕</button>
+          <button class="btn btn-fantasma btn-mini" id="btn-wz-fechar" title="Fechar" aria-label="Fechar" hidden><svg class="ic" aria-hidden="true"><use href="#i-x"/></svg></button>
         </div>
         <div class="wz-progresso"><span id="wz-barra"></span></div>
         <p class="mini" id="wz-contagem"></p>
@@ -259,9 +240,9 @@
             <input type="text" id="ig-in-id" inputmode="numeric" placeholder="ex.: 17841450161230918" autocomplete="off">
           </label>
           <label class="pub-campo"><span>Token de acesso</span>
-            <span class="senha-wrap"><input type="password" id="ig-in-token" placeholder="Cole o token inteiro" autocomplete="off" spellcheck="false"><button type="button" class="olho" id="ig-olho" aria-label="Mostrar token">👁</button></span>
+            <span class="senha-wrap"><input type="password" id="ig-in-token" placeholder="Cole o token inteiro" autocomplete="off" spellcheck="false"><button type="button" class="olho" id="ig-olho" aria-label="Mostrar token"><svg class="ic" aria-hidden="true"><use href="#i-eye"/></svg></button></span>
           </label>
-          <p class="mini">🔒 O token é guardado <b>criptografado</b> e nunca volta para o navegador. A ThyfIA só salva depois de a Meta confirmar que ele funciona.</p>
+          <p class="mini"><svg class="ic" aria-hidden="true"><use href="#i-lock"/></svg> O token é guardado <b>criptografado</b> e nunca volta para o navegador. A ThyfIA só salva depois de a Meta confirmar que ele funciona.</p>
           <p class="envio-msg" id="ig-msg" role="status" aria-live="polite"></p>
           <div class="wz-acoes">
             <button class="btn btn-primario" type="submit" id="btn-ig-conectar"><span class="btn-txt">Validar e conectar</span><span class="spinner"></span></button>
@@ -277,7 +258,7 @@
         <button class="btn btn-fantasma btn-mini" id="btn-ig-trocar" hidden title="Trocar conta ou renovar o token">Trocar conta / token</button>
         <button class="btn btn-fantasma btn-mini" id="btn-ig-atualizar" title="Verificar de novo">↻</button>
       </div>
-      <p class="pub-aviso" id="pub-aviso">⏰ <span id="pub-aviso-txt">O ThyfIA precisa estar rodando no horário agendado para publicar.</span></p>
+      <p class="pub-aviso" id="pub-aviso"><svg class="ic" aria-hidden="true"><use href="#i-clock"/></svg> <span id="pub-aviso-txt">O ThyfIA precisa estar rodando no horário agendado para publicar.</span></p>
       </div><!-- /pub-ws-instagram -->
 
       <!-- Facebook -->
@@ -303,8 +284,8 @@
             <label class="pub-campo"><span>ID da Página</span>
               <input type="text" id="fb-in-id" inputmode="numeric" placeholder="ex.: 105736241234567" autocomplete="off"></label>
             <label class="pub-campo"><span>Token da Página</span>
-              <span class="senha-wrap"><input type="password" id="fb-in-token" placeholder="Cole o token inteiro" autocomplete="off" spellcheck="false"><button type="button" class="olho" id="fb-olho" aria-label="Mostrar token">👁</button></span></label>
-            <p class="mini">🔒 O token é guardado <b>criptografado</b> e nunca volta para o navegador.</p>
+              <span class="senha-wrap"><input type="password" id="fb-in-token" placeholder="Cole o token inteiro" autocomplete="off" spellcheck="false"><button type="button" class="olho" id="fb-olho" aria-label="Mostrar token"><svg class="ic" aria-hidden="true"><use href="#i-eye"/></svg></button></span></label>
+            <p class="mini"><svg class="ic" aria-hidden="true"><use href="#i-lock"/></svg> O token é guardado <b>criptografado</b> e nunca volta para o navegador.</p>
             <p class="envio-msg" id="fb-msg" role="status" aria-live="polite"></p>
             <div class="wz-acoes">
               <button class="btn btn-primario" type="submit" id="btn-fb-conectar"><span class="btn-txt">Validar e conectar</span><span class="spinner"></span></button>
@@ -323,7 +304,7 @@
         <label class="pub-campo pub-qtd"><span>Candidatos</span>
           <input type="number" id="pub-qtd" min="1" max="20" value="5">
         </label>
-        <button class="btn btn-primario" id="btn-sugerir"><span class="btn-txt">✦ Sugerir melhor item</span><span class="spinner"></span></button>
+        <button class="btn btn-primario" id="btn-sugerir"><span class="btn-txt"><svg class="ic" aria-hidden="true"><use href="#i-spark"/></svg> Sugerir melhor item</span><span class="spinner"></span></button>
         <button class="btn btn-fantasma" id="btn-post-manual" title="Subir uma foto e escrever a legenda que quiser">＋ Post manual com foto</button>
       </div>
       <p class="muted pub-info" id="pub-info"></p>
@@ -332,7 +313,7 @@
       <section class="painel pub-editor" id="pub-editor" hidden>
         <div class="pub-editor-topo">
           <h3 id="pub-editor-titulo">Revisar post</h3>
-          <button class="btn btn-fantasma btn-mini" id="btn-fechar-editor" title="Fechar">✕</button>
+          <button class="btn btn-fantasma btn-mini" id="btn-fechar-editor" title="Fechar" aria-label="Fechar"><svg class="ic" aria-hidden="true"><use href="#i-x"/></svg></button>
         </div>
         <div class="pub-editor-grid">
           <div class="ig-preview">
@@ -353,13 +334,13 @@
                 <label><input type="radio" name="reels-fonte" value="auto"> Gerar com as fotos do produto</label>
               </div>
               <div id="reels-upload">
-                <label class="btn btn-fantasma btn-mini pub-upload">⬆ Escolher vídeo (MP4 ou MOV)
+                <label class="btn btn-fantasma btn-mini pub-upload"><svg class="ic" aria-hidden="true"><use href="#i-upload"/></svg> Escolher vídeo (MP4 ou MOV)
                   <input type="file" id="pub-video-arquivo" accept="video/mp4,video/quicktime,video/*" hidden>
                 </label>
                 <p class="mini">De 3 a 90 segundos, até 100 MB. Qualquer proporção: a ThyfIA converte para 9:16 (tela cheia) com fundo desfocado.</p>
               </div>
               <div id="reels-auto" hidden>
-                <button class="btn btn-fantasma btn-mini" id="btn-gerar-video" type="button"><span class="btn-txt">🎬 Gerar vídeo com as fotos</span><span class="spinner"></span></button>
+                <button class="btn btn-fantasma btn-mini" id="btn-gerar-video" type="button"><span class="btn-txt"><svg class="ic" aria-hidden="true"><use href="#i-video"/></svg> Gerar vídeo com as fotos</span><span class="spinner"></span></button>
                 <label class="reels-preco"><input type="checkbox" id="reels-com-preco" checked> Mostrar título e preço no vídeo</label>
               </div>
               <p class="mini" id="reels-msg" role="status" aria-live="polite"></p>
@@ -368,7 +349,7 @@
               <span class="pub-rotulo"><b id="carr-rotulo">Fotos do carrossel</b> <small id="pub-carr-cont">0/10</small></span>
               <div class="carr-bandeja" id="carr-bandeja"></div>
               <div class="pub-foto-acoes">
-                <label class="btn btn-fantasma btn-mini pub-upload">⬆ Adicionar fotos
+                <label class="btn btn-fantasma btn-mini pub-upload"><svg class="ic" aria-hidden="true"><use href="#i-upload"/></svg> Adicionar fotos
                   <input type="file" id="pub-arquivos" accept="image/jpeg,image/png,image/webp" multiple hidden>
                 </label>
               </div>
@@ -377,7 +358,7 @@
             <div class="pub-foto" id="pub-foto-unica">
               <span class="pub-rotulo">Foto do post</span>
               <div class="pub-foto-acoes">
-                <label class="btn btn-fantasma btn-mini pub-upload">⬆ Enviar foto
+                <label class="btn btn-fantasma btn-mini pub-upload"><svg class="ic" aria-hidden="true"><use href="#i-upload"/></svg> Enviar foto
                   <input type="file" id="pub-arquivo" accept="image/jpeg,image/png,image/webp" hidden>
                 </label>
                 <button class="btn btn-fantasma btn-mini" id="btn-foto-produto" hidden>Usar foto do produto</button>
@@ -396,7 +377,7 @@
               <input type="datetime-local" id="pub-quando">
             </label>
             <div class="pub-acoes">
-              <button class="btn btn-primario" id="btn-agendar"><span class="btn-txt">📅 Agendar publicação no Instagram</span><span class="spinner"></span></button>
+              <button class="btn btn-primario" id="btn-agendar"><span class="btn-txt"><svg class="ic" aria-hidden="true"><use href="#i-calendar"/></svg> Agendar publicação no Instagram</span><span class="spinner"></span></button>
               <button class="btn btn-fantasma" id="btn-publicar-agora"><span class="btn-txt">Publicar agora</span><span class="spinner"></span></button>
             </div>
             <p class="envio-msg" id="pub-msg" role="status" aria-live="polite"></p>
@@ -591,6 +572,7 @@
       </header>
 
       <section class="painel pl-topo" id="pl-topo">
+        <img class="pl-thyf" id="pl-thyf" src="/static/marca/mascote-neutro.svg" alt="">
         <div class="pl-liga">
           <label class="pl-switch"><input type="checkbox" id="pl-ativo"><span class="pl-trilho" aria-hidden="true"></span><b id="pl-ativo-txt">Piloto desligado</b></label>
           <p class="mini" id="pl-situacao"></p>
@@ -713,7 +695,7 @@
         <p class="muted">Guia completo, passo a passo, de tudo o que a ThyfIA faz.</p>
       </header>
       <div class="aj-busca">
-        <span class="aj-busca-ic">⌕</span>
+        <span class="aj-busca-ic"><svg class="ic" aria-hidden="true"><use href="#i-search"/></svg></span>
         <input id="aj-busca" type="search" placeholder="Buscar no guia (ex.: instagram, planilha, extensão)…" autocomplete="off">
         <small id="aj-contagem" class="muted"></small>
       </div>
@@ -729,17 +711,9 @@
 <div id="overlay-gerando" class="overlay" hidden>
   <div class="gerando-box">
     <div class="estado estado-progresso">
-      <div class="cafe">
-        <div class="vapor"><span></span><span></span><span></span></div>
-        <div class="xicara">
-          <div class="liquido" id="liquido"><div class="onda"></div></div>
-          <div class="brilho"></div>
-        </div>
-        <div class="alca"></div>
-        <div class="pires"></div>
-      </div>
+      <img class="thyf-estado balanca" src="/static/marca/mascote-pensando.svg" alt="">
       <h2>Aguarde enquanto a <span class="grad">ThyfIA</span> gera seus links…</h2>
-      <p class="cafe-msg">Enquanto isso, que tal um café? ☕</p>
+      <p class="cafe-msg">Enquanto isso, que tal um café?</p>
       <div class="progresso"><div class="progresso-barra" id="prog-barra"></div></div>
       <div class="progresso-info">
         <span id="prog-fase">Preparando o ambiente</span>
@@ -749,7 +723,7 @@
     </div>
 
     <div class="estado estado-fim" hidden>
-      <svg class="check" viewBox="0 0 80 80"><circle cx="40" cy="40" r="36"/><path d="M24 41l11 11 22-24"/></svg>
+      <img class="thyf-estado" src="/static/marca/mascote-feliz.svg" alt="Thyf comemorando">
       <h2>Seus links estão prontos!</h2>
       <p class="muted" id="fim-resumo"></p>
       <div class="fim-stats">
@@ -757,11 +731,11 @@
         <div><strong id="fim-total">0</strong><small>produtos analisados</small></div>
       </div>
       <div class="fim-acoes">
-        <a class="btn btn-primario btn-grande" id="btn-baixar" href="#" download>⬇ Baixar planilha</a>
+        <a class="btn btn-primario btn-grande" id="btn-baixar" href="#" download><svg class="ic" aria-hidden="true"><use href="#i-download"/></svg> Baixar planilha</a>
         <button class="btn btn-fantasma" id="btn-nova">Nova busca</button>
       </div>
       <div class="envio-box" id="fim-envio">
-        <button class="btn btn-fantasma" id="btn-enviar-auto"><span class="btn-txt">➜ Enviar para automação</span><span class="spinner"></span></button>
+        <button class="btn btn-fantasma" id="btn-enviar-auto"><span class="btn-txt"><svg class="ic" aria-hidden="true"><use href="#i-arrow"/></svg> Enviar para automação</span><span class="spinner"></span></button>
         <p class="envio-msg" id="fim-envio-msg" role="status" aria-live="polite"></p>
       </div>
     </div>
@@ -788,7 +762,7 @@
       <button class="btn btn-fantasma" id="btn-fechar-modal">Fechar</button>
     </div>
     <div class="estado m-extensao" hidden>
-      <div class="ext-icone">🧩</div>
+      <img class="thyf-estado" src="/static/marca/mascote-pensando.svg" alt="">
       <h2>Instale o ThyfIA Conector</h2>
       <p class="muted">Ele conecta o Mercado Livre usando o login que você <b>já tem neste navegador</b>. É uma vez só:</p>
       <ol class="passos">
@@ -804,7 +778,7 @@
       </div>
     </div>
     <div class="estado m-ok" hidden>
-      <svg class="check" viewBox="0 0 80 80"><circle cx="40" cy="40" r="36"/><path d="M24 41l11 11 22-24"/></svg>
+      <img class="thyf-estado" src="/static/marca/mascote-feliz.svg" alt="Thyf comemorando">
       <h2>Conta conectada!</h2>
       <p class="muted">Tudo pronto para gerar seus links.</p>
     </div>
@@ -813,7 +787,7 @@
       <h2>Não foi possível conectar</h2>
       <p class="muted" id="ml-erro"></p>
       <div class="fim-acoes">
-        <button class="btn btn-ml" id="btn-tentar-ml">Tentar novamente</button>
+        <button class="btn btn-primario" id="btn-tentar-ml">Tentar novamente</button>
         <button class="btn btn-fantasma" id="btn-fechar-modal2">Fechar</button>
       </div>
     </div>
@@ -823,7 +797,7 @@
 <!-- ======================= Logout ======================= -->
 <div id="overlay-logout" class="overlay" hidden>
   <div class="logout-box">
-    <div class="aceno">👋</div>
+    <img class="thyf-estado" src="/static/marca/mascote-feliz.svg" alt="">
     <h2 id="logout-txt">Até logo!</h2>
     <p class="muted">Encerrando sua sessão com segurança…</p>
   </div>
@@ -833,20 +807,49 @@
 <canvas id="confete" aria-hidden="true"></canvas>
 <div id="toasts" aria-live="polite"></div>
 
-<!-- símbolo reutilizável do logo -->
-<svg width="0" height="0" style="position:absolute">
+<!-- ícones da interface (traço de 2px, pontas redondas; cor = currentColor) -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
   <defs>
-    <linearGradient id="lg-m" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8B5CF6"/><stop offset="1" stop-color="#22D3EE"/></linearGradient>
-    <symbol id="logo-simbolo" viewBox="0 0 64 64">
-      <rect width="64" height="64" rx="18" fill="url(#lg-m)"/>
-      <path d="M18 22h28M32 22v24" stroke="#fff" stroke-width="6" stroke-linecap="round" fill="none"/>
-      <circle cx="46" cy="44" r="4" fill="#fff"/>
-    </symbol>
+    <symbol id="i-spark" viewBox="0 0 24 24"><path d="M12 3l1.9 5.6L19.5 10.5l-5.6 1.9L12 18l-1.9-5.6L4.5 10.5l5.6-1.9L12 3z"/><path d="M19 3v4M17 5h4"/></symbol>
+    <symbol id="i-plug" viewBox="0 0 24 24"><path d="M12 22v-5"/><path d="M9 8V2M15 8V2"/><path d="M18 8v5a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V8z"/></symbol>
+    <symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></symbol>
+    <symbol id="i-send" viewBox="0 0 24 24"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></symbol>
+    <symbol id="i-megaphone" viewBox="0 0 24 24"><path d="M3 11l18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></symbol>
+    <symbol id="i-bulb" viewBox="0 0 24 24"><path d="M9 18h6M10 22h4"/><path d="M15 14c.2-1 .7-1.7 1.5-2.5A6 6 0 1 0 6 8c0 1 .2 2.2 1.5 3.5.8.8 1.3 1.5 1.5 2.5"/></symbol>
+    <symbol id="i-star" viewBox="0 0 24 24"><path d="M12 2l3.1 6.3 6.9 1-5 4.9 1.2 6.9L12 17.8 5.8 21.1 7 14.2 2 9.3l6.9-1L12 2z"/></symbol>
+    <symbol id="i-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3M12 17h.01"/></symbol>
+    <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M21 4h-7M10 4H3M21 12h-9M8 12H3M21 20h-5M12 20H3M14 2v4M8 10v4M16 18v4"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></symbol>
+    <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></symbol>
+    <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+    <symbol id="i-eye-off" viewBox="0 0 24 24"><path d="M9.9 9.9a3 3 0 1 0 4.2 4.2"/><path d="M10.7 5.1A10.4 10.4 0 0 1 12 5c7 0 10 7 10 7a13 13 0 0 1-1.7 2.7"/><path d="M6.6 6.6A13.5 13.5 0 0 0 2 12s3 7 10 7a9.7 9.7 0 0 0 5.4-1.6"/><path d="M2 2l20 20"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></symbol>
+    <symbol id="i-upload" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5M12 3v12"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5M12 15V3"/></symbol>
+    <symbol id="i-video" viewBox="0 0 24 24"><rect x="2" y="6" width="14" height="12" rx="2"/><path d="M22 8l-6 4 6 4V8z"/></symbol>
+    <symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></symbol>
+    <symbol id="i-chart" viewBox="0 0 24 24"><path d="M12 20V10M18 20V4M6 20v-4"/></symbol>
+    <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><path d="M3 21v-5h5"/></symbol>
+    <symbol id="i-alert" viewBox="0 0 24 24"><path d="M21.7 18l-8-14a2 2 0 0 0-3.4 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.7-3z"/><path d="M12 9v4M12 17h.01"/></symbol>
+    <symbol id="i-msg" viewBox="0 0 24 24"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22l5.9-2z"/></symbol>
+    <symbol id="i-users" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"/></symbol>
+    <symbol id="i-logout" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5M21 12H9"/></symbol>
+    <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></symbol>
+    <symbol id="i-pencil" viewBox="0 0 24 24"><path d="M17 3a2.8 2.8 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></symbol>
+    <symbol id="i-save" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/></symbol>
+    <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></symbol>
+    <symbol id="i-settings" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></symbol>
+    <symbol id="i-image" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="M21 15l-5-5L5 21"/></symbol>
+    <symbol id="i-layers" viewBox="0 0 24 24"><path d="M12 2l10 5-10 5L2 7l10-5z"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5"/></symbol>
+    <symbol id="i-smartphone" viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 18h.01"/></symbol>
   </defs>
 </svg>
 
-<script src="/static/app.js?v=17"></script>
-<script src="/static/planos.js?v=7"></script>
-<script src="/static/piloto.js?v=7"></script>
+<script src="/static/app.js?v=18"></script>
+<script src="/static/planos.js?v=8"></script>
+<script src="/static/piloto.js?v=8"></script>
 </body>
 </html>

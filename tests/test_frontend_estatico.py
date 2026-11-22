@@ -76,6 +76,38 @@ class TestFrontendEstatico(unittest.TestCase):
         self.assertIn('closest("#view-admin', planos, "o clique global do admin precisa ficar restrito a #view-admin")
         self.assertNotRegex(planos, r'closest\("\[data-conceder\]', "seletor global sem escopo")
 
+    def test_interface_nao_usa_emoji_como_icone(self):
+        """Design system ThyfIA: emoji só dentro de texto de mensagem/legenda enviado ao público; na interface
+        os ícones vêm do sprite (`ic("nome")`). Linhas com a legenda-modelo do Instagram são a exceção."""
+        emoji = re.compile("[\U0001F300-\U0001FAFF\u2600-\u27BF\u2B50\u2B06\u23F0]")
+        ok_legenda = ("Achados com preço bom", "Link na bio")
+        achados = []
+        for nome in ("index.html", "app.js", "planos.js", "piloto.js", "../conteudo/ajuda.html"):
+            for n, linha in enumerate(_ler(nome).splitlines(), 1):
+                if emoji.search(linha) and not any(o in linha for o in ok_legenda):
+                    achados.append(f"{nome}:{n}")
+        self.assertEqual(achados, [], f"emoji na interface (use um ícone do sprite): {achados}")
+
+    def test_icones_usados_existem_no_sprite(self):
+        """`ic("x")` / `#i-x` apontando para um ícone que não existe renderiza um quadrado vazio."""
+        html = _ler("index.html")
+        sprite = set(re.findall(r'<symbol id="i-([a-z-]+)"', html))
+        usados = set(re.findall(r'#i-([a-z-]+)', html))
+        for nome in ("app.js", "planos.js", "piloto.js"):
+            usados |= set(re.findall(r'\bic\("([a-z-]+)"\)', _ler(nome)))
+        usados |= {m for m in re.findall(r'icone: "([a-z-]{3,})"', _ler("app.js"))}
+        self.assertEqual(sorted(usados - sprite), [], "ícones sem <symbol> no sprite")
+
+    def test_tokens_e_fontes_do_design_system_existem(self):
+        """tokens.css referencia as fontes locais (nada de Google Fonts) e o front usa só tokens, sem degradê roxo-ciano."""
+        tok = _ler("tokens.css")
+        for arq in re.findall(r'url\("/static/([^"]+)"\)', tok):
+            self.assertTrue((ESTATICO / arq).exists(), f"fonte ausente: {arq}")
+        self.assertIn("--brand: #7B4DEF", tok)
+        self.assertNotIn("fonts.googleapis", _ler("index.html"))
+        css = _ler("styles.css")
+        self.assertNotRegex(css, r"linear-gradient\([^)]*(#22d3ee|#8b5cf6|var\(--accent\)|var\(--brand\))", "degradê roxo-ciano não faz parte da identidade")
+
 
 if __name__ == "__main__":
     unittest.main()

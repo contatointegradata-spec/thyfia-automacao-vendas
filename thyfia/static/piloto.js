@@ -18,9 +18,9 @@ const PL_ACOES = {
   desligado: "Ligue o Piloto primeiro.",
 };
 
-function plNichos() { return piloto.dados?.nichos || [{ slug: "geral", nome: "Todos os nichos", emoji: "🌐" }]; }
-function plOpcoesNicho(sel) { return plNichos().map((n) => `<option value="${esc(n.slug)}" ${n.slug === sel ? "selected" : ""}>${n.emoji} ${esc(n.nome)}</option>`).join(""); }
-function plNicho(slug) { return plNichos().find((n) => n.slug === slug) || { nome: "Sem nicho", emoji: "•" }; }
+function plNichos() { return piloto.dados?.nichos || [{ slug: "geral", nome: "Todos os nichos" }]; }
+function plOpcoesNicho(sel) { return plNichos().map((n) => `<option value="${esc(n.slug)}" ${n.slug === sel ? "selected" : ""}>${esc(n.nome)}</option>`).join(""); }
+function plNicho(slug) { return plNichos().find((n) => n.slug === slug) || { nome: "Sem nicho" }; }
 function plMsg(t, tipo) { const m = $("#pl-msg"); m.textContent = t || ""; m.className = "envio-msg " + (tipo || ""); }
 function plHora(iso) { return iso ? new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : ""; }
 
@@ -43,6 +43,7 @@ function renderPiloto(silencioso) {
   // topo
   $("#pl-ativo").checked = c.ativo;
   $("#pl-ativo-txt").textContent = c.ativo ? "Piloto ligado" : "Piloto desligado";
+  $("#pl-thyf").src = `/static/marca/mascote-${c.ativo ? "dormindo" : "neutro"}.svg`;  // o Thyf descansa enquanto o Piloto trabalha
   const prontos = d.destinos.filter((x) => x.verificado && x.ativo).length;
   let sit;
   if (!c.ativo) sit = "Ligue para as ofertas saírem sozinhas, dentro do horário que você definir.";
@@ -78,8 +79,8 @@ function renderNichos(d) {
   if (sel.dataset.n !== String(plNichos().length)) { sel.innerHTML = plOpcoesNicho(atual); sel.dataset.n = String(plNichos().length); }
   const box = $("#pl-cobertura"), cob = (d.cobertura || []).filter((x) => x.nicho !== "geral");
   box.hidden = !cob.length;
-  box.innerHTML = cob.map((x) => `<span class="pl-chip ${x.ofertas < 2 ? "alerta" : ""}" title="${x.ofertas} oferta(s) pronta(s) para este nicho">${x.emoji} ${esc(x.nome)} · ${x.grupos} grupo(s) · ${x.ofertas} oferta(s)${x.ofertas < 2 ? " ⚠️" : ""}</span>`).join("")
-    + (cob.some((x) => x.ofertas < 2) ? `<p class="mini">⚠️ Poucas ofertas nesse nicho. Gere links com buscas dele (ex.: “whey”, “air fryer”) para o Piloto ter o que enviar.</p>` : "");
+  box.innerHTML = cob.map((x) => `<span class="pl-chip ${x.ofertas < 2 ? "alerta" : ""}" title="${x.ofertas} oferta(s) pronta(s) para este nicho">${esc(x.nome)} · ${x.grupos} grupo(s) · ${x.ofertas} oferta(s)${x.ofertas < 2 ? " " + ic("alert") : ""}</span>`).join("")
+    + (cob.some((x) => x.ofertas < 2) ? `<p class="mini">${ic("alert")} Poucas ofertas nesse nicho. Gere links com buscas dele (ex.: “whey”, “air fryer”) para o Piloto ter o que enviar.</p>` : "");
 }
 
 function renderDestinos(d) {
@@ -93,7 +94,7 @@ function renderDestinos(d) {
     const acoes = !x.verificado
       ? `<input class="pl-cod" inputmode="numeric" maxlength="4" placeholder="0000" data-cod="${x.id}" aria-label="Código recebido no destino"><button class="btn btn-primario btn-mini" data-confirmar="${x.id}" type="button"><span class="btn-txt">Confirmar</span><span class="spinner"></span></button>`
       : `<button class="btn btn-fantasma btn-mini" data-alternar="${x.id}" data-liga="${x.ativo ? 0 : 1}" type="button">${x.ativo ? "Pausar" : "Ligar"}</button>`;
-    return `<div class="pl-destino ${x.ativo || !x.verificado ? "" : "off"}"><div class="pl-d-info"><b>${esc(x.nome || x.ref)}</b><small>${esc(t.nome)} · ${esc(x.ref)}</small><label class="pl-nicho-l">Nicho <select class="pl-nicho" data-nicho="${x.id}" aria-label="Nicho de ${esc(x.nome || x.ref)}">${plOpcoesNicho(x.nicho)}</select></label>${x.erro ? `<div class="pl-d-erro">${esc(x.erro)}</div>` : ""}</div>${exp}${tag}<div class="pl-d-acoes">${acoes}<button class="btn btn-fantasma btn-mini" data-remover="${x.id}" type="button" aria-label="Remover destino">✕</button></div></div>`;
+    return `<div class="pl-destino ${x.ativo || !x.verificado ? "" : "off"}"><div class="pl-d-info"><b>${esc(x.nome || x.ref)}</b><small>${esc(t.nome)} · ${esc(x.ref)}</small><label class="pl-nicho-l">Nicho <select class="pl-nicho" data-nicho="${x.id}" aria-label="Nicho de ${esc(x.nome || x.ref)}">${plOpcoesNicho(x.nicho)}</select></label>${x.erro ? `<div class="pl-d-erro">${esc(x.erro)}</div>` : ""}</div>${exp}${tag}<div class="pl-d-acoes">${acoes}<button class="btn btn-fantasma btn-mini" data-remover="${x.id}" type="button" aria-label="Remover destino">${ic("x")}</button></div></div>`;
   }).join("");
 }
 
@@ -110,7 +111,7 @@ function renderEstoque(d) {
   const e = d.estoque, box = $("#pl-estoque");
   if (!e.total) { box.innerHTML = `<p class="pl-vazio">Sem ofertas novas dentro das suas regras. Gere mais links em <b>Gerar links</b> — o Piloto avisa no seu WhatsApp quando o estoque acaba.</p>`; return; }
   box.innerHTML = e.proximas.map((o) =>
-    `<div class="pl-oferta"><span class="pl-pontos" title="Pontuação do Cérebro">${o.pontos}</span><b>${esc(o.titulo)}</b><small>${brl(o.preco)}${o.condicao === "cupom" ? " com cupom" : o.condicao === "pix" ? " no Pix" : ""} · ${esc(o.busca)}${/MAIS VENDIDO/i.test(o.selo || "") ? " · 🏆 mais vendido" : ""}</small><label class="pl-nicho-l">Nicho${o.nicho_origem ? ` <em>(${esc(o.nicho_origem)})</em>` : ""} <select class="pl-nicho" data-busca="${esc(o.busca)}" aria-label="Nicho da busca ${esc(o.busca)}"><option value="">${o.nicho ? "automático" : "sem nicho — escolher"}</option>${plNichos().filter((n) => n.slug !== "geral").map((n) => `<option value="${esc(n.slug)}" ${o.nicho === n.slug && o.nicho_origem === "correção sua" ? "selected" : ""}>${n.emoji} ${esc(n.nome)}</option>`).join("")}</select></label><small>Por que o Cérebro gosta: ${esc(o.motivos.join("; ") || "melhor pontuação disponível")}</small></div>`).join("")
+    `<div class="pl-oferta"><span class="pl-pontos" title="Pontuação do Cérebro">${o.pontos}</span><b>${esc(o.titulo)}</b><small>${brl(o.preco)}${o.condicao === "cupom" ? " com cupom" : o.condicao === "pix" ? " no Pix" : ""} · ${esc(o.busca)}${/MAIS VENDIDO/i.test(o.selo || "") ? " · mais vendido" : ""}</small><label class="pl-nicho-l">Nicho${o.nicho_origem ? ` <em>(${esc(o.nicho_origem)})</em>` : ""} <select class="pl-nicho" data-busca="${esc(o.busca)}" aria-label="Nicho da busca ${esc(o.busca)}"><option value="">${o.nicho ? "automático" : "sem nicho — escolher"}</option>${plNichos().filter((n) => n.slug !== "geral").map((n) => `<option value="${esc(n.slug)}" ${o.nicho === n.slug && o.nicho_origem === "correção sua" ? "selected" : ""}>${esc(n.nome)}</option>`).join("")}</select></label><small>Por que o Cérebro gosta: ${esc(o.motivos.join("; ") || "melhor pontuação disponível")}</small></div>`).join("")
     + (e.total > e.proximas.length ? `<p class="mini">+ ${e.total - e.proximas.length} oferta(s) na fila.</p>` : "");
 }
 
@@ -365,7 +366,7 @@ async function carregarAprendizado() {
       barra("Por nicho", p.nicho) + barra("Por busca", p.busca) + barra("Por faixa de preço", p.faixa) + barra("Layout da mensagem", p.variante);
   const pal = Object.values(a.palavras_aprendidas);
   $("#ap-palavras").innerHTML = pal.length
-    ? pal.map((n) => `<div class="ap-bloco"><b>${n.emoji} ${esc(n.nome)}</b><div>${n.palavras.map((w) => `<span class="pl-chip">${esc(w)}</span>`).join("")}</div></div>`).join("")
+    ? pal.map((n) => `<div class="ap-bloco"><b>${esc(n.nome)}</b><div>${n.palavras.map((w) => `<span class="pl-chip">${esc(w)}</span>`).join("")}</div></div>`).join("")
     : `<p class="muted">Ainda nenhuma. Conforme você busca, o Cérebro aprende que palavras novas indicam cada nicho.</p>`;
   $("#ap-quedas").innerHTML = a.precos.quedas.length
     ? a.precos.quedas.map((q) => `<div class="ap-queda"><b>${esc(q.titulo)}</b><small>de ${brl(q.de)} para ${brl(q.para)} · −${q.pct}%</small></div>`).join("")

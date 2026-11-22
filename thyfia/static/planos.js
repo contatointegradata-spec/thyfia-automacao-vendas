@@ -80,18 +80,18 @@ function renderPlano() {
   const av = $("#pl-aviso");
   if (plano.destaque) {
     av.hidden = false;
-    av.innerHTML = `<b>🔒 ${esc(NOME_REC[plano.destaque])}</b> faz parte do plano <b>${NOME_PLANO[PLANO_DO_RECURSO[plano.destaque]]}</b> ou superior. Escolha abaixo para liberar.`;
+    av.innerHTML = `<b>${ic("lock")} ${esc(NOME_REC[plano.destaque])}</b> faz parte do plano <b>${NOME_PLANO[PLANO_DO_RECURSO[plano.destaque]]}</b> ou superior. Escolha abaixo para liberar.`;
   } else av.hidden = true;
 
   // cartão de status
   const [txt, cls] = STATUS_TXT[sit.status] || STATUS_TXT.sem_plano;
   $("#pl-status").innerHTML = admin
-    ? `<div class="pl-st"><div class="pl-st-ic">⚙</div><div><strong>Administrador</strong><p class="muted">Você tem todos os recursos liberados, sem cobrança.</p></div><span class="status-pill conectado">Tudo liberado</span></div>`
+    ? `<div class="pl-st"><div class="pl-st-ic">${ic("sliders")}</div><div><strong>Administrador</strong><p class="muted">Você tem todos os recursos liberados, sem cobrança.</p></div><span class="status-pill conectado">Tudo liberado</span></div>`
     : sit.ativo
-      ? `<div class="pl-st"><div class="pl-st-ic ${sit.plano}">★</div><div><strong>Plano ${NOME_PLANO[sit.plano]}</strong>
+      ? `<div class="pl-st"><div class="pl-st-ic ${sit.plano}">${ic("star")}</div><div><strong>Plano ${NOME_PLANO[sit.plano]}</strong>
           <p class="muted">${sit.status === "cancelada" ? "Cancelado — você mantém o acesso até" : sit.status === "atrasada" ? "Regularize o pagamento para não perder o acesso. Acesso garantido até" : "Acesso garantido até"} <b>${dia(sit.valido_ate)}</b>${sit.origem === "manual" ? " · cortesia" : ""}</p></div>
           <span class="status-pill ${cls}">${txt}</span></div>`
-      : `<div class="pl-st"><div class="pl-st-ic">☆</div><div><strong>${sit.ultimo_plano ? "Seu plano não está mais ativo" : "Você ainda não tem um plano"}</strong>
+      : `<div class="pl-st"><div class="pl-st-ic">${ic("star")}</div><div><strong>${sit.ultimo_plano ? "Seu plano não está mais ativo" : "Você ainda não tem um plano"}</strong>
           <p class="muted">${sit.status === "reembolsada" ? "O pagamento foi reembolsado." : sit.ultimo_plano ? "Renove para voltar a usar a plataforma." : "Escolha um dos planos abaixo para começar a gerar links."}</p></div>
           <span class="status-pill ${cls}">${txt}</span></div>`;
   $("#plano-sub").textContent = sit.ativo || admin ? "Veja o que está incluso, faça upgrade quando quiser e siga o passo a passo." :
@@ -102,7 +102,7 @@ function renderPlano() {
     const alvo = plano.destaque && PLANO_DO_RECURSO[plano.destaque] === p.id;
     let acao;
     if (admin) acao = `<button class="btn btn-fantasma btn-grande" disabled>Incluído para você</button>`;
-    else if (p.atual) acao = `<button class="btn btn-fantasma btn-grande" disabled>✓ Seu plano atual</button>`;
+    else if (p.atual) acao = `<button class="btn btn-fantasma btn-grande" disabled>${ic("check")} Seu plano atual</button>`;
     else if (p.inclui_atual) acao = `<button class="btn btn-fantasma btn-grande" disabled>Já incluso no seu plano</button>`;
     else if (p.checkout) acao = `<button class="btn ${p.destaque || alvo ? "btn-primario" : "btn-fantasma"} btn-grande" data-comprar="${p.id}">${sit.ativo ? "Fazer upgrade" : "Assinar"} ${p.nome}</button>`;
     else acao = `<button class="btn btn-fantasma btn-grande" data-suporte="1">Falar com o suporte</button>`;
@@ -119,8 +119,8 @@ function renderPlano() {
     </article>`;
   }).join("");
   $("#pl-nota").innerHTML = pagOk || admin
-    ? `💡 Na hora de pagar, use o <b>mesmo e-mail</b> da sua conta: <b>${esc(estado.usuario.email)}</b>. O plano libera sozinho assim que o pagamento é confirmado.`
-    : `⚠️ O pagamento ainda está sendo configurado.${zap ? ` Fale com o suporte: <a href="https://wa.me/${esc(zap)}" target="_blank" rel="noopener">WhatsApp</a>.` : ""}`;
+    ? `${ic("bulb")} Na hora de pagar, use o <b>mesmo e-mail</b> da sua conta: <b>${esc(estado.usuario.email)}</b>. O plano libera sozinho assim que o pagamento é confirmado.`
+    : `${ic("alert")} O pagamento ainda está sendo configurado.${zap ? ` Fale com o suporte: <a href="https://wa.me/${esc(zap)}" target="_blank" rel="noopener">WhatsApp</a>.` : ""}`;
 
   renderTabelaPlanos(planos);
   renderPassos();
@@ -135,7 +135,7 @@ function renderTabelaPlanos(planos) {
     ["Agente de Publicação (Instagram)", [0, 0, 1]], ["Passo a passo para ligar o Instagram/Meta", [0, 0, 1]],
   ];
   $("#pl-tabela").innerHTML = `<thead><tr><th></th>${planos.map((p) => `<th class="${p.id}">${p.nome}<small>${brl(p.preco)}/mês</small></th>`).join("")}</tr></thead>
-    <tbody>${linhas.map(([n, v]) => `<tr><td>${n}</td>${v.map((x) => `<td>${x ? '<span class="ck">✓</span>' : '<span class="tr">—</span>'}</td>`).join("")}</tr>`).join("")}</tbody>`;
+    <tbody>${linhas.map(([n, v]) => `<tr><td>${n}</td>${v.map((x) => `<td>${x ? '<span class="ck">' + ic("check") + '</span>' : '<span class="tr">—</span>'}</td>`).join("")}</tr>`).join("")}</tbody>`;
 }
 
 /* ---- passo a passo do plano contratado ---- */
@@ -157,14 +157,14 @@ function renderPassos() {
   const obrig = plano.passos.filter((p) => !p.opcional);
   const feitos = obrig.filter((p) => p.feito).length;
   const proximo = plano.passos.find((p) => !p.feito && !p.opcional);
-  $("#pl-passos-pill").textContent = feitos === obrig.length ? "Tudo pronto 🎉" : `${feitos} de ${obrig.length} concluídos`;
+  $("#pl-passos-pill").textContent = feitos === obrig.length ? "Tudo pronto" : `${feitos} de ${obrig.length} concluídos`;
   $("#pl-passos-pill").className = "status-pill " + (feitos === obrig.length ? "conectado" : "conectando");
   $("#pl-passos-barra").style.width = Math.round((feitos / Math.max(obrig.length, 1)) * 100) + "%";
   $("#pl-passos").innerHTML = plano.passos.map((p, i) => {
     const [t, d] = PASSOS_INFO[p.id];
     const eh = proximo && proximo.id === p.id;
     return `<li class="pl-passo ${p.feito ? "feito" : ""} ${eh ? "proximo" : ""}">
-      <span class="pl-bola">${p.feito ? "✓" : i + 1}</span>
+      <span class="pl-bola">${p.feito ? ic("check") : i + 1}</span>
       <div class="pl-passo-corpo"><strong>${t}${p.opcional ? ' <em>opcional</em>' : ""}${eh ? ' <span class="tag-prox">próximo passo</span>' : ""}</strong><p>${d}</p></div>
       <button class="btn ${eh ? "btn-primario" : "btn-fantasma"} btn-mini" data-ir="${p.ir}">${p.feito ? "Abrir" : "Fazer agora"}</button>
     </li>`;
@@ -224,7 +224,7 @@ async function conferirPagamento(base) {
   if (eu.plano.ativo && eu.plano.plano !== base) {
     clearInterval(plano.espera); $("#pl-espera").hidden = true;
     confete(220);
-    toast(`Plano ${NOME_PLANO[eu.plano.plano]} liberado! 🎉`, "ok");
+    toast(`Plano ${NOME_PLANO[eu.plano.plano]} liberado!`, "ok");
     plano.destaque = null; await carregarPlano();
     $("#pl-passos-box").scrollIntoView({ behavior: "smooth", block: "start" });
     return true;
@@ -269,9 +269,9 @@ function renderAutomacao() {
   $("#au-p1").classList.toggle("feito", !!c.whatsapp_numero);
   $("#au-p2").classList.toggle("feito", !!c.telegram_canal);
   $("#au-p3").classList.toggle("feito", $("#chk-auto-envio").checked);
-  $("#au-p1 .au-num").textContent = c.whatsapp_numero ? "✓" : "1";
-  $("#au-p2 .au-num").textContent = c.telegram_canal ? "✓" : "2";
-  $("#au-p3 .au-num").textContent = $("#chk-auto-envio").checked ? "✓" : "3";
+  $("#au-p1 .au-num").innerHTML = c.whatsapp_numero ? ic("check") : "1";
+  $("#au-p2 .au-num").innerHTML = c.telegram_canal ? ic("check") : "2";
+  $("#au-p3 .au-num").innerHTML = $("#chk-auto-envio").checked ? ic("check") : "3";
 }
 function msgAu(t, tipo) { const m = $("#au-msg"); m.textContent = t; m.className = "envio-msg " + (tipo || ""); }
 
@@ -289,7 +289,7 @@ $("#form-whats").addEventListener("submit", async (e) => {
   const b = $("#btn-au-salvar"); carregando(b, true);
   try {
     au.cfg = { ...au.cfg, ...(await api("/api/conta/canais", { method: "PUT", body: { whatsapp: $("#au-whats").value, telegram: au.cfg.telegram_canal || "" } })) };
-    toast("WhatsApp salvo ✔", "ok"); renderAutomacao(); atualizarPassos(); recarregarPerfil();
+    toast("WhatsApp salvo", "ok"); renderAutomacao(); atualizarPassos(); recarregarPerfil();
   } catch (err) { toast(err.message, "erro"); } finally { carregando(b, false); }
 });
 $("#form-tg").addEventListener("submit", async (e) => {
@@ -298,15 +298,15 @@ $("#form-tg").addEventListener("submit", async (e) => {
   const b = $("#btn-au-salvar-tg"); carregando(b, true);
   try {
     au.cfg = { ...au.cfg, ...(await api("/api/conta/canais", { method: "PUT", body: { whatsapp: au.cfg.whatsapp_numero, telegram: $("#au-tg").value } })) };
-    toast(au.cfg.telegram_canal ? "Canal salvo ✔" : "Telegram desligado.", "ok"); renderAutomacao(); atualizarPassos();
+    toast(au.cfg.telegram_canal ? "Canal salvo" : "Telegram desligado.", "ok"); renderAutomacao(); atualizarPassos();
   } catch (err) { toast(err.message, "erro"); } finally { carregando(b, false); }
 });
 async function testar(btn, rota, ok) {
   carregando(btn, true);
   try { await api(rota, { body: {} }); toast(ok, "ok"); } catch (err) { toast(err.message, "erro"); } finally { carregando(btn, false); }
 }
-$("#btn-au-teste-whats").addEventListener("click", (e) => testar(e.currentTarget, "/api/conta/canais/testar-whatsapp", "Mensagem de teste enviada. Confira seu WhatsApp! ✔"));
-$("#btn-au-teste-tg").addEventListener("click", (e) => testar(e.currentTarget, "/api/conta/canais/testar-telegram", "Teste enviado ao canal. Confira o Telegram! ✔"));
+$("#btn-au-teste-whats").addEventListener("click", (e) => testar(e.currentTarget, "/api/conta/canais/testar-whatsapp", "Mensagem de teste enviada. Confira seu WhatsApp!"));
+$("#btn-au-teste-tg").addEventListener("click", (e) => testar(e.currentTarget, "/api/conta/canais/testar-telegram", "Teste enviado ao canal. Confira o Telegram!"));
 
 /* ------------------------------------------------------------------ INSTAGRAM / META (Premium) */
 const IG_PASSOS = [
@@ -335,7 +335,7 @@ function gravarPassosIg(v) { try { localStorage.setItem(`thyfia_ig_${estado.usua
 function renderWizardIg() {
   const feitos = lerPassosIg();
   $("#wz-lista").innerHTML = IG_PASSOS.map(([t, h], i) => `<details class="wz-passo ${feitos.includes(i) ? "feito" : ""}" ${i === (feitos.length < IG_PASSOS.length ? Math.min(...IG_PASSOS.map((_, k) => k).filter((k) => !feitos.includes(k))) : -1) ? "open" : ""}>
-    <summary><span class="wz-bola">${feitos.includes(i) ? "✓" : i + 1}</span><span class="wz-titulo">${t}</span></summary>
+    <summary><span class="wz-bola">${feitos.includes(i) ? ic("check") : i + 1}</span><span class="wz-titulo">${t}</span></summary>
     <div class="wz-corpo">${h}<label class="wz-ok"><input type="checkbox" data-wz="${i}" ${feitos.includes(i) ? "checked" : ""}> Concluí este passo</label></div></details>`).join("");
   $("#wz-barra").style.width = Math.round((feitos.length / IG_PASSOS.length) * 100) + "%";
   $("#wz-contagem").textContent = `${feitos.length} de ${IG_PASSOS.length} passos marcados`;
@@ -364,8 +364,8 @@ $("#form-ig").addEventListener("submit", async (e) => {
   try {
     const r = await api("/api/conta/instagram", { method: "PUT", body: { user_id: $("#ig-in-id").value, token: $("#ig-in-token").value } });
     $("#ig-in-token").value = ""; $("#ig-in-id").value = "";
-    msgIg(`Conectado a @${r.username || "sua conta"} ✔`, "ok");
-    confete(160); toast("Instagram conectado! 🎉", "ok");
+    msgIg(`Conectado a @${r.username || "sua conta"}`, "ok");
+    confete(160); toast("Instagram conectado!", "ok");
     await espera(900);
     mostrarWizardIg(false); abrirPublicacao(); atualizarPassos();
   } catch (err) { msgIg(err.message, "erro"); } finally { carregando(b, false); }
@@ -419,7 +419,7 @@ async function admResumo() {
         <div class="stat"><small>Receita mensal (estimada)</small><strong>${brl(r.receita_mensal)}</strong></div>
         <div class="stat"><small>Gerações nos últimos 30 dias</small><strong>${r.jobs_30d}</strong></div></div>
       <section class="painel"><div class="pl-passos-topo"><h3>Checklist para vender</h3><span class="status-pill ${pronto === checks.length ? "conectado" : "conectando"}">${pronto} de ${checks.length}</span></div>
-        <ul class="ad-check">${checks.map(([n, ok]) => `<li class="${ok ? "ok" : ""}"><span>${ok ? "✓" : "○"}</span>${n}</li>`).join("")}</ul>
+        <ul class="ad-check">${checks.map(([n, ok]) => `<li class="${ok ? "ok" : ""}"><span>${ok ? ic("check") : ""}</span>${n}</li>`).join("")}</ul>
         <button class="btn btn-fantasma" data-aba-ir="config">Abrir configurações</button></section>`;
   } catch (e) { box.innerHTML = `<p class="muted">${esc(e.message)}</p>`; }
 }
@@ -470,7 +470,7 @@ function abrirConcessao(email) {
     const b = e.currentTarget; carregando(b, true);
     try {
       await api("/api/admin/assinaturas", { body: { email: $("#cc-email", ov).value, plano: $("#cc-plano", ov).value, dias: Number($("#cc-dias", ov).value), observacao: $("#cc-obs", ov).value } });
-      toast("Plano liberado ✔", "ok"); fechar(); admUsuarios($("#ad-busca")?.value || "");
+      toast("Plano liberado", "ok"); fechar(); admUsuarios($("#ad-busca")?.value || "");
     } catch (err) { $("#cc-msg", ov).textContent = err.message; $("#cc-msg", ov).className = "envio-msg erro"; } finally { carregando(b, false); }
   });
   $("#cc-email", ov).focus();
@@ -493,7 +493,7 @@ document.addEventListener("click", async (e) => {
       if (!confirm(v === "1" ? "Dar acesso de administrador a este usuário?" : "Remover o acesso de administrador?")) return;
       await api(`/api/admin/usuarios/${id}`, { method: "PUT", body: { admin: v === "1" } });
     }
-    toast("Feito ✔", "ok"); admUsuarios($("#ad-busca")?.value || "");
+    toast("Feito", "ok"); admUsuarios($("#ad-busca")?.value || "");
   } catch (err) { toast(err.message, "erro"); }
 });
 
@@ -517,7 +517,7 @@ async function admPagamentos() {
       <section class="painel"><div class="pl-passos-topo"><h3>Últimos eventos</h3><button class="btn btn-fantasma btn-mini" id="btn-ev-atualizar">↻ Atualizar</button></div>
         <div class="ad-eventos">${ev.length ? ev.map((x) => `<div class="ad-ev"><span class="status-pill ${RES[x.resultado] || ""}">${esc(x.resultado)}</span>
           <div><strong>${esc(x.evento || "—")}</strong> · ${esc(x.email || "sem e-mail")}${x.plano ? ` · ${NOME_PLANO[x.plano]}` : ""}<small>${esc(x.detalhe || "")} — ${esc(x.recebido_em)}</small></div></div>`).join("") : '<p class="muted">Nenhum evento recebido ainda.</p>'}</div></section>`;
-    $("#btn-ad-copiar").addEventListener("click", () => navigator.clipboard?.writeText(cfg.webhook_url).then(() => toast("Endereço copiado ✔", "ok")));
+    $("#btn-ad-copiar").addEventListener("click", () => navigator.clipboard?.writeText(cfg.webhook_url).then(() => toast("Endereço copiado", "ok")));
     $("#btn-ev-atualizar").addEventListener("click", admPagamentos);
     $("#btn-sim").addEventListener("click", async (e) => {
       const b = e.currentTarget; carregando(b, true); const m = $("#sim-msg");
@@ -553,7 +553,7 @@ async function admConfig() {
       e.preventDefault();
       const valores = {}; $$("[data-cfg]", box).forEach((i) => (valores[i.dataset.cfg] = i.value));
       const b = $("#btn-cfg"); carregando(b, true);
-      try { await api("/api/admin/config", { method: "PUT", body: { valores } }); toast("Configurações salvas ✔", "ok"); admConfig(); }
+      try { await api("/api/admin/config", { method: "PUT", body: { valores } }); toast("Configurações salvas", "ok"); admConfig(); }
       catch (err) { toast(err.message, "erro"); } finally { carregando(b, false); }
     });
   } catch (e) { box.innerHTML = `<p class="muted">${esc(e.message)}</p>`; }
