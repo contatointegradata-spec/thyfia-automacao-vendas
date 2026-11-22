@@ -870,10 +870,110 @@ function renderEnvioHist(box, j) {
 }
 
 /* ------------------------------------------------------------------ AGENTE DE PUBLICAÇÃO */
-const pub = { item: null, editando: null, foto: "", fotoLocal: "", fotoProduto: "", user: "sua_conta", ig: null };
+const pub = { item: null, editando: null, foto: "", fotoLocal: "", fotoProduto: "", user: "sua_conta", ig: null,
+  canal: null, formato: null, fotos: [], legendaEditada: false, canais: null };
+const MAX_CARROSSEL = 10;
+/* catálogo da navegação: canal → formatos. "breve" = só a tela, ainda não publica */
+const CANAIS_PUB = {
+  instagram: { nome: "Instagram", icone: "IG", cor: "ig", desc: "Publique na sua conta comercial do Instagram.", formatos: {
+    feed: { nome: "Feed", icone: "▣", desc: "Foto com legenda no seu perfil." },
+    story: { nome: "Story", icone: "◔", desc: "Foto em tela cheia por 24 h, sem legenda." },
+    carrossel: { nome: "Carrossel", icone: "▤", desc: "De 2 a 10 fotos que o público desliza." },
+    reels: { nome: "Reels", icone: "▶", desc: "Vídeo vertical curto: seu MP4 ou gerado das fotos.", breve: true } } },
+  facebook: { nome: "Facebook", icone: "f", cor: "fb", desc: "Publique na sua Página do Facebook.", formatos: {
+    feed: { nome: "Feed", icone: "▣", desc: "Foto com texto na linha do tempo da Página.", breve: true },
+    story: { nome: "Story", icone: "◔", desc: "Story da Página, em tela cheia.", breve: true },
+    publicacao: { nome: "Publicação com link", icone: "⛓", desc: "Post normal com o link do produto.", breve: true } } },
+  whatsapp: { nome: "WhatsApp", icone: "✆", cor: "wa", desc: "Grupo, canal ou story — pela automação.", formatos: {
+    grupo: { nome: "Grupo", icone: "☷", desc: "A oferta cai no seu grupo via automação.", via: true },
+    canal: { nome: "Canal", icone: "☍", desc: "A oferta cai no seu canal via automação.", via: true },
+    story: { nome: "Story (Status)", icone: "◔", desc: "Status do WhatsApp com a foto da oferta.", breve: true } } },
+};
+const PUBLICAVEL_PADRAO = ["instagram/feed", "instagram/story", "instagram/carrossel"];
+const ehPublicavel = (c, f) => (pub.canais?.publicaveis || PUBLICAVEL_PADRAO).includes(`${c}/${f}`);
+const ROTULO_FORMATO = { feed: "Feed", story: "Story", carrossel: "Carrossel", reels: "Reels", publicacao: "Publicação", grupo: "Grupo", canal: "Canal" };
 const ROTULO_PUB = { rascunho: "rascunho", agendado: "agendado", publicando: "publicando…", publicado: "publicado", erro: "erro", cancelado: "cancelado" };
 
-function abrirPublicacao() { statusInstagram(); carregarPalavras(); carregarPublicacoes(); }
+async function abrirPublicacao() {
+  carregarPublicacoes();
+  try { pub.canais = await api("/api/publicacao/canais"); } catch { /* usa o padrão */ }
+  mostrarNivelPub();
+}
+
+/* ---- navegação: canais → formatos → tela de trabalho ---- */
+function escolherCanal(c) { pub.canal = c; pub.formato = null; fecharEditorPub(); mostrarNivelPub(); }
+function escolherFormato(f) {
+  pub.formato = f; fecharEditorPub(); mostrarNivelPub();
+  $(".conteudo").scrollTo({ top: 0, behavior: REDUZIR ? "auto" : "smooth" });
+}
+function voltarPub(nivel) {
+  if (nivel === 0) { pub.canal = null; pub.formato = null; } else pub.formato = null;
+  fecharEditorPub(); mostrarNivelPub();
+}
+function fecharEditorPub() { $("#pub-editor").hidden = true; pub.item = null; pub.fotos = []; modoEdicao(null); }
+
+function cartaoNav(icone, cor, nome, desc, selo, onclick, i) {
+  const b = document.createElement("button");
+  b.type = "button"; b.className = "canal-card" + (cor ? " " + cor : ""); b.style.setProperty("--i", i);
+  b.innerHTML = `<span class="canal-icone"></span><span class="canal-txt"><strong></strong><small></small></span><span class="canal-selo"></span>`;
+  $(".canal-icone", b).textContent = icone; $("strong", b).textContent = nome; $("small", b).textContent = desc;
+  const sl = $(".canal-selo", b);
+  if (selo) { sl.textContent = selo.txt; sl.classList.add(selo.cls); } else sl.remove();
+  b.addEventListener("click", onclick);
+  return b;
+}
+
+function mostrarNivelPub() {
+  const { canal, formato } = pub, c = canal && CANAIS_PUB[canal], f = c && formato && c.formatos[formato];
+  const trilha = $("#pub-trilha");
+  trilha.hidden = !canal; trilha.innerHTML = "";
+  if (canal) {
+    const t = (txt, fn) => { const e = document.createElement(fn ? "button" : "span"); e.textContent = txt; if (fn) { e.type = "button"; e.addEventListener("click", fn); } trilha.appendChild(e); };
+    t("← Canais", () => voltarPub(0));
+    t("›"); if (formato) { t(c.nome, () => voltarPub(1)); t("›"); t(f.nome); } else t(c.nome);
+  }
+  // nível 0: canais
+  const gc = $("#pub-canais"); gc.hidden = !!canal; if (!canal) {
+    gc.innerHTML = "";
+    Object.entries(CANAIS_PUB).forEach(([k, v], i) => {
+      let selo = null;
+      if (k === "instagram" && pub.canais) selo = pub.canais.instagram.configurado ? { txt: "conectado", cls: "ok" } : { txt: "conectar", cls: "off" };
+      if (k === "facebook" && pub.canais) selo = pub.canais.facebook.configurado ? { txt: "conectado", cls: "ok" } : { txt: "conectar", cls: "off" };
+      if (k === "whatsapp" && pub.canais) selo = pub.canais.whatsapp.automacao_pronta ? { txt: "automação pronta", cls: "ok" } : { txt: "configurar", cls: "off" };
+      gc.appendChild(cartaoNav(v.icone, v.cor, v.nome, v.desc, selo, () => escolherCanal(k), i));
+    });
+  }
+  // nível 1: formatos
+  const gf = $("#pub-formatos"); gf.hidden = !(canal && !formato); if (canal && !formato) {
+    gf.innerHTML = "";
+    Object.entries(c.formatos).forEach(([k, v], i) => {
+      const selo = v.breve ? { txt: "em breve", cls: "breve" } : v.via ? { txt: "via automação", cls: "via" } : ehPublicavel(canal, k) ? { txt: "disponível", cls: "ok" } : null;
+      gf.appendChild(cartaoNav(v.icone, c.cor, v.nome, v.desc, selo, () => escolherFormato(k), i));
+    });
+  }
+  // nível 2: tela de trabalho
+  const ws = (id, on) => { $("#" + id).hidden = !on; };
+  const ig = canal === "instagram" && ["feed", "story", "carrossel"].includes(formato);
+  ws("pub-ws-instagram", ig);
+  ws("pub-ws-reels", canal === "instagram" && formato === "reels");
+  ws("pub-ws-facebook", canal === "facebook" && !!formato);
+  ws("pub-ws-whatsapp", canal === "whatsapp" && !!formato);
+  if (ig) { adaptarTelaFormato(); statusInstagram(); carregarPalavras(); }
+  if (canal === "facebook" && formato) abrirFacebook();
+  if (canal === "whatsapp" && formato) abrirWhatsapp();
+}
+
+/* textos e campos que mudam conforme o formato (feed / story / carrossel) */
+function adaptarTelaFormato() {
+  const fm = pub.formato, story = fm === "story", carr = fm === "carrossel";
+  $("#pub-campo-legenda").hidden = story; $("#pub-dica-legenda").hidden = story; $("#pub-dica-story").hidden = !story;
+  $("#pub-carrossel").hidden = !carr; $("#pub-foto-unica").hidden = carr;
+  $("#pv-img-box").classList.toggle("story", story); $(".ig-preview").classList.toggle("story", story);
+  $("#btn-post-manual").textContent = story ? "＋ Story manual com foto" : carr ? "＋ Carrossel manual com fotos" : "＋ Post manual com foto";
+  $("#btn-sugerir .btn-txt").textContent = carr ? "✦ Sugerir itens para o carrossel" : "✦ Sugerir melhor item";
+  $("#pub-info").textContent = ""; $("#pub-candidatos").innerHTML = "";
+  modoEdicao(pub.editando ? { id: pub.editando } : null);
+}
 
 async function statusInstagram(atualizar = false) {
   const conta = $("#ig-conta"), lim = $("#ig-limite"), box = $("#ig-status");
@@ -928,7 +1028,7 @@ $("#btn-sugerir").addEventListener("click", async (e) => {
       el.innerHTML = `<div class="pub-card-img"></div><div class="pub-card-corpo">
         ${k === 0 ? '<span class="selo-melhor">★ melhor escolha</span>' : ""}
         <strong></strong><b class="pub-preco"></b><small class="pub-motivo"></small>
-        <button class="btn btn-fantasma btn-mini">Escolher</button></div>`;
+        <button class="btn btn-fantasma btn-mini">${pub.formato === "carrossel" ? "＋ Adicionar" : "Escolher"}</button></div>`;
       const img = $(".pub-card-img", el);
       if (c.image_url) { const i = new Image(); i.src = c.image_url; i.alt = ""; i.loading = "lazy"; img.appendChild(i); }
       else img.innerHTML = '<span class="sem-foto">sem foto<br><small>envie uma</small></span>';
@@ -954,29 +1054,89 @@ function isoParaLocal(iso) {
 
 function modoEdicao(p) {
   pub.editando = p ? p.id : null;
-  $("#btn-agendar .btn-txt").textContent = p ? "💾 Salvar alterações" : "📅 Agendar publicação no Instagram";
+  const nome = { story: "story", carrossel: "carrossel" }[pub.formato] || "publicação";
+  $("#btn-agendar .btn-txt").textContent = p ? "💾 Salvar alterações" : `📅 Agendar ${nome} no Instagram`;
   $("#btn-publicar-agora").hidden = !!p;
 }
 
 function editarAgendada(p) {
+  if (pub.canal !== "instagram" || pub.formato !== p.formato) { pub.canal = "instagram"; pub.formato = p.formato; mostrarNivelPub(); }
   abrirEditor(null);
   modoEdicao(p);
   pub.foto = p.image_url || ""; pub.fotoLocal = p.image_url && p.image_url.startsWith("/midia/") ? p.image_url : "";
+  if (p.formato === "carrossel") pub.fotos = (p.midias || []).map((m) => ({ url: m.url, local: m.url.startsWith("/midia/") ? m.url : "", item_id: m.item_id ?? null }));
   $("#pub-editor-titulo").textContent = "Alterar publicação agendada";
-  $("#pub-legenda").value = p.legenda || "";
+  $("#pub-legenda").value = p.legenda || ""; pub.legendaEditada = true;
   $("#pub-quando").value = isoParaLocal(p.agendado_para);
   $("#pub-foto-msg").textContent = "Para trocar a foto, envie outra.";
   atualizarPreview();
 }
 
+/* ---- carrossel: bandeja de fotos ---- */
+function adicionarFoto(f) {
+  if (pub.fotos.length >= MAX_CARROSSEL) { toast(`O carrossel aceita até ${MAX_CARROSSEL} fotos.`, "erro"); return false; }
+  pub.fotos.push(f); return true;
+}
+function moverFoto(i, d) { const j = i + d; if (j < 0 || j >= pub.fotos.length) return; [pub.fotos[i], pub.fotos[j]] = [pub.fotos[j], pub.fotos[i]]; renderBandeja(); }
+function renderBandeja() {
+  const box = $("#carr-bandeja"); box.innerHTML = "";
+  pub.fotos.forEach((f, i) => {
+    const el = document.createElement("div"); el.className = "carr-foto";
+    el.innerHTML = `<img alt=""><span class="carr-n"></span><span class="carr-acoes"><button type="button" data-a="e" aria-label="Mover para a esquerda">◀</button><button type="button" data-a="d" aria-label="Mover para a direita">▶</button><button type="button" data-a="x" aria-label="Remover foto">✕</button></span>`;
+    $("img", el).src = f.local || f.url; $(".carr-n", el).textContent = i === 0 ? "capa" : i + 1;
+    el.addEventListener("click", (e) => {
+      const a = e.target.closest("button")?.dataset.a; if (!a) return;
+      if (a === "x") { pub.fotos.splice(i, 1); renderBandeja(); } else moverFoto(i, a === "e" ? -1 : 1);
+    });
+    box.appendChild(el);
+  });
+  $("#pub-carr-cont").textContent = `${pub.fotos.length}/${MAX_CARROSSEL}`;
+  legendaDoCarrossel(); atualizarPreview();
+}
+/* legenda automática do carrossel: lista os produtos escolhidos, até o usuário editar à mão */
+function legendaDoCarrossel() {
+  if (pub.formato !== "carrossel" || pub.legendaEditada) return;
+  const itens = pub.fotos.filter((f) => f.titulo);
+  if (!itens.length) return;
+  $("#pub-legenda").value = ("🔥 Achados com preço bom!\n\n" + itens.map((f) => `• ${f.titulo.slice(0, 70)} — ${f.preco_fmt}`).join("\n") +
+    "\n\n👉 Link na bio e nos nossos canais.\n\n#promoção #oferta #desconto #achadinhos").slice(0, 2200);
+  atualizarContador();
+}
+function atualizarContador() { $("#pub-contador").textContent = `${$("#pub-legenda").value.length}/2200`; }
+$("#pub-arquivos").addEventListener("change", async (e) => {
+  const arqs = [...e.target.files], msg = $("#carr-msg"); e.target.value = "";
+  for (const f of arqs) {
+    if (pub.fotos.length >= MAX_CARROSSEL) { msg.textContent = `Máximo de ${MAX_CARROSSEL} fotos: as demais foram ignoradas.`; break; }
+    if (f.size > 8 * 1024 * 1024) { msg.textContent = `“${f.name}” passa de 8 MB e foi ignorada.`; continue; }
+    msg.textContent = `Enviando ${f.name}…`;
+    try {
+      const r = await fetch("/api/publicacao/imagem", { method: "POST", body: f, headers: { "Content-Type": f.type || "application/octet-stream" }, credentials: "same-origin" });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.detail || "Não consegui enviar a foto.");
+      adicionarFoto({ url: d.image_url, local: d.local_url, item_id: null });
+      renderBandeja(); msg.textContent = "";
+    } catch (err) { msg.textContent = err.message; }
+  }
+});
+
 function abrirEditor(c) {
+  const carr = pub.formato === "carrossel", acumula = carr && !$("#pub-editor").hidden && !pub.editando && c;
   modoEdicao(null);
-  pub.item = c;
+  pub.item = carr ? null : c;
   pub.fotoProduto = c?.image_url || "";
   pub.foto = pub.fotoProduto; pub.fotoLocal = "";
-  $("#pub-editor-titulo").textContent = c ? "Revisar post" : "Post manual";
-  $("#pub-legenda").value = c ? c.legenda : "";
-  $("#pub-quando").value = horaPadrao();
+  if (carr) {
+    if (!acumula) { pub.fotos = []; pub.legendaEditada = false; }
+    if (c) {
+      if (!c.image_url) { toast("Este produto está sem foto: envie uma foto pelo botão “Adicionar fotos”.", "erro"); }
+      else if (pub.fotos.some((f) => f.item_id === c.item_id)) toast("Este produto já está no carrossel.", "erro");
+      else adicionarFoto({ url: c.image_url, local: "", item_id: c.item_id, titulo: c.titulo, preco_fmt: c.preco_fmt });
+    }
+    renderBandeja();
+  }
+  $("#pub-editor-titulo").textContent = { story: c ? "Revisar story" : "Story manual", carrossel: "Montar carrossel" }[pub.formato] || (c ? "Revisar post" : "Post manual");
+  if (!acumula) { $("#pub-legenda").value = c && !carr ? c.legenda : ""; pub.legendaEditada = false; if (carr) legendaDoCarrossel(); }
+  if (!acumula) $("#pub-quando").value = horaPadrao();
   $("#pub-msg").textContent = ""; $("#pub-msg").className = "envio-msg";
   $("#pub-foto-msg").textContent = c && !c.image_url ? "Não consegui a foto deste produto pelo link. Envie uma foto." : "";
   $("#btn-foto-produto").hidden = true;
@@ -984,20 +1144,22 @@ function abrirEditor(c) {
   atualizarPreview();
   const ed = $("#pub-editor"); ed.hidden = false;
   ed.scrollIntoView({ behavior: REDUZIR ? "auto" : "smooth", block: "start" });
-  if (!c) $("#pub-legenda").focus({ preventScroll: true });
+  if (!c && pub.formato === "feed") $("#pub-legenda").focus({ preventScroll: true });
 }
 $("#btn-post-manual").addEventListener("click", () => abrirEditor(null));
-$("#btn-fechar-editor").addEventListener("click", () => { $("#pub-editor").hidden = true; pub.item = null; modoEdicao(null); });
+$("#btn-fechar-editor").addEventListener("click", fecharEditorPub);
 
 function atualizarPreview() {
-  const src = pub.fotoLocal || pub.foto, img = $("#pv-img");
+  const carr = pub.formato === "carrossel";
+  const src = carr ? (pub.fotos[0] && (pub.fotos[0].local || pub.fotos[0].url)) : (pub.fotoLocal || pub.foto), img = $("#pv-img");
   img.hidden = !src; $("#pv-sem-foto").hidden = !!src;
   if (src) img.src = src; else img.removeAttribute("src");
+  const cont = $("#pv-contagem"); cont.hidden = !(carr && pub.fotos.length); cont.textContent = `1/${pub.fotos.length}`;
   const leg = $("#pub-legenda").value;
-  $("#pv-legenda").textContent = leg;
-  $("#pub-contador").textContent = `${leg.length}/2200`;
+  $("#pv-legenda").textContent = pub.formato === "story" ? "" : leg;
+  atualizarContador();
 }
-$("#pub-legenda").addEventListener("input", atualizarPreview);
+$("#pub-legenda").addEventListener("input", () => { pub.legendaEditada = true; atualizarPreview(); });
 
 $("#pub-arquivo").addEventListener("change", async (e) => {
   const f = e.target.files[0], msg = $("#pub-foto-msg");
@@ -1021,12 +1183,17 @@ $("#btn-foto-produto").addEventListener("click", () => {
 });
 
 function dadosPost() {
-  return { item_id: pub.item ? pub.item.item_id : null, legenda: $("#pub-legenda").value, image_url: pub.foto };
+  const base = { canal: "instagram", formato: pub.formato || "feed", item_id: pub.item ? pub.item.item_id : null };
+  if (pub.formato === "carrossel") return { ...base, item_id: null, legenda: $("#pub-legenda").value, image_url: "", midias: pub.fotos.map((f) => ({ url: f.url, item_id: f.item_id })) };
+  if (pub.formato === "story") return { ...base, legenda: "", image_url: pub.foto };
+  return { ...base, legenda: $("#pub-legenda").value, image_url: pub.foto };
 }
 function msgPub(texto, tipo) { const m = $("#pub-msg"); m.textContent = texto; m.className = "envio-msg " + (tipo || ""); }
 function validarPost() {
-  if (!pub.foto) { msgPub("Escolha uma foto: envie uma imagem.", "erro"); return false; }
-  if (!$("#pub-legenda").value.trim()) { msgPub("Escreva a legenda.", "erro"); return false; }
+  if (pub.formato === "carrossel") {
+    if (pub.fotos.length < 2) { msgPub("O carrossel precisa de pelo menos 2 fotos.", "erro"); return false; }
+  } else if (!pub.foto) { msgPub("Escolha uma foto: envie uma imagem.", "erro"); return false; }
+  if (pub.formato !== "story" && !$("#pub-legenda").value.trim()) { msgPub("Escreva a legenda.", "erro"); return false; }
   return true;
 }
 
@@ -1045,7 +1212,7 @@ $("#btn-agendar").addEventListener("click", async (e) => {
       toast("Publicação agendada! 📅", "ok");
     }
     msgPub(`Agendado para ${dataBR(quando)}. Deixe o ThyfIA rodando nesse horário.`, "ok");
-    $("#pub-editor").hidden = true; $("#pub-candidatos").innerHTML = ""; $("#pub-info").textContent = "";
+    fecharEditorPub(); $("#pub-candidatos").innerHTML = ""; $("#pub-info").textContent = "";
     carregarPublicacoes(); carregarPalavras();
   } catch (err) { msgPub(err.message, "erro"); }
   finally { carregando(btn, false); }
@@ -1053,11 +1220,12 @@ $("#btn-agendar").addEventListener("click", async (e) => {
 
 $("#btn-publicar-agora").addEventListener("click", async (e) => {
   if (!validarPost()) return;
-  if (!confirm(`Publicar AGORA no Instagram @${pub.user}?\n\nO post sai imediatamente e fica visível para todos.`)) return;
-  const btn = e.currentTarget; carregando(btn, true); msgPub("Publicando… (o Instagram pode levar até 1 minuto)");
+  const oque = { story: "O story", carrossel: "O carrossel" }[pub.formato] || "O post";
+  if (!confirm(`Publicar AGORA no Instagram @${pub.user}?\n\n${oque} sai imediatamente e fica visível para todos.`)) return;
+  const btn = e.currentTarget; carregando(btn, true); msgPub(pub.formato === "carrossel" ? "Publicando o carrossel… (cada foto é processada; pode levar alguns minutos)" : "Publicando… (o Instagram pode levar até 1 minuto)");
   try {
     const p = await api("/api/publicacao/publicar-agora", { body: { ...dadosPost(), confirmar: true } });
-    if (p.status === "publicado") { msgPub("Publicado no Instagram! 🎉", "ok"); toast("Post publicado! 🎉", "ok"); confete(90); $("#pub-editor").hidden = true; $("#pub-candidatos").innerHTML = ""; }
+    if (p.status === "publicado") { msgPub("Publicado no Instagram! 🎉", "ok"); toast("Post publicado! 🎉", "ok"); confete(90); fecharEditorPub(); $("#pub-candidatos").innerHTML = ""; }
     else msgPub(p.erro || "Não foi possível publicar.", "erro");
     carregarPublicacoes(); statusInstagram(true);
   } catch (err) { msgPub(err.message, "erro"); }
@@ -1076,8 +1244,10 @@ async function carregarPublicacoes() {
       el.innerHTML = `<div class="pub-thumb"></div><div class="pub-linha-txt"><strong></strong><small></small></div>
         <span class="selo ${p.status}"></span><span class="pub-linha-acao"></span>`;
       if (p.image_url) { const i = new Image(); i.src = p.image_url; i.alt = ""; i.loading = "lazy"; $(".pub-thumb", el).appendChild(i); }
-      $("strong", el).textContent = p.titulo || (p.legenda || "Post manual").split("\n")[0];
-      const quando = p.status === "publicado" ? "publicado " + dataBR(p.publicado_em) : p.agendado_para ? "para " + dataBR(p.agendado_para) : dataBR(p.criado_em);
+      $("strong", el).textContent = p.formato === "story" ? "Story" + (p.titulo ? " · " + p.titulo : "")
+        : p.formato === "carrossel" ? `Carrossel de ${(p.midias || []).length} fotos` : (p.titulo || (p.legenda || "Post manual").split("\n")[0]);
+      const onde = `Instagram ${ROTULO_FORMATO[p.formato] || "Feed"} · `;
+      const quando = onde + (p.status === "publicado" ? "publicado " + dataBR(p.publicado_em) : p.agendado_para ? "para " + dataBR(p.agendado_para) : dataBR(p.criado_em));
       const det = $("small", el); det.textContent = quando + (p.erro ? " · " + p.erro : ""); det.title = det.textContent;
       $(".selo", el).textContent = ROTULO_PUB[p.status] || p.status;
       if (p.status === "agendado") {
@@ -1097,6 +1267,62 @@ async function carregarPublicacoes() {
     });
   } catch (e) { box.innerHTML = ""; toast(e.message, "erro"); }
 }
+
+/* ---- Facebook: conectar a Página (ID + token da Página) ---- */
+async function abrirFacebook() {
+  const f = CANAIS_PUB.facebook.formatos[pub.formato];
+  $("#fb-breve").hidden = !f?.breve;
+  $("#fb-breve-titulo").textContent = `Publicar no Facebook · ${f.nome}`;
+  $("#fb-breve-txt").textContent = { feed: "Foto com texto direto na linha do tempo da sua Página.", story: "Story da Página, em tela cheia, com a foto da oferta.", publicacao: "Post normal da Página com o link do produto — no Facebook o link é clicável." }[pub.formato];
+  try { renderFacebook((await api("/api/publicacao/canais")).facebook); } catch (e) { $("#fb-detalhe").textContent = e.message; }
+}
+function renderFacebook(s) {
+  const box = $("#fb-status"); box.className = "ig-status " + (s.configurado ? "ok" : "off");
+  $("#fb-conta").textContent = s.configurado ? (s.nome || "Página conectada") : "Facebook não conectado";
+  $("#fb-detalhe").textContent = s.configurado ? "Página validada pelo Facebook. O token está guardado criptografado." : "Conecte a sua Página para publicar nela.";
+  $("#fb-conectar").hidden = !!s.configurado; $("#btn-fb-trocar").hidden = !s.configurado; $("#btn-fb-remover").hidden = !s.configurado;
+  if (pub.canais) pub.canais.facebook = { configurado: s.configurado, nome: s.nome || "" };
+}
+$("#btn-fb-trocar").addEventListener("click", () => { $("#fb-conectar").hidden = false; $("#btn-fb-trocar").hidden = true; $("#btn-fb-remover").hidden = false; $("#fb-in-id").focus(); });
+$("#fb-olho").addEventListener("click", () => { const i = $("#fb-in-token"); i.type = i.type === "password" ? "text" : "password"; });
+$("#form-fb").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const btn = $("#btn-fb-conectar"), msg = $("#fb-msg"), id = $("#fb-in-id").value.trim(), token = $("#fb-in-token").value.trim();
+  msg.className = "envio-msg";
+  if (!id || !token) { msg.textContent = "Preencha o ID da Página e o token."; msg.classList.add("erro"); return; }
+  carregando(btn, true); msg.textContent = "Perguntando ao Facebook se está tudo certo…";
+  try {
+    const r = await api("/api/conta/facebook", { method: "PUT", body: { page_id: id, token } });
+    $("#fb-in-token").value = ""; msg.textContent = "";
+    renderFacebook(r); toast("Página do Facebook conectada! ✓", "ok");
+  } catch (err) { msg.textContent = err.message; msg.classList.add("erro"); }
+  finally { carregando(btn, false); }
+});
+$("#btn-fb-remover").addEventListener("click", async () => {
+  if (!confirm("Desconectar a Página do Facebook? Posts já agendados nela não serão afetados.")) return;
+  try { renderFacebook(await api("/api/conta/facebook", { method: "DELETE" })); toast("Página desconectada.", "ok"); } catch (err) { toast(err.message, "erro"); }
+});
+
+/* ---- WhatsApp: grupo e canal saem pela automação ---- */
+function abrirWhatsapp() {
+  const f = CANAIS_PUB.whatsapp.formatos[pub.formato], w = pub.canais?.whatsapp || {};
+  $("#wa-titulo").textContent = `WhatsApp · ${f.nome}`;
+  $("#wa-selo").textContent = f.breve ? "em breve" : "via automação"; $("#wa-selo").className = "badge-breve" + (f.breve ? "" : " via");
+  const info = $("#wa-estado"); info.innerHTML = "";
+  const btn = $("#btn-wa-automacao"); btn.hidden = !!f.breve;
+  if (f.breve) {
+    $("#wa-txt").textContent = "O Status (story) do WhatsApp publica com a foto da oferta. Ele sai pelo número de cada cliente, por isso cada um vai conectar o próprio WhatsApp (leitura de QR) — essa parte está em construção.";
+    return;
+  }
+  $("#wa-txt").textContent = pub.formato === "grupo"
+    ? "Cada oferta com link gerado é enviada automaticamente para o seu grupo de WhatsApp. Você não publica à mão: a automação cuida do envio no ritmo que você configurar."
+    : "Cada oferta com link gerado é enviada automaticamente para o seu canal de WhatsApp. Você não publica à mão: a automação cuida do envio no ritmo que você configurar.";
+  const li = (ok, txt) => { const p = document.createElement("p"); p.className = "wa-linha " + (ok ? "ok" : "off"); p.textContent = (ok ? "✓ " : "• ") + txt; info.appendChild(p); };
+  li(!!w.automacao_pronta, w.automacao_pronta ? "Automação pronta para enviar." : "Automação ainda não configurada — abra a Automação e preencha o destino.");
+  li(!!w.numero, w.numero ? `WhatsApp de destino: ${w.numero}` : "Nenhum número/grupo de destino informado.");
+  if (w.telegram) li(true, `Telegram: ${w.telegram}`);
+}
+$("#btn-wa-automacao").addEventListener("click", () => irPara("automacao"));
 
 /* ------------------------------------------------------------------ CÉREBRO */
 async function carregarCerebro() {

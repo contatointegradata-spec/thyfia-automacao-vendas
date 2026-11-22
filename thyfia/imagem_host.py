@@ -146,12 +146,17 @@ AVISO_TEMP = "Foto pronta. Na hora de publicar, ela vai para um link temporário
 
 
 def url_base_publica() -> str:
-    return (os.environ.get("THYFIA_URL_PUBLICA") or "").strip().rstrip("/")
+    """Endereço público desta ThyfIA: o configurado em Administração (ou THYFIA_URL_PUBLICA)."""
+    try:
+        from . import configuracoes
+        valor = configuracoes.obter("url_publica")
+    except Exception:  # sem banco/configuração (uso isolado): só a variável de ambiente
+        valor = ""
+    return (valor or os.environ.get("THYFIA_URL_PUBLICA") or "").strip().rstrip("/")
 
 
-def preparar_jpeg(dados: bytes) -> bytes:
-    """Qualquer imagem (PNG, WEBP, JPEG, HEIC não) → JPEG até 1440px, com margem branca se a
-    proporção estiver fora do que o feed aceita."""
+def _abrir_imagem(dados: bytes):
+    """Bytes de qualquer imagem comum → PIL RGB (transparência vira fundo branco)."""
     import io
 
     from PIL import Image, ImageOps, UnidentifiedImageError
@@ -170,9 +175,24 @@ def preparar_jpeg(dados: bytes) -> bytes:
         img = img.convert("RGBA")
         fundo = Image.new("RGB", img.size, "white")
         fundo.paste(img, mask=img.split()[-1])
-        img = fundo
-    else:
-        img = img.convert("RGB")
+        return fundo
+    return img.convert("RGB")
+
+
+def _jpeg(img, qualidade: int = 90) -> bytes:
+    import io
+
+    buf = io.BytesIO()
+    img.save(buf, "JPEG", quality=qualidade, optimize=True)
+    return buf.getvalue()
+
+
+def preparar_jpeg(dados: bytes) -> bytes:
+    """Qualquer imagem (PNG, WEBP, JPEG, HEIC não) → JPEG até 1440px, com margem branca se a
+    proporção estiver fora do que o feed aceita."""
+    from PIL import Image
+
+    img = _abrir_imagem(dados)
     w, h = img.size
     prop = w / h
     if prop < PROPORCAO_MIN:      # alta demais → margem nas laterais
@@ -186,9 +206,66 @@ def preparar_jpeg(dados: bytes) -> bytes:
         tela.paste(img, ((novo[0] - w) // 2, (novo[1] - h) // 2))
         img = tela
     img.thumbnail((1440, 1800))
-    buf = io.BytesIO()
-    img.save(buf, "JPEG", quality=90, optimize=True)
-    return buf.getvalue()
+    return _jpeg(img)
+
+
+def preparar_story(dados: bytes) -> bytes:
+    """Foto → JPEG 1080×1920 (9:16): a foto inteira no centro, sobre ela mesma ampliada e desfocada."""
+    from PIL import Image, ImageEnhance, ImageFilter
+
+    img = _abrir_imagem(dados)
+    W, H = 1080, 1920
+    esc = max(W / img.width, H / img.height)
+    fundo = img.resize((round(img.width * esc), round(img.height * esc)))
+    fundo = fundo.crop(((fundo.width - W) // 2, (fundo.height - H) // 2,
+                        (fundo.width - W) // 2 + W, (fundo.height - H) // 2 + H))
+    fundo = ImageEnhance.Brightness(fundo.filter(ImageFilter.GaussianBlur(40))).enhance(0.6)
+    frente = img.copy()
+    frente.thumbnail((980, 1500))
+    fundo.paste(frente, ((W - frente.width) // 2, (H - frente.height) // 2))
+    return _jpeg(fundo)
+
+
+def preparar_quadrado(dados: bytes) -> bytes:
+    """Foto → JPEG 1080×1080 com margem branca (todas as fotos de um carrossel com a mesma proporção)."""
+    from PIL import Image
+
+    img = _abrir_imagem(dados)
+    img.thumbnail((1080, 1080))
+    tela = Image.new("RGB", (1080, 1080), "white")
+    tela.paste(img, ((1080 - img.width) // 2, (1080 - img.height) // 2))
+    return _jpeg(tela)
+
+
+def _bytes_da_imagem(image_url: str, pasta) -> bytes:
+    """Foto enviada pela tela (arquivo local) ou URL pública (baixa, no máximo 8 MB)."""
+    if e_local(image_url):
+        arq = arquivo_local(image_url, pasta)
+        if not arq:
+            raise ErroImagem("A foto enviada não foi encontrada no ThyfIA. Envie de novo.")
+        return arq.read_bytes()
+    try:
+        r = requests.get(image_url, timeout=25, headers={"User-Agent": "ThyfIA/1.0"}, stream=True)
+        dados = r.raw.read(MAX_UPLOAD + 1, decode_content=True) if r.status_code == 200 else b""
+    except requests.RequestException as e:
+        raise ErroImagem(f"Não consegui baixar a foto ({type(e).__name__}).") from None
+    if not dados:
+        raise ErroImagem("Não consegui baixar a foto do produto. Envie uma foto.")
+    return dados
+
+
+def midia_para_formato(image_url: str, pasta, formato: str) -> str:
+    """Prepara a foto para o formato (story 9:16, carrossel 1:1), salva em dados/midia e devolve
+    o link local ('/midia/…jpg') — que `url_para_instagram` transforma em link público."""
+    import secrets
+    from pathlib import Path
+
+    dados = _bytes_da_imagem(image_url, pasta)
+    jpeg = {"story": preparar_story, "carrossel": preparar_quadrado}.get(formato, preparar_jpeg)(dados)
+    nome = f"{secrets.token_urlsafe(12)}.jpg"
+    Path(pasta).mkdir(parents=True, exist_ok=True)
+    (Path(pasta) / nome).write_bytes(jpeg)
+    return f"/midia/{nome}"
 
 
 def salvar_upload(dados: bytes, pasta) -> dict:

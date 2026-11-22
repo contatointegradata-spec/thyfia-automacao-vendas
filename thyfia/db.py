@@ -204,6 +204,15 @@ def init() -> None:
         "ALTER TABLE usuarios ADD COLUMN ativo INTEGER NOT NULL DEFAULT 1",
         # 0 = item aguardando o link do navegador da pessoa (geração pela extensão); 1 = resolvido
         "ALTER TABLE job_itens ADD COLUMN processado INTEGER NOT NULL DEFAULT 1",
+        # Agente de Publicação por canal/formato: instagram|facebook|whatsapp × feed|story|carrossel|reels…
+        "ALTER TABLE publicacoes_instagram ADD COLUMN canal TEXT NOT NULL DEFAULT 'instagram'",
+        "ALTER TABLE publicacoes_instagram ADD COLUMN formato TEXT NOT NULL DEFAULT 'feed'",
+        "ALTER TABLE publicacoes_instagram ADD COLUMN midias TEXT",  # JSON [{url, item_id}] (carrossel)
+        # Página do Facebook do cliente (token cifrado, igual ao do Instagram)
+        "ALTER TABLE config_usuario ADD COLUMN fb_page_id TEXT",
+        "ALTER TABLE config_usuario ADD COLUMN fb_token_cifrado TEXT",
+        "ALTER TABLE config_usuario ADD COLUMN fb_page_nome TEXT",
+        "ALTER TABLE config_usuario ADD COLUMN fb_validado_em TEXT",
     )
     for sql in migracoes:
         try:

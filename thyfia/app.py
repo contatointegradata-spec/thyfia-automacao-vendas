@@ -458,17 +458,42 @@ class Sugerir(BaseModel):
     quantidade: int = Field(default=5, ge=1, le=20)
 
 
+class FotoCarrossel(BaseModel):
+    url: str = Field(max_length=2000)
+    item_id: int | None = None
+
+
 class NovaPublicacao(BaseModel):
     item_id: int | None = None          # None = post manual (foto enviada)
-    legenda: str = Field(max_length=2200)
-    image_url: str = Field(max_length=2000)
+    legenda: str = Field(default="", max_length=2200)  # story não tem legenda
+    image_url: str = Field(default="", max_length=2000)  # carrossel: a capa vem de `midias`
     agendado_para: str | None = Field(default=None, max_length=40)
     confirmar: bool = False
+    canal: str = Field(default="instagram", max_length=20)
+    formato: str = Field(default="feed", max_length=20)
+    midias: list[FotoCarrossel] | None = Field(default=None, max_length=10)  # carrossel: 2 a 10 fotos
+
+    def fotos(self) -> list[dict] | None:
+        return [m.model_dump() for m in self.midias] if self.midias is not None else None
 
 
 @app.post("/api/publicacao/sugerir")
 def publicacao_sugerir(dados: Sugerir, u=Depends(exige("agente"))):
     return agente_publicacao.sugerir(u["id"], dados.keyword, dados.job_id, dados.quantidade)
+
+
+@app.get("/api/publicacao/canais")
+def publicacao_canais(u=Depends(exige("agente"))):
+    """Estado de cada canal (conectado ou não) e os formatos que a tela oferece."""
+    t = tenant.publica(u["id"])
+    return {
+        "formatos": {c: list(f) for c, f in agente_publicacao.CANAIS.items()},
+        "publicaveis": sorted(f"{c}/{f}" for c, f in agente_publicacao.PUBLICAVEIS),
+        "instagram": {"configurado": t["instagram"]["configurado"], "username": t["instagram"]["username"]},
+        "facebook": {"configurado": t["facebook"]["configurado"], "nome": t["facebook"]["nome"]},
+        "whatsapp": {"numero": t["whatsapp_formatado"], "telegram": t["telegram_canal"],
+                     "automacao_pronta": tenant.automacao_pronta(u["id"])},
+    }
 
 
 @app.get("/api/publicacao/palavras")
@@ -491,7 +516,8 @@ def publicacao_agendar(dados: NovaPublicacao, u=Depends(exige("agente"))):
     if not dados.agendado_para:
         raise HTTPException(400, "Escolha a data e a hora da publicação.")
     try:
-        return agente_publicacao.agendar(u["id"], dados.item_id, dados.legenda, dados.image_url, dados.agendado_para)
+        return agente_publicacao.agendar(u["id"], dados.item_id, dados.legenda, dados.image_url, dados.agendado_para,
+                                         dados.canal, dados.formato, dados.fotos())
     except Exception as e:
         raise _erro_pub(e)
 
@@ -501,7 +527,7 @@ def publicacao_publicar_agora(dados: NovaPublicacao, u=Depends(exige("agente")))
     try:
         with tenant.ig_ctx(u["id"]):
             pub = agente_publicacao.publicar_agora(u["id"], dados.item_id, dados.legenda, dados.image_url,
-                                                   dados.confirmar)
+                                                   dados.confirmar, dados.canal, dados.formato, dados.fotos())
     except Exception as e:
         raise _erro_pub(e)
     _cache_ig["em"] = 0  # o limite mudou
@@ -519,7 +545,8 @@ def publicacao_editar(pub_id: int, dados: NovaPublicacao, u=Depends(exige("agent
     if not dados.agendado_para:
         raise HTTPException(400, "Escolha a data e a hora da publicação.")
     try:
-        return agente_publicacao.editar(u["id"], pub_id, dados.legenda, dados.image_url, dados.agendado_para)
+        return agente_publicacao.editar(u["id"], pub_id, dados.legenda, dados.image_url, dados.agendado_para,
+                                        dados.fotos())
     except Exception as e:
         raise _erro_pub(e)
 
@@ -643,6 +670,21 @@ def conta_instagram_remover(u=Depends(exige("agente"))):
     r = tenant.instagram_remover(u["id"])
     _cache_ig["em"] = 0
     return r
+
+
+class ContaFacebook(BaseModel):
+    page_id: str = Field(max_length=40)
+    token: str = Field(max_length=1000)
+
+
+@app.put("/api/conta/facebook")
+def conta_facebook_salvar(dados: ContaFacebook, u=Depends(exige("agente"))):
+    return _config_http(tenant.facebook_salvar, u["id"], dados.page_id, dados.token)
+
+
+@app.delete("/api/conta/facebook")
+def conta_facebook_remover(u=Depends(exige("agente"))):
+    return tenant.facebook_remover(u["id"])
 
 
 @app.get("/api/onboarding")

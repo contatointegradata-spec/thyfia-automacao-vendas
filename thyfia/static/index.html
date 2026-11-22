@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/styles.css?v=5">
+  <link rel="stylesheet" href="/static/styles.css?v=6">
 </head>
 <body>
 
@@ -227,9 +227,15 @@
     <div class="view" id="view-publicacao" hidden>
       <header class="view-topo">
         <h1>Agente de <span class="grad">Publicação</span></h1>
-        <p class="muted">O agente escolhe o melhor item e prepara o post. Você revisa e aprova — nada é publicado sem o seu clique.</p>
+        <p class="muted">Escolha onde e como publicar. O agente prepara o post, você revisa e aprova — nada sai sem o seu clique.</p>
       </header>
 
+      <nav class="pub-trilha" id="pub-trilha" aria-label="Onde você está"></nav>
+      <div class="canal-grid" id="pub-canais"></div>
+      <div class="canal-grid formatos" id="pub-formatos" hidden></div>
+
+      <!-- Instagram: Feed, Story e Carrossel -->
+      <div id="pub-ws-instagram" hidden>
       <section class="painel ig-wizard" id="ig-wizard" hidden>
         <div class="wz-topo">
           <div>
@@ -291,11 +297,22 @@
             <div class="ig-preview-img" id="pv-img-box">
               <img id="pv-img" alt="Prévia da imagem do post" hidden>
               <div class="pv-sem-foto" id="pv-sem-foto">Sem foto<br><small>envie uma imagem ao lado</small></div>
+              <span class="pv-contagem" id="pv-contagem" hidden></span>
             </div>
             <p class="ig-preview-legenda"><b id="pv-user2">sua_conta</b> <span id="pv-legenda"></span></p>
           </div>
           <div class="pub-form">
-            <div class="pub-foto">
+            <div class="pub-carrossel" id="pub-carrossel" hidden>
+              <span class="pub-rotulo">Fotos do carrossel <small id="pub-carr-cont">0/10</small></span>
+              <div class="carr-bandeja" id="carr-bandeja"></div>
+              <div class="pub-foto-acoes">
+                <label class="btn btn-fantasma btn-mini pub-upload">⬆ Adicionar fotos
+                  <input type="file" id="pub-arquivos" accept="image/jpeg,image/png,image/webp" multiple hidden>
+                </label>
+              </div>
+              <p class="mini" id="carr-msg">De 2 a 10 fotos. Para incluir produtos, use “Sugerir melhor item” e clique em <b>Adicionar</b>. A primeira foto é a capa; todas ficam quadradas.</p>
+            </div>
+            <div class="pub-foto" id="pub-foto-unica">
               <span class="pub-rotulo">Foto do post</span>
               <div class="pub-foto-acoes">
                 <label class="btn btn-fantasma btn-mini pub-upload">⬆ Enviar foto
@@ -305,10 +322,11 @@
               </div>
               <p class="mini" id="pub-foto-msg"></p>
             </div>
-            <label class="pub-campo"><span>Legenda <small id="pub-contador">0/2200</small></span>
+            <label class="pub-campo" id="pub-campo-legenda"><span>Legenda <small id="pub-contador">0/2200</small></span>
               <textarea id="pub-legenda" rows="9" maxlength="2200" placeholder="Escreva a legenda do post…"></textarea>
             </label>
-            <p class="mini">O link de afiliado não vai na legenda (no Instagram ele não é clicável): use a bio e os canais.</p>
+            <p class="mini" id="pub-dica-legenda">O link de afiliado não vai na legenda (no Instagram ele não é clicável): use a bio e os canais.</p>
+            <p class="mini" id="pub-dica-story" hidden>Story não tem legenda: sai só a foto, em tela cheia (9:16) com fundo desfocado. Para levar o público ao produto, mande o link pelos canais.</p>
             <label class="pub-campo"><span>Data e hora</span>
               <input type="datetime-local" id="pub-quando">
             </label>
@@ -321,7 +339,70 @@
         </div>
       </section>
 
-      <div class="painel">
+      </div><!-- /pub-ws-instagram -->
+
+      <!-- Instagram Reels (em breve) -->
+      <section class="painel pub-breve" id="pub-ws-reels" hidden>
+        <div class="breve-topo"><h3>Reels</h3><span class="badge-breve">em breve</span></div>
+        <p class="muted">Vídeo vertical curto no Instagram. Vão existir dois jeitos de criar:</p>
+        <div class="reels-modos">
+          <label class="reels-modo"><input type="radio" name="reels-fonte" value="upload" checked disabled>
+            <span><b>Enviar meu vídeo</b><small>Você sobe um MP4 pronto e a ThyfIA publica com a legenda.</small></span></label>
+          <label class="reels-modo"><input type="radio" name="reels-fonte" value="auto" disabled>
+            <span><b>Gerar com as fotos do produto</b><small>A ThyfIA monta um vídeo curto com as fotos, o preço e o título.</small></span></label>
+        </div>
+        <button class="btn btn-primario" disabled>Publicar Reels — em breve</button>
+        <p class="mini">Já está no nosso roteiro: precisa de um passo a mais na publicação (envio de vídeo), por isso ainda não liberamos. Enquanto isso, use Feed, Story ou Carrossel.</p>
+      </section>
+
+      <!-- Facebook -->
+      <div id="pub-ws-facebook" hidden>
+        <div class="ig-status off" id="fb-status">
+          <div class="ig-logo fb">f</div>
+          <div class="ig-info"><strong id="fb-conta">Facebook não conectado</strong><small id="fb-detalhe">Conecte a sua Página para publicar nela.</small></div>
+          <button class="btn btn-fantasma btn-mini" id="btn-fb-trocar" hidden>Trocar Página / token</button>
+        </div>
+        <section class="painel fb-conectar" id="fb-conectar">
+          <h3>Conectar a sua Página do Facebook</h3>
+          <p class="muted">O Facebook usa um token <b>da Página</b> (diferente do token do Instagram). Cole o ID e o token abaixo — a ThyfIA só salva depois que o Facebook confirmar.</p>
+          <details class="fb-passos"><summary>Como pegar o ID e o token da Página</summary>
+            <ol>
+              <li>Abra <b>developers.facebook.com</b> → <b>Ferramentas → Explorador da Graph API</b>, no mesmo app que você criou para o Instagram.</li>
+              <li>Em <b>Usuário ou Página</b>, escolha <b>Obter token de acesso da Página</b> e selecione a sua Página.</li>
+              <li>Marque as permissões <b>pages_show_list</b>, <b>pages_read_engagement</b> e <b>pages_manage_posts</b> e gere o token.</li>
+              <li>O <b>ID da Página</b> fica em: sua Página → <b>Sobre</b> → <b>Transparência da Página</b> (ou na própria resposta do Explorador, no campo <i>id</i>).</li>
+              <li>Cole os dois aqui embaixo. Dica: gere o token a partir de um token de usuário de <b>longa duração</b> para ele não expirar logo.</li>
+            </ol>
+          </details>
+          <form id="form-fb" autocomplete="off" novalidate>
+            <label class="pub-campo"><span>ID da Página</span>
+              <input type="text" id="fb-in-id" inputmode="numeric" placeholder="ex.: 105736241234567" autocomplete="off"></label>
+            <label class="pub-campo"><span>Token da Página</span>
+              <span class="senha-wrap"><input type="password" id="fb-in-token" placeholder="Cole o token inteiro" autocomplete="off" spellcheck="false"><button type="button" class="olho" id="fb-olho" aria-label="Mostrar token">👁</button></span></label>
+            <p class="mini">🔒 O token é guardado <b>criptografado</b> e nunca volta para o navegador.</p>
+            <p class="envio-msg" id="fb-msg" role="status" aria-live="polite"></p>
+            <div class="wz-acoes">
+              <button class="btn btn-primario" type="submit" id="btn-fb-conectar"><span class="btn-txt">Validar e conectar</span><span class="spinner"></span></button>
+              <button class="btn btn-fantasma" type="button" id="btn-fb-remover" hidden>Desconectar Página</button>
+            </div>
+          </form>
+        </section>
+        <section class="painel pub-breve" id="fb-breve" hidden>
+          <div class="breve-topo"><h3 id="fb-breve-titulo">Publicar no Facebook</h3><span class="badge-breve">em breve</span></div>
+          <p class="muted" id="fb-breve-txt"></p>
+          <p class="mini">Sua Página já fica conectada e validada — assim que a publicação for liberada, é só usar.</p>
+        </section>
+      </div>
+
+      <!-- WhatsApp -->
+      <section class="painel pub-whats" id="pub-ws-whatsapp" hidden>
+        <div class="breve-topo"><h3 id="wa-titulo">WhatsApp</h3><span class="badge-breve" id="wa-selo">via automação</span></div>
+        <p class="muted" id="wa-txt"></p>
+        <div class="wa-estado" id="wa-estado"></div>
+        <div class="wz-acoes"><button class="btn btn-primario" id="btn-wa-automacao">Abrir Automação</button></div>
+      </section>
+
+      <div class="painel" id="pub-painel-lista">
         <h3>Publicações</h3>
         <div class="pub-lista" id="pub-lista"></div>
       </div>
@@ -636,7 +717,7 @@
   </defs>
 </svg>
 
-<script src="/static/app.js?v=10"></script>
-<script src="/static/planos.js?v=5"></script>
+<script src="/static/app.js?v=11"></script>
+<script src="/static/planos.js?v=6"></script>
 </body>
 </html>

@@ -175,9 +175,12 @@ def limite_publicacao() -> dict:
     return {"usado": usado, "total": total, "restante": max(total - usado, 0)}
 
 
-def criar_container(image_url: str, caption: str) -> str:
+def criar_container(image_url: str, caption: str, extra: dict | None = None) -> str:
     """POST /{IG_USER_ID}/media → id do container."""
-    d = _req("POST", f"{config()['user_id']}/media", {"image_url": image_url, "caption": caption})
+    params = {"image_url": image_url}
+    if caption:
+        params["caption"] = caption
+    d = _req("POST", f"{config()['user_id']}/media", {**params, **(extra or {})})
     if not d.get("id"):
         raise ErroInstagram("O Instagram não devolveu o id do container.", "container")
     return str(d["id"])
@@ -213,6 +216,34 @@ def publicar(container_id: str) -> str:
 def publicar_imagem(image_url: str, caption: str, dormir=None) -> str:
     """Fluxo completo: container → aguardar → publish. Retorna o id da mídia."""
     cid = criar_container(image_url, caption)
+    aguardar_container(cid, dormir=dormir)
+    return publicar(cid)
+
+
+def publicar_story(image_url: str, dormir=None) -> str:
+    """Story com uma foto (9:16). O Instagram não aceita legenda em story."""
+    cid = criar_container(image_url, "", {"media_type": "STORIES"})
+    aguardar_container(cid, dormir=dormir)
+    return publicar(cid)
+
+
+MIN_CARROSSEL, MAX_CARROSSEL = 2, 10
+
+
+def publicar_carrossel(image_urls: list[str], caption: str, dormir=None) -> str:
+    """Carrossel de 2 a 10 fotos: um container por foto → container do carrossel → publish."""
+    if not MIN_CARROSSEL <= len(image_urls) <= MAX_CARROSSEL:
+        raise ErroInstagram(f"O carrossel precisa de {MIN_CARROSSEL} a {MAX_CARROSSEL} fotos.", "imagem")
+    filhos = []
+    for url in image_urls:
+        fid = criar_container(url, "", {"is_carousel_item": "true"})
+        aguardar_container(fid, dormir=dormir)
+        filhos.append(fid)
+    d = _req("POST", f"{config()['user_id']}/media",
+             {"media_type": "CAROUSEL", "children": ",".join(filhos), "caption": caption})
+    if not d.get("id"):
+        raise ErroInstagram("O Instagram não devolveu o id do carrossel.", "container")
+    cid = str(d["id"])
     aguardar_container(cid, dormir=dormir)
     return publicar(cid)
 

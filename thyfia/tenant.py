@@ -14,7 +14,7 @@ from datetime import datetime
 
 import requests
 
-from . import cofre, configuracoes, db, instagram, motor_ml, planos
+from . import cofre, configuracoes, db, facebook, instagram, motor_ml, planos
 
 
 class ErroConfig(Exception):
@@ -45,6 +45,10 @@ def publica(uid: int) -> dict:
                       "user_id": r["ig_user_id"] or "", "username": r["ig_username"] or "",
                       "token": cofre.mascarar(cofre.abrir(r["ig_token_cifrado"])) if r["ig_token_cifrado"] else "",
                       "validado_em": r["ig_validado_em"]},
+        "facebook": {"configurado": bool(r["fb_page_id"] and r["fb_token_cifrado"]),
+                     "page_id": r["fb_page_id"] or "", "nome": r["fb_page_nome"] or "",
+                     "token": cofre.mascarar(cofre.abrir(r["fb_token_cifrado"])) if r["fb_token_cifrado"] else "",
+                     "validado_em": r["fb_validado_em"]},
         "teste_whatsapp_disponivel": bool(configuracoes.obter("evolution_url") and configuracoes.obter("evolution_apikey")
                                           and configuracoes.obter("evolution_instancia")),
         "teste_telegram_disponivel": bool(configuracoes.obter("telegram_bot_token")),
@@ -198,6 +202,36 @@ def instagram_remover(uid: int) -> dict:
               "ig_validado_em=NULL WHERE usuario_id=?", (uid,))
     c.commit()
     return publica(uid)["instagram"]
+
+
+# --------------------------------------------------------------------------- Facebook (Premium)
+def facebook_salvar(uid: int, page_id: str, token: str) -> dict:
+    page_id = re.sub(r"\D", "", page_id or "")
+    token = (token or "").strip()
+    if not 5 <= len(page_id) <= 25:
+        raise ErroConfig("O ID da Página é só números (ex.: 105736241234567).")
+    if len(token) < 30 or re.search(r"\s", token):
+        raise ErroConfig("Token inválido: cole o token da Página inteiro, sem espaços ou quebras de linha.")
+    try:  # só grava se a Meta aceitar de verdade
+        pagina = facebook.validar_pagina(page_id, token)
+    except facebook.ErroFacebook as e:
+        raise ErroConfig(str(e), 400)
+    _linha(uid)
+    c = db.conn()
+    c.execute("UPDATE config_usuario SET fb_page_id=?, fb_token_cifrado=?, fb_page_nome=?, fb_validado_em=?, "
+              "atualizado=datetime('now','localtime') WHERE usuario_id=?",
+              (pagina["id"], cofre.cifrar(token), pagina["nome"], planos.agora_iso(), uid))
+    c.commit()
+    return publica(uid)["facebook"]
+
+
+def facebook_remover(uid: int) -> dict:
+    _linha(uid)
+    c = db.conn()
+    c.execute("UPDATE config_usuario SET fb_page_id=NULL, fb_token_cifrado=NULL, fb_page_nome=NULL, "
+              "fb_validado_em=NULL WHERE usuario_id=?", (uid,))
+    c.commit()
+    return publica(uid)["facebook"]
 
 
 def _ig_env_liberado(uid: int) -> bool:

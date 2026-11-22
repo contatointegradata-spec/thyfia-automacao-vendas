@@ -13,6 +13,7 @@ O agente SUGERE; a pessoa aprova (nada é publicado sem um clique).
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import re
@@ -32,7 +33,22 @@ INTERVALO_AGENDADOR = 60
 LIMITE_ATINGIDO = "Limite diário de publicações do Instagram atingido."
 AVISO_AGENDADOR = "O ThyfIA precisa estar rodando no horário agendado para publicar."
 
+# canal → formatos que a tela oferece; PUBLICAVEIS = o que já publica de verdade (o resto é "em breve")
+CANAIS = {"instagram": ("feed", "story", "carrossel", "reels"),
+          "facebook": ("feed", "story", "publicacao"),
+          "whatsapp": ("story", "grupo", "canal")}
+PUBLICAVEIS = {("instagram", "feed"), ("instagram", "story"), ("instagram", "carrossel")}
+SEM_LEGENDA = {"story"}  # o Instagram não aceita legenda em story
+
 _lock = threading.Lock()  # cria publicações uma de cada vez (evita agendar o mesmo item duas vezes)
+
+
+def checar_publicavel(canal: str, formato: str) -> None:
+    if formato not in CANAIS.get(canal, ()):
+        raise ErroPublicacao("Canal ou formato desconhecido.")
+    if (canal, formato) not in PUBLICAVEIS:
+        raise ErroPublicacao("Esse formato ainda não publica por aqui — está chegando. "
+                             "Por enquanto use Instagram (Feed, Story ou Carrossel).")
 
 
 class ErroPublicacao(Exception):
@@ -124,10 +140,12 @@ SELECT i.id, i.job_id, i.busca, i.titulo, i.preco, i.url_produto, i.link_afiliad
  WHERE j.usuario_id = ?
    AND TRIM(i.titulo) <> '' AND i.preco IS NOT NULL AND i.preco > 0 AND i.link_afiliado IS NOT NULL
    AND NOT EXISTS (
-        SELECT 1 FROM publicacoes_instagram p JOIN job_itens i2 ON i2.id = p.item_id
-         WHERE p.status IN ({','.join('?' * len(BLOQUEIAM))})
+        SELECT 1 FROM publicacoes_instagram p LEFT JOIN job_itens i2 ON i2.id = p.item_id
+         WHERE p.status IN ({','.join('?' * len(BLOQUEIAM))}) AND p.formato <> 'story'
            AND (i2.id = i.id OR (i.url_produto <> '' AND i2.url_produto = i.url_produto)
-                OR i2.link_afiliado = i.link_afiliado))
+                OR i2.link_afiliado = i.link_afiliado
+                OR EXISTS (SELECT 1 FROM json_each(COALESCE(p.midias, '[]')) j
+                            WHERE json_extract(j.value, '$.item_id') = i.id)))
 """
 
 
@@ -201,13 +219,17 @@ def _pub_dict(r) -> dict:
     d = dict(r)
     for k in ("titulo", "preco", "busca", "link_afiliado"):
         d.setdefault(k, None)
+    try:
+        d["midias"] = json.loads(d["midias"]) if d.get("midias") else []
+    except ValueError:
+        d["midias"] = []
     return d
 
 
 def listar(uid: int, limite: int = 100) -> list[dict]:
     rows = db.conn().execute(
         "SELECT p.id, p.item_id, p.status, p.legenda, p.image_url, p.agendado_para, p.publicado_em, "
-        "p.ig_media_id, p.erro, p.criado_em, i.titulo, i.preco, i.busca, i.link_afiliado "
+        "p.ig_media_id, p.erro, p.criado_em, p.canal, p.formato, p.midias, i.titulo, i.preco, i.busca, i.link_afiliado "
         "FROM publicacoes_instagram p LEFT JOIN job_itens i ON i.id = p.item_id "
         "WHERE p.usuario_id = ? ORDER BY COALESCE(p.agendado_para, p.criado_em) DESC, p.id DESC LIMIT ?",
         (uid, limite)).fetchall()
@@ -219,10 +241,30 @@ def obter(pub_id: int) -> dict | None:
     return dict(r) if r else None
 
 
-def _validar_entrada(uid: int, item_id: int | None, legenda: str, image_url: str) -> tuple[str, str]:
+def _validar_entrada(uid: int, item_id: int | None, legenda: str, image_url: str, formato: str = "feed",
+                     midias: list | None = None) -> tuple[str, str, str | None]:
+    """→ (legenda, image_url, midias_json). No carrossel a primeira foto é a capa (image_url)."""
+    if formato == "carrossel":
+        fotos = _validar_midias(uid, midias)
+        return _validar_legenda(legenda), fotos[0]["url"], json.dumps(fotos, ensure_ascii=False)
     if item_id is not None:
         _validar_item(uid, item_id)
-    return _validar_post(legenda, image_url)
+    legenda, image_url = _validar_post(legenda, image_url, formato)
+    return legenda, image_url, None
+
+
+def _validar_midias(uid: int, midias: list | None, checar_itens: bool = True) -> list[dict]:
+    fotos = []
+    for m in midias or []:
+        m = {"url": m} if isinstance(m, str) else dict(m)
+        iid = m.get("item_id")
+        if iid is not None and checar_itens:
+            _validar_item(uid, int(iid))
+        fotos.append({"url": _validar_imagem(m.get("url") or ""), "item_id": iid})
+    if not instagram.MIN_CARROSSEL <= len(fotos) <= instagram.MAX_CARROSSEL:
+        raise ErroPublicacao(f"O carrossel precisa de {instagram.MIN_CARROSSEL} a {instagram.MAX_CARROSSEL} fotos "
+                             f"(você escolheu {len(fotos)}).")
+    return fotos
 
 
 def _validar_item(uid: int, item_id: int) -> None:
@@ -237,7 +279,7 @@ def _validar_item(uid: int, item_id: int) -> None:
         raise ErroPublicacao("Esse produto já foi publicado ou está agendado.", 409)
 
 
-def _validar_post(legenda: str, image_url: str) -> tuple[str, str]:
+def _validar_legenda(legenda: str) -> str:
     legenda = (legenda or "").strip()
     if not legenda:
         raise ErroPublicacao("A legenda não pode ficar vazia.")
@@ -245,64 +287,83 @@ def _validar_post(legenda: str, image_url: str) -> tuple[str, str]:
         raise ErroPublicacao(f"A legenda passou de {MAX_LEGENDA} caracteres ({len(legenda)}).")
     if len(re.findall(r"(?<!\w)#\w", legenda)) > MAX_HASHTAGS:
         raise ErroPublicacao(f"O Instagram aceita no máximo {MAX_HASHTAGS} hashtags.")
+    return legenda
+
+
+def _validar_imagem(image_url: str) -> str:
     image_url = imagem_host.para_jpg(image_url or "")
     if not image_url:
         raise ErroPublicacao("Escolha uma foto (envie uma imagem ou use a do produto).")
     if imagem_host.e_local(image_url):  # foto enviada pela tela: vira link público ao publicar
         if not imagem_host.arquivo_local(image_url, db.MIDIA):
             raise ErroPublicacao("A foto enviada não foi encontrada. Envie de novo.")
-        return legenda, image_url
+        return image_url
     if not imagem_host.url_publica(image_url):
         raise ErroPublicacao("A imagem precisa ser uma URL pública https (localhost não funciona no Instagram).")
     if not imagem_host.validar_jpeg(image_url):
         raise ErroPublicacao("A imagem não respondeu como JPEG (HTTP 200, image/jpeg). Use outra URL.")
-    return legenda, image_url
+    return image_url
+
+
+def _validar_post(legenda: str, image_url: str, formato: str = "feed") -> tuple[str, str]:
+    legenda = "" if formato in SEM_LEGENDA else _validar_legenda(legenda)
+    return legenda, _validar_imagem(image_url)
 
 
 def _bloqueado(item) -> bool:
     r = db.conn().execute(
-        f"SELECT 1 FROM publicacoes_instagram p JOIN job_itens i2 ON i2.id=p.item_id "
-        f"WHERE p.status IN ({','.join('?' * len(BLOQUEIAM))}) AND (i2.id=? OR "
-        f"(?<>'' AND i2.url_produto=?) OR i2.link_afiliado=?) LIMIT 1",
-        (*BLOQUEIAM, item["id"], item["url_produto"], item["url_produto"], item["link_afiliado"])).fetchone()
+        f"SELECT 1 FROM publicacoes_instagram p LEFT JOIN job_itens i2 ON i2.id=p.item_id "
+        f"WHERE p.status IN ({','.join('?' * len(BLOQUEIAM))}) AND p.formato <> 'story' AND (i2.id=? OR "
+        f"(?<>'' AND i2.url_produto=?) OR i2.link_afiliado=? OR EXISTS (SELECT 1 FROM json_each(COALESCE(p.midias,'[]')) j "
+        f"WHERE json_extract(j.value,'$.item_id') = ?)) LIMIT 1",
+        (*BLOQUEIAM, item["id"], item["url_produto"], item["url_produto"], item["link_afiliado"],
+         item["id"])).fetchone()
     return bool(r)
 
 
-def _inserir(uid, item_id, legenda, image_url, status, agendado_para) -> int:
+def _inserir(uid, item_id, legenda, image_url, status, agendado_para, canal="instagram", formato="feed",
+             midias=None) -> int:
     c = db.conn()
     cur = c.execute(
-        "INSERT INTO publicacoes_instagram (item_id, usuario_id, status, legenda, image_url, agendado_para, criado_em) "
-        "VALUES (?,?,?,?,?,?,?)", (item_id, uid, status, legenda, image_url, agendado_para, agora_iso()))
+        "INSERT INTO publicacoes_instagram (item_id, usuario_id, status, legenda, image_url, agendado_para, criado_em, "
+        "canal, formato, midias) VALUES (?,?,?,?,?,?,?,?,?,?)",
+        (item_id, uid, status, legenda, image_url, agendado_para, agora_iso(), canal, formato, midias))
     c.commit()
     return cur.lastrowid
 
 
-def agendar(uid: int, item_id: int | None, legenda: str, image_url: str, agendado_para: str) -> dict:
+def agendar(uid: int, item_id: int | None, legenda: str, image_url: str, agendado_para: str,
+            canal: str = "instagram", formato: str = "feed", midias: list | None = None) -> dict:
+    checar_publicavel(canal, formato)
     quando = _dt(agendado_para)
     if not quando:
         raise ErroPublicacao("Data/hora inválida.")
     if quando < _agora().replace(second=0, microsecond=0):
         raise ErroPublicacao("Escolha um horário no futuro.")
     with _lock:
-        legenda, image_url = _validar_entrada(uid, item_id, legenda, image_url)
-        pid = _inserir(uid, item_id, legenda, image_url, "agendado", quando.isoformat(timespec="seconds"))
-    log.info("Publicação %s agendada para %s.", pid, quando.isoformat(timespec="minutes"))
+        legenda, image_url, midias_json = _validar_entrada(uid, item_id, legenda, image_url, formato, midias)
+        pid = _inserir(uid, item_id, legenda, image_url, "agendado", quando.isoformat(timespec="seconds"),
+                       canal, formato, midias_json)
+    log.info("Publicação %s (%s/%s) agendada para %s.", pid, canal, formato, quando.isoformat(timespec="minutes"))
     return obter(pid)
 
 
-def publicar_agora(uid: int, item_id: int | None, legenda: str, image_url: str, confirmar: bool) -> dict:
+def publicar_agora(uid: int, item_id: int | None, legenda: str, image_url: str, confirmar: bool,
+                   canal: str = "instagram", formato: str = "feed", midias: list | None = None) -> dict:
     if confirmar is not True:
         raise ErroPublicacao("Confirme explicitamente para publicar agora.")
+    checar_publicavel(canal, formato)
     if not instagram.configurado():
         raise ErroPublicacao(instagram.NAO_CONFIGURADO + ".", 503)
     with _lock:
-        legenda, image_url = _validar_entrada(uid, item_id, legenda, image_url)
-        pid = _inserir(uid, item_id, legenda, image_url, "publicando", agora_iso())
+        legenda, image_url, midias_json = _validar_entrada(uid, item_id, legenda, image_url, formato, midias)
+        pid = _inserir(uid, item_id, legenda, image_url, "publicando", agora_iso(), canal, formato, midias_json)
     _executar(pid, agendada=False)
     return obter(pid)
 
 
-def editar(uid: int, pub_id: int, legenda: str, image_url: str, agendado_para: str) -> dict:
+def editar(uid: int, pub_id: int, legenda: str, image_url: str, agendado_para: str,
+           midias: list | None = None) -> dict:
     """Altera legenda, foto e horário de uma publicação ainda AGENDADA."""
     p = obter(pub_id)
     if not p or p["usuario_id"] != uid:
@@ -314,12 +375,17 @@ def editar(uid: int, pub_id: int, legenda: str, image_url: str, agendado_para: s
         raise ErroPublicacao("Data/hora inválida.")
     if quando < _agora().replace(second=0, microsecond=0):
         raise ErroPublicacao("Escolha um horário no futuro.")
-    legenda, image_url = _validar_post(legenda, image_url)
+    if p["formato"] == "carrossel":
+        fotos = _validar_midias(uid, midias, checar_itens=False)
+        legenda, image_url, midias_json = _validar_legenda(legenda), fotos[0]["url"], json.dumps(fotos, ensure_ascii=False)
+    else:
+        legenda, image_url = _validar_post(legenda, image_url, p["formato"])
+        midias_json = p["midias"]
     c = db.conn()
     cur = c.execute(  # WHERE status='agendado': se o agendador já pegou, não altera
-        "UPDATE publicacoes_instagram SET legenda=?, image_url=?, agendado_para=?, erro=NULL "
+        "UPDATE publicacoes_instagram SET legenda=?, image_url=?, midias=?, agendado_para=?, erro=NULL "
         "WHERE id=? AND usuario_id=? AND status='agendado'",
-        (legenda, image_url, quando.isoformat(timespec="seconds"), pub_id, uid))
+        (legenda, image_url, midias_json, quando.isoformat(timespec="seconds"), pub_id, uid))
     c.commit()
     if not cur.rowcount:
         raise ErroPublicacao("Essa publicação acabou de sair da fila (já está sendo publicada).", 409)
@@ -356,6 +422,23 @@ def _executar(pub_id: int, agendada: bool) -> None:
         _executar_com_conta(pub_id, p, agendada)
 
 
+def _url_publica(foto: str, formato: str) -> str:
+    """Prepara a foto para o formato (story 9:16, carrossel quadrado) e devolve o link que o Instagram busca."""
+    if formato in ("story", "carrossel"):
+        foto = imagem_host.midia_para_formato(foto, db.MIDIA, formato)
+    return imagem_host.url_para_instagram(foto, db.MIDIA)
+
+
+def _publicar_no_instagram(p: dict) -> str:
+    formato = p.get("formato") or "feed"
+    if formato == "story":
+        return instagram.publicar_story(_url_publica(p["image_url"], "story"))
+    if formato == "carrossel":
+        fotos = json.loads(p.get("midias") or "[]")
+        return instagram.publicar_carrossel([_url_publica(f["url"], "carrossel") for f in fotos], p["legenda"])
+    return instagram.publicar_imagem(imagem_host.url_para_instagram(p["image_url"], db.MIDIA), p["legenda"])
+
+
 def _executar_com_conta(pub_id: int, p: dict, agendada: bool) -> None:
     try:
         if instagram.limite_publicacao()["restante"] <= 0:
@@ -364,8 +447,7 @@ def _executar_com_conta(pub_id: int, p: dict, agendada: bool) -> None:
                 log.warning("Publicação %s adiada: %s", pub_id, LIMITE_ATINGIDO)
                 return
             raise instagram.ErroInstagram(LIMITE_ATINGIDO + " Agende para mais tarde.", "limite")
-        url = imagem_host.url_para_instagram(p["image_url"], db.MIDIA)
-        media_id = instagram.publicar_imagem(url, p["legenda"])
+        media_id = _publicar_no_instagram(p)
     except (instagram.ErroInstagram, imagem_host.ErroImagem) as e:
         _atualizar(pub_id, status="erro", erro=str(e))
         log.warning("Publicação %s falhou: %s", pub_id, e)
