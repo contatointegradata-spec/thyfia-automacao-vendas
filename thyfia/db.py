@@ -33,6 +33,15 @@ CREATE TABLE IF NOT EXISTS sessoes (
     expira      TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS redefinicoes_senha (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    usuario_id  INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+    token_hash  TEXT NOT NULL UNIQUE,   -- só o hash do token fica no banco (o token vai apenas no e-mail)
+    expira      TEXT NOT NULL,
+    usado       INTEGER NOT NULL DEFAULT 0,
+    criado      TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+);
+
 CREATE TABLE IF NOT EXISTS ml_conexoes (
     usuario_id   INTEGER PRIMARY KEY REFERENCES usuarios(id) ON DELETE CASCADE,
     status       TEXT NOT NULL DEFAULT 'desconectado',  -- desconectado | conectando | conectado | erro

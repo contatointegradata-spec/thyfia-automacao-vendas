@@ -97,6 +97,15 @@ class Login(BaseModel):
     senha: str = Field(max_length=128)
 
 
+class EsqueciSenha(BaseModel):
+    email: str = Field(max_length=120)
+
+
+class RedefinirSenha(BaseModel):
+    token: str = Field(max_length=200)
+    senha: str = Field(max_length=128)
+
+
 class NovoJob(BaseModel):
     termo: str = Field(min_length=2, max_length=80)
     limite: int = Field(default=20, ge=1, le=50)
@@ -212,6 +221,25 @@ def login(dados: Login, resp: Response):
         raise HTTPException(401, "E-mail ou senha incorretos.")
     _set_cookie(resp, auth.criar_sessao(u["id"]))
     return _perfil_usuario(u)
+
+
+@app.post("/api/senha/esqueci")
+def senha_esqueci(dados: EsqueciSenha):
+    """Pede o link de redefinição. A resposta é sempre a mesma, exista a conta ou não (não revela quem tem conta)."""
+    pedido = auth.pedir_redefinicao(dados.email)
+    if pedido:
+        nome, email, token = pedido
+        emails.enviar_redefinicao_em_segundo_plano(nome, email, token)
+    return {"ok": True}
+
+
+@app.post("/api/senha/redefinir")
+def senha_redefinir(dados: RedefinirSenha):
+    try:
+        email = auth.redefinir_senha(dados.token, dados.senha)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    return {"ok": True, "email": email}
 
 
 @app.post("/api/logout")
