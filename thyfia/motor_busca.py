@@ -60,9 +60,39 @@ RE_PRECO = re.compile(r'"prc":([\d.]+)')
 RE_PRECO_ATUAL = re.compile(r'"current_price":\{"value":([\d.]+)')  # cartões sem "prc" trazem o preço aqui
 RE_VENDAS = re.compile(r'"sales":(\d+)')
 RE_NOTA = re.compile(r'"reviews_rating":([\d.]+)')
+# selo do cartão (etiqueta na foto): {"highlight":{"id":"best_seller","text":"MAIS VENDIDO"…
+RE_SELO = re.compile(r'"highlight":\{"id":"[a-z_]+","text":"((?:[^"\\]|\\.)*)"')
+# preço "de" (riscado) e % de desconto que o próprio Mercado Livre mostra
+RE_PRECO_DE = re.compile(r'"key":"previous_price".{0,300}?"price":\{"value":([\d.]+)', re.S)
+RE_DESCONTO = re.compile(r'"discount_pct":(\d+)')
+# o que o preço exige: "com Cupom" (só vale com o cupom ativado) ou "no Pix" (só vale pagando no Pix)
+RE_CONDICAO = re.compile(r'"discount_complement":\{.{0,400}?"label":\{"text":"((?:[^"\\]|\\.)*)"', re.S)
 # id de foto do ML: "608923-MLB120463575227_102026" (formato inconfundível, diferente do id do item)
 RE_FOTO = re.compile(r'"id":"(\d{3,7}-ML[A-Z]\d+_\d{6})"')
 CDN_FOTO = "https://http2.mlstatic.com/D_NQ_NP_2X_{}-F.jpg"  # JPEG em alta (o Instagram exige JPEG)
+
+
+def _condicao(texto: str) -> str | None:
+    t = re.sub(r"[^a-z]", "", texto.lower())
+    return "cupom" if "cupom" in t else "pix" if "pix" in t else None
+
+
+def _dados_de_oferta(bloco: str, preco_atual: float | None) -> dict:
+    """Selo, preço "de", desconto e condição do preço, lidos do cartão. Tudo opcional: o que não vier fica None."""
+    selo = RE_SELO.search(bloco)
+    de = RE_PRECO_DE.search(bloco)
+    desc = RE_DESCONTO.search(bloco)
+    cond = RE_CONDICAO.search(bloco)
+    preco_de = float(de.group(1)) if de else None
+    if preco_de is not None and (not preco_atual or preco_de <= preco_atual * 1.03):
+        preco_de = None  # "de" que não é maior que o preço atual não serve de nada
+    pct = int(desc.group(1)) if desc else None
+    return {
+        "selo": _texto_json(selo.group(1)).strip().upper() or None if selo else None,
+        "preco_de": preco_de,
+        "desconto_pct": pct if preco_de and pct and 1 <= pct <= 95 else None,
+        "condicao": _condicao(_texto_json(cond.group(1))) if cond else None,
+    }
 
 
 def extrair_produtos(html: str) -> list[dict]:
@@ -86,7 +116,12 @@ def extrair_produtos(html: str) -> list[dict]:
         vendas = RE_VENDAS.search(bloco[:4000])
         nota = RE_NOTA.search(bloco[:4000])
         foto = RE_FOTO.search(bloco)
+        try:
+            atual = float(prc.group(1)) if prc else None
+        except ValueError:
+            atual = None
         produtos.append({
+            **_dados_de_oferta(bloco[:7000], atual),
             "titulo": _texto_json(tit.group(1)).strip() if tit else "",
             "preco": _preco_br(prc.group(1) if prc else None),
             "url": url,

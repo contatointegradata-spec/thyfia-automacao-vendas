@@ -443,7 +443,8 @@ def candidatos(uid: int, cfg: dict | None = None, agora: datetime | None = None,
     c = db.conn()
     corte = _iso(agora - timedelta(days=cfg["validade_dias"]))
     rows = [dict(r) for r in c.execute(
-        "SELECT i.id, i.busca, i.titulo, i.preco, i.url_produto, i.link_afiliado, i.imagem, i.criado_em "
+        "SELECT i.id, i.busca, i.titulo, i.preco, i.url_produto, i.link_afiliado, i.imagem, i.criado_em, "
+        "i.selo, i.preco_de, i.desconto_pct, i.condicao, i.vendas, i.nota "
         "FROM job_itens i JOIN jobs j ON j.id = i.job_id "
         "WHERE j.usuario_id=? AND TRIM(i.titulo) <> '' AND i.preco IS NOT NULL AND i.preco > 0 "
         "AND i.link_afiliado LIKE 'http%' AND i.criado_em >= ? ORDER BY i.id DESC", (uid, corte)).fetchall()]
@@ -787,7 +788,8 @@ def status(uid: int) -> dict:
             "estoque": {"total": len(estoque), "baixo": len(estoque) < ESTOQUE_BAIXO,
                         "proximas": [{"titulo": o["titulo"], "preco": o["preco"], "busca": o["busca"],
                                       "pontos": o["pontos"], "motivos": o["motivos"], "nicho": o["nicho"],
-                                      "nicho_origem": o.get("nicho_origem", "")}
+                                      "nicho_origem": o.get("nicho_origem", ""), "selo": o.get("selo"),
+                                      "condicao": o.get("condicao")}
                                      for o in estoque[:5]]},
             "nichos": nichos.catalogo(), "cobertura": cobertura(uid, estoque),
             "hoje": _resumo_dia(uid, _iso(agora)[:10]), "aprovacao": pendentes_aprovacao(uid),

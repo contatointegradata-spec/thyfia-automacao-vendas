@@ -358,6 +358,11 @@ def _diagnostico_pagina(page, rede: list[str]) -> str:
 # requisição vem do IP do servidor, mas atende normalmente no navegador do cliente. Aqui o servidor só
 # prepara a lista de produtos e recebe os links; quem abre o gerador é a extensão.
 # ---------------------------------------------------------------------------
+def _dados_do_cartao(prod: dict) -> dict:
+    """Selo, preço "de", desconto, condição do preço, vendas e nota lidos do cartão da busca (o que houver)."""
+    return {k: prod.get(k) for k in ("selo", "preco_de", "desconto_pct", "condicao", "vendas", "nota")}
+
+
 def preparar_job_extensao(job_id: str, uid: int, termo: str, limite: int, trechos: str) -> None:
     """Lê os cartões enviados pela extensão, ranqueia e guarda os produtos aguardando link."""
     try:
@@ -371,7 +376,7 @@ def preparar_job_extensao(job_id: str, uid: int, termo: str, limite: int, trecho
             raise RuntimeError("Nenhum produto encontrado para essa busca.")
         for prod in produtos:
             itens.salvar_item(job_id, termo, prod.get("titulo", ""), prod.get("preco"), prod["url"], None,
-                              imagem=prod.get("imagem"), processado=0)
+                              imagem=prod.get("imagem"), processado=0, **_dados_do_cartao(prod))
         _atualizar_job(job_id, status="gerando", total=len(produtos), feitos=0, ok=0)
     except Exception as e:
         traceback.print_exc()
@@ -502,7 +507,7 @@ def executar_job(job_id: str, uid: int, termo: str, limite: int, trechos: str | 
                     resultados.append({**prod, "ok": bool(link)})
                     # grava o item no banco assim que o link é criado (fonte dos dados)
                     itens.salvar_item(job_id, termo, prod.get("titulo", ""), prod.get("preco"),
-                                      prod["url"], link, imagem=prod.get("imagem"))
+                                      prod["url"], link, imagem=prod.get("imagem"), **_dados_do_cartao(prod))
                     _atualizar_job(job_id, feitos=i, ok=ok)
                     page.wait_for_timeout(600)
 

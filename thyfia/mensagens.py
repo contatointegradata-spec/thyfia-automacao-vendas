@@ -69,10 +69,49 @@ def emoji_da(busca: str, titulo: str) -> str:
     return "🛍️"
 
 
-def prova_de_preco(item: dict) -> str:
-    """Frase SÓ com o que o histórico de preços da ThyfIA comprova (nunca inventa desconto). Vazio se não houver."""
+# Só entra na mensagem o que o cartão do Mercado Livre mostrou (selo, preço "de", cupom/Pix, vendas e nota).
+SELOS = (("mais vendido", "🏆 Mais vendido no Mercado Livre"), ("black friday", "🖤 Black Friday"))
+CONDICOES = {"cupom": " com cupom", "pix": " no Pix"}
+AVISO_CUPOM = "🎟️ Ative o cupom na página do produto antes de comprar"
+NOTA_MIN, VENDAS_MIN = 4.5, 500  # prova social só quando é boa notícia de verdade
+
+
+def selo_linha(item: dict) -> str:
+    t = _norm(item.get("selo") or "")
+    return next((frase for chave, frase in SELOS if chave in t), "")
+
+
+def preco_de(item: dict) -> float | None:
+    """Preço "de" que o Mercado Livre mostra riscado, se for mesmo maior que o atual."""
+    try:
+        de, atual = float(item.get("preco_de") or 0), float(item["preco"])
+    except (TypeError, ValueError):
+        return None
+    return de if de > atual * 1.03 else None
+
+
+def vendas_txt(v) -> str:
+    v = int(v or 0)
+    if v < 500:
+        return ""
+    return f"+{v // 1000} mil" if v >= 5000 else f"+{v}"
+
+
+def prova_social(item: dict) -> str:
+    try:
+        nota, vendas = float(item.get("nota") or 0), int(item.get("vendas") or 0)
+    except (TypeError, ValueError):
+        return ""
+    if nota < NOTA_MIN or vendas < VENDAS_MIN:
+        return ""
+    return f"⭐ {nota:.1f} · {vendas_txt(vendas)} vendidos".replace(".", ",", 1)
+
+
+def prova_de_preco(item: dict, sem_baixa: bool = False) -> str:
+    """Frase SÓ com o que o histórico de preços da ThyfIA comprova (nunca inventa desconto). Vazio se não houver.
+    `sem_baixa`: a mensagem já mostra o "de/por" do Mercado Livre; então não repete a queda."""
     pct, ref = item.get("queda_pct") or 0, item.get("preco_ref")
-    if pct >= 5 and ref:
+    if pct >= 5 and ref and not sem_baixa:
         return f"\n📉 Baixou {round(pct)}% (já esteve ~R$ {preco_br(ref)})"
     if item.get("menor_preco"):
         return "\n⭐ Menor preço que registramos"
@@ -97,17 +136,38 @@ def compor(item: dict, estilo: str = "variado", semente: int = 0, variante: str 
     layout = rnd.choice("ABC")
     if variante in ("A", "B", "C"):
         layout = variante
-    prova = prova_de_preco(item)
+    de = preco_de(item)
+    de_txt = preco_br(de) if de else ""
+    prova = prova_de_preco(item, sem_baixa=bool(de))
+    cond = CONDICOES.get(item.get("condicao") or "", "")
+    pct = item.get("desconto_pct")
+    pct_txt = f" ({int(pct)}% OFF)" if de and pct and 5 <= int(pct) <= 90 else ""
+    selo = selo_linha(item)
+    extras = [x for x in (prova_social(item), AVISO_CUPOM if item.get("condicao") == "cupom" else "") if x]
+    extra = "".join(f"\n{x}" for x in extras)
+    topo = f"\n{selo}" if selo else ""
 
     if layout == "A":
-        wa = f"{gancho}\n\n{emoji} *{titulo}*\n\n💰 Por *R$ {preco}*{prova}\n\n_{AVISO}_\n👉 {link}"
+        preco_wa = (f"💰 De ~R$ {de_txt}~ por *R$ {preco}*" if de else f"💰 Por *R$ {preco}*") + cond + pct_txt
+        wa = f"{gancho}\n\n{emoji} *{titulo}*{topo}\n\n{preco_wa}{prova}{extra}\n\n_{AVISO}_\n👉 {link}"
     elif layout == "B":
-        wa = f"{gancho}\n\n*{titulo}*\n💰 R$ {preco}{prova}\n\n_{AVISO}_\n🛒 Compre aqui: {link}"
+        preco_wa = (f"💰 ~R$ {de_txt}~ ➜ R$ {preco}" if de else f"💰 R$ {preco}") + cond + pct_txt
+        wa = f"{gancho}\n\n*{titulo}*{topo}\n{preco_wa}{prova}{extra}\n\n_{AVISO}_\n🛒 Compre aqui: {link}"
     else:
-        wa = f"{emoji} {gancho}\n*{titulo}*\n\nPor apenas *R$ {preco}*{prova} 👇\n{link}\n\n_{AVISO}_"
+        preco_wa = (f"De ~R$ {de_txt}~ por apenas *R$ {preco}*" if de else f"Por apenas *R$ {preco}*") + cond + pct_txt
+        wa = f"{emoji} {gancho}\n*{titulo}*{topo}\n\n{preco_wa}{prova}{extra} 👇\n{link}\n\n_{AVISO}_"
 
     esc = html.escape
-    corpo = {"A": f"{esc(gancho)}\n\n{emoji} <b>{esc(titulo)}</b>\n\n💰 Por <b>R$ {preco}</b>{esc(prova)}",
-             "B": f"{esc(gancho)}\n\n<b>{esc(titulo)}</b>\n💰 R$ {preco}{esc(prova)}",
-             "C": f"{emoji} {esc(gancho)}\n<b>{esc(titulo)}</b>\n\nPor apenas <b>R$ {preco}</b>{esc(prova)} 👇"}[layout]
+    topo_h = f"\n{esc(selo)}" if selo else ""
+    extra_h = "".join(f"\n{esc(x)}" for x in extras)
+    fim = esc(cond + pct_txt) + esc(prova) + extra_h
+    if layout == "A":
+        p_h = (f"💰 De <s>R$ {de_txt}</s> por <b>R$ {preco}</b>" if de else f"💰 Por <b>R$ {preco}</b>")
+        corpo = f"{esc(gancho)}\n\n{emoji} <b>{esc(titulo)}</b>{topo_h}\n\n{p_h}{fim}"
+    elif layout == "B":
+        p_h = (f"💰 <s>R$ {de_txt}</s> ➜ R$ {preco}" if de else f"💰 R$ {preco}")
+        corpo = f"{esc(gancho)}\n\n<b>{esc(titulo)}</b>{topo_h}\n{p_h}{fim}"
+    else:
+        p_h = (f"De <s>R$ {de_txt}</s> por apenas <b>R$ {preco}</b>" if de else f"Por apenas <b>R$ {preco}</b>")
+        corpo = f"{emoji} {esc(gancho)}\n<b>{esc(titulo)}</b>{topo_h}\n\n{p_h}{fim} 👇"
     return {"texto": wa, "html": f"{corpo}\n\n<i>{esc(AVISO)}</i>", "titulo": titulo, "preco": preco, "layout": layout}
