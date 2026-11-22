@@ -944,3 +944,21 @@ button { cursor: pointer; background: none; border: 0; }
 .pl-linha .pl-t { flex: 1 1 200px; min-width: 0; overflow-wrap: anywhere; }
 .pl-linha .pl-q { color: var(--texto-2); font-size: 12.5px; }
 .pl-vazio { color: var(--texto-2); font-size: 14px; margin: 0; }
+
+/* Piloto — WhatsApp do cliente (QR) e escolha de grupos */
+.pl-wa-ok { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 6px 0 2px; }
+.pl-qr { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; margin: 10px 0; }
+.pl-qr img { width: 220px; height: 220px; background: #fff; padding: 8px; border-radius: 12px; image-rendering: pixelated; }
+.pl-qr ol { margin: 0; padding-left: 18px; line-height: 1.7; max-width: 280px; }
+.pl-sub { margin: 4px 0 8px; font-size: 1rem; }
+.pl-busca { width: 100%; margin-bottom: 8px; }
+.pl-grupos { display: grid; gap: 6px; max-height: 340px; overflow-y: auto; margin-bottom: 10px; padding-right: 4px; }
+.pl-grupo { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border: 1px solid var(--borda-forte); border-radius: 10px; cursor: pointer; }
+.pl-grupo:has(input:checked) { border-color: var(--ciano); }
+.pl-grupo input:checked + .auto-caixa { background: var(--grad); border-color: transparent; }
+.pl-grupo input:checked + .auto-caixa::after { opacity: 1; transform: scale(1); }
+.pl-grupo input:focus-visible + .auto-caixa { outline: 2px solid var(--ciano); outline-offset: 2px; }
+.pl-grupo input { position: absolute; opacity: 0; }
+.pl-g-nome { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.pl-grupo small { opacity: .65; }
+@media (max-width: 520px) { .pl-qr img { width: 100%; max-width: 260px; height: auto; } }

@@ -278,6 +278,8 @@ def init() -> None:
         "ALTER TABLE config_usuario ADD COLUMN fb_token_cifrado TEXT",
         "ALTER TABLE config_usuario ADD COLUMN fb_page_nome TEXT",
         "ALTER TABLE config_usuario ADD COLUMN fb_validado_em TEXT",
+        # Piloto: NULL = envia pelo número da ThyfIA; preenchido = instância do próprio cliente (QR code)
+        "ALTER TABLE piloto_destinos ADD COLUMN instancia TEXT",
     )
     for sql in migracoes:
         try:

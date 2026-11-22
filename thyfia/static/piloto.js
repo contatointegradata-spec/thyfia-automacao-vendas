@@ -1,7 +1,7 @@
 /* =====================================================================
    ThyfIA — Piloto Automático (carregado depois de planos.js: usa $, $$, api, toast, estado, esc, brl…)
    ===================================================================== */
-const piloto = { dados: null, timer: null, aguardandoCodigo: {} };
+const piloto = { dados: null, timer: null, waTimer: null, qr: "", qrEm: 0, escolhendo: false, grupos: [], sel: new Set(), filtro: "", waAssin: "" };
 
 const PL_TIPOS = {
   whatsapp_grupo: { nome: "Grupo de WhatsApp", rotulo: "Link de convite do grupo", ph: "https://chat.whatsapp.com/…" },
@@ -24,6 +24,7 @@ function plHora(iso) { return iso ? new Date(iso).toLocaleTimeString("pt-BR", { 
 async function abrirPiloto() {
   clearInterval(piloto.timer);
   await carregarPiloto();
+  verificarWhatsapp();
   piloto.timer = setInterval(() => { if (estado.view === "piloto" && !document.hidden) carregarPiloto(true); else if (estado.view !== "piloto") clearInterval(piloto.timer); }, 15000);
 }
 
@@ -59,6 +60,7 @@ function renderPiloto(silencioso) {
   av.hidden = !falta.length;
   if (falta.length) av.textContent = `A ThyfIA ainda não habilitou o envio por ${falta.join(" e ")}. Se for o canal que você quer usar, fale com o suporte.`;
 
+  renderWhatsapp();
   renderDestinos(d);
   if (!silencioso || !$("#form-pl-config").contains(document.activeElement)) preencherRegras(c);
   renderEstoque(d);
@@ -70,11 +72,11 @@ function renderPiloto(silencioso) {
 function renderDestinos(d) {
   const box = $("#pl-destinos");
   if (box.contains(document.activeElement) && document.activeElement.classList.contains("pl-cod")) return;  // não atrapalha quem digita o código
-  if (!d.destinos.length) { box.innerHTML = `<p class="pl-vazio">Nenhum destino ainda. Adicione o primeiro abaixo.</p>`; return; }
+  if (!d.destinos.length) { box.innerHTML = `<p class="pl-vazio">Nenhum destino ainda. Conecte o WhatsApp e escolha seus grupos, ou adicione um Telegram abaixo.</p>`; return; }
   box.innerHTML = d.destinos.map((x) => {
     const t = PL_TIPOS[x.tipo];
     const tag = !x.verificado ? `<span class="pl-tag espera">aguardando código</span>` : x.ativo ? `<span class="pl-tag ok">ativo</span>` : `<span class="pl-tag">desligado</span>`;
-    const exp = x.experimental ? `<span class="pl-tag exp">experimental</span>` : "";
+    const exp = (x.experimental ? `<span class="pl-tag exp">experimental</span>` : "") + (x.proprio ? `<span class="pl-tag">meu WhatsApp</span>` : "");
     const acoes = !x.verificado
       ? `<input class="pl-cod" inputmode="numeric" maxlength="4" placeholder="0000" data-cod="${x.id}" aria-label="Código recebido no destino"><button class="btn btn-primario btn-mini" data-confirmar="${x.id}" type="button"><span class="btn-txt">Confirmar</span><span class="spinner"></span></button>`
       : `<button class="btn btn-fantasma btn-mini" data-alternar="${x.id}" data-ativo="${x.ativo ? 0 : 1}" type="button">${x.ativo ? "Pausar" : "Ligar"}</button>`;
@@ -117,10 +119,129 @@ function atualizarDica() {
   const t = PL_TIPOS[$("#pl-tipo").value], p = piloto.dados?.plataforma || {};
   $("#pl-entrada-rotulo").textContent = t.rotulo; $("#pl-entrada").placeholder = t.ph;
   const tipo = $("#pl-tipo").value;
+  const conectado = piloto.dados?.whatsapp?.estado === "conectado";
   $("#pl-dica").textContent = tipo === "telegram"
     ? `Antes: adicione o bot ${p.bot || "da ThyfIA"} como administrador do canal, com permissão de publicar.`
+    : tipo === "whatsapp_canal" && conectado
+    ? "O canal precisa ser seu (você como administrador) e o ID termina em @newsletter. Como o seu WhatsApp está conectado, não precisa de código."
     : `Antes: adicione o número ${p.numero ? "+" + p.numero : "da ThyfIA"} ao ${tipo === "whatsapp_grupo" ? "grupo" : "canal"} como administrador. Um código de 4 dígitos será enviado lá — digite-o aqui para confirmar.`;
 }
+
+/* ---- WhatsApp do cliente: QR code e escolha de grupos ---- */
+function pararWa() { clearInterval(piloto.waTimer); piloto.waTimer = null; }
+
+async function verificarWhatsapp() {  // pergunta à Evolution se a conexão continua de pé
+  try {
+    const w = await api("/api/piloto/whatsapp");
+    if (piloto.dados) { piloto.dados.whatsapp = w; renderWhatsapp(); }
+  } catch (_) { /* silencioso: o painel mostra o último estado conhecido */ }
+}
+
+function renderWhatsapp(forcar) {
+  const w = piloto.dados.whatsapp, plat = piloto.dados.plataforma, box = $("#pl-wa-corpo");
+  if (piloto.escolhendo && !forcar) return;  // não atrapalha quem está marcando os grupos
+  const nProprios = piloto.dados.destinos.filter((x) => x.proprio && x.tipo === "whatsapp_grupo").length;
+  const assin = [w.estado, w.numero, !!piloto.qr, piloto.qr.slice(-12), nProprios, plat.qr].join("|");
+  if (!forcar && assin === piloto.waAssin) return;
+  piloto.waAssin = assin;
+  if (!plat.qr) { box.innerHTML = `<p class="pl-aviso">A ThyfIA ainda não habilitou a conexão por QR code. Fale com o suporte.</p>`; return; }
+  if (w.estado === "conectado") {
+    pararWa();
+    box.innerHTML = `<div class="pl-wa-ok"><span class="pl-tag ok">conectado</span><b>${w.numero ? "+" + esc(w.numero) : "WhatsApp conectado"}</b></div>
+      <p class="mini">${nProprios ? `O Piloto publica em <b>${nProprios}</b> grupo(s) seu(s).` : "Agora escolha em quais grupos o Piloto vai publicar."}</p>
+      <div class="au-acoes"><button class="btn btn-primario" id="btn-wa-grupos" type="button"><span class="btn-txt">${nProprios ? "Mudar grupos" : "Escolher grupos"}</span><span class="spinner"></span></button>
+      <button class="btn btn-fantasma" id="btn-wa-sair" type="button">Desconectar</button></div>`;
+  } else if (w.estado === "conectando" && piloto.qr) {
+    box.innerHTML = `<div class="pl-qr"><img src="${esc(piloto.qr)}" alt="QR code para conectar o WhatsApp"><ol>
+      <li>Abra o WhatsApp no celular</li><li>Toque em <b>Aparelhos conectados</b></li><li>Toque em <b>Conectar um aparelho</b> e aponte a câmera para o QR code</li></ol></div>
+      <p class="mini">O código se renova sozinho. Esta tela detecta a conexão assim que você ler.</p>
+      <div class="au-acoes"><button class="btn btn-fantasma" id="btn-wa-cancelar" type="button">Cancelar</button></div>`;
+  } else {
+    const caiu = w.estado === "desconectado" && (w.numero || nProprios);
+    box.innerHTML = (caiu ? `<p class="pl-aviso">O seu WhatsApp está desconectado e o Piloto não consegue publicar. Leia o QR code de novo — os seus grupos continuam salvos.</p>` : "")
+      + (w.erro ? `<p class="pl-aviso">${esc(w.erro)}</p>` : "")
+      + `<div class="au-acoes"><button class="btn btn-primario" id="btn-wa-conectar" type="button"><span class="btn-txt">${caiu ? "Reconectar" : "Conectar meu WhatsApp"}</span><span class="spinner"></span></button></div>`;
+  }
+}
+
+async function gerarQr(btn) {
+  if (btn) carregando(btn, true);
+  try {
+    const r = await api("/api/piloto/whatsapp/conectar", { body: {} });
+    piloto.dados.whatsapp = { ...piloto.dados.whatsapp, estado: r.estado, numero: r.numero || piloto.dados.whatsapp.numero };
+    piloto.qr = r.qr || ""; piloto.qrEm = Date.now();
+    renderWhatsapp(true);
+    if (r.estado === "conectado") { await carregarPiloto(); return abrirGrupos(); }
+    iniciarVigiaQr();
+  } catch (err) { plMsg(err.message, "erro"); } finally { if (btn) carregando(btn, false); }
+}
+
+function iniciarVigiaQr() {
+  pararWa();
+  piloto.waTimer = setInterval(async () => {
+    if (estado.view !== "piloto") return pararWa();
+    try {
+      if (Date.now() - piloto.qrEm > 40000) {  // o QR do WhatsApp vence em ~1 min: renova
+        const r = await api("/api/piloto/whatsapp/conectar", { body: {} });
+        piloto.qrEm = Date.now();
+        if (r.estado !== "conectado") { piloto.qr = r.qr || piloto.qr; renderWhatsapp(true); return; }
+      }
+      const w = await api("/api/piloto/whatsapp");
+      piloto.dados.whatsapp = w;
+      if (w.estado === "conectado") { pararWa(); piloto.qr = ""; plMsg("WhatsApp conectado!", "ok"); await carregarPiloto(); abrirGrupos(); }
+    } catch (_) { /* tenta de novo no próximo ciclo */ }
+  }, 3000);
+}
+
+async function abrirGrupos() {
+  const btn = $("#btn-wa-grupos"); if (btn) carregando(btn, true);
+  try {
+    piloto.grupos = await api("/api/piloto/whatsapp/grupos");
+    piloto.sel = new Set(piloto.grupos.filter((g) => g.selecionado).map((g) => g.jid));
+    piloto.filtro = ""; piloto.escolhendo = true;
+    $("#pl-wa-corpo").innerHTML = `<h4 class="pl-sub">Em quais grupos o Piloto publica?</h4>
+      <input type="text" id="pl-g-busca" class="pl-busca" placeholder="Buscar grupo…" autocomplete="off" aria-label="Buscar grupo">
+      <div id="pl-g-lista" class="pl-grupos"></div>
+      <div class="au-acoes"><button class="btn btn-primario" id="btn-g-salvar" type="button"><span class="btn-txt">Salvar grupos</span><span class="spinner"></span></button>
+      <button class="btn btn-fantasma" id="btn-g-cancelar" type="button">Cancelar</button></div>`;
+    renderGrupos();
+  } catch (err) { plMsg(err.message, "erro"); } finally { if (btn) carregando(btn, false); }
+}
+
+function renderGrupos() {
+  const f = piloto.filtro.toLowerCase();
+  const lista = piloto.grupos.filter((g) => !f || g.nome.toLowerCase().includes(f));
+  $("#pl-g-lista").innerHTML = lista.length ? lista.map((g) =>
+    `<label class="pl-grupo"><input type="checkbox" data-jid="${esc(g.jid)}" ${piloto.sel.has(g.jid) ? "checked" : ""}><span class="auto-caixa" aria-hidden="true"></span><span class="pl-g-nome">${esc(g.nome)}</span>${g.tamanho ? `<small>${g.tamanho} membros</small>` : ""}</label>`).join("")
+    : `<p class="pl-vazio">${piloto.grupos.length ? "Nenhum grupo com esse nome." : "Não encontrei grupos neste WhatsApp."}</p>`;
+  $("#btn-g-salvar .btn-txt").textContent = `Salvar grupos (${piloto.sel.size})`;
+}
+
+$("#pl-wa-corpo").addEventListener("click", async (e) => {
+  const b = e.target.closest("button"); if (!b) return;
+  if (b.id === "btn-wa-conectar") gerarQr(b);
+  else if (b.id === "btn-wa-cancelar") { pararWa(); piloto.qr = ""; renderWhatsapp(true); }
+  else if (b.id === "btn-wa-grupos") abrirGrupos();
+  else if (b.id === "btn-g-cancelar") { piloto.escolhendo = false; renderWhatsapp(true); }
+  else if (b.id === "btn-g-salvar") {
+    carregando(b, true);
+    try {
+      piloto.dados.destinos = await api("/api/piloto/whatsapp/grupos", { method: "PUT", body: { jids: [...piloto.sel] } });
+      piloto.escolhendo = false; plMsg(piloto.sel.size ? "Grupos salvos. O Piloto já pode publicar neles." : "Nenhum grupo selecionado.", "ok");
+      await carregarPiloto(); renderWhatsapp(true);
+    } catch (err) { plMsg(err.message, "erro"); carregando(b, false); }
+  } else if (b.id === "btn-wa-sair") {
+    if (!confirm("Desconectar o seu WhatsApp? O Piloto para de publicar nos seus grupos até você ler o QR de novo.")) return;
+    try { await api("/api/piloto/whatsapp/desconectar", { body: {} }); piloto.qr = ""; await carregarPiloto(); renderWhatsapp(true); }
+    catch (err) { plMsg(err.message, "erro"); }
+  }
+});
+$("#pl-wa-corpo").addEventListener("change", (e) => {
+  const c = e.target.closest("input[data-jid]"); if (!c) return;
+  c.checked ? piloto.sel.add(c.dataset.jid) : piloto.sel.delete(c.dataset.jid);
+  $("#btn-g-salvar .btn-txt").textContent = `Salvar grupos (${piloto.sel.size})`;
+});
+$("#pl-wa-corpo").addEventListener("input", (e) => { if (e.target.id === "pl-g-busca") { piloto.filtro = e.target.value; renderGrupos(); } });
 
 /* ---- ações ---- */
 async function salvarPiloto(corpo, msgOk) {
@@ -142,9 +263,10 @@ $("#form-pl-destino").addEventListener("submit", async (e) => {
   if (!entrada) return plMsg("Informe o destino.", "erro");
   carregando(btn, true); plMsg("");
   try {
-    await api("/api/piloto/destinos", { body: { tipo: $("#pl-tipo").value, entrada } });
+    const tipo = $("#pl-tipo").value, meu = tipo === "whatsapp_canal" && piloto.dados?.whatsapp?.estado === "conectado";
+    await api("/api/piloto/destinos", { body: { tipo, entrada, meu_numero: meu } });
     $("#pl-entrada").value = "";
-    plMsg("Código enviado ao destino. Abra lá, veja os 4 dígitos e digite aqui em “Confirmar”.", "ok");
+    plMsg(meu ? "Canal adicionado." : "Código enviado ao destino. Abra lá, veja os 4 dígitos e digite aqui em “Confirmar”.", "ok");
     await carregarPiloto();
   } catch (err) { plMsg(err.message, "erro"); } finally { carregando(btn, false); }
 });

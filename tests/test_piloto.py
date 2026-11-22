@@ -30,11 +30,13 @@ class Gravador:
         self.falha_whats: ErroEnvio | None = None
         self.falha_tg: ErroEnvio | None = None
         self.ordem: list[str] = []  # tudo o que foi enviado, na ordem
+        self.instancias: list[str | None] = []  # instância usada em cada envio de WhatsApp
 
-    def whatsapp_enviar(self, jid, texto, imagem=None):
+    def whatsapp_enviar(self, jid, texto, imagem=None, instancia=None):
         if self.falha_whats:
             raise self.falha_whats
         self.whats.append((jid, texto, imagem))
+        self.instancias.append(instancia)
         self.ordem.append(texto)
 
     def telegram_enviar(self, chat, html, imagem, link):
@@ -48,8 +50,9 @@ class Gravador:
         self.texto_tg.append((chat, texto))
         self.ordem.append(texto)
 
-    def whatsapp_texto_privado(self, numero, texto):
+    def whatsapp_texto_privado(self, numero, texto, instancia=None):
         self.whats.append((f"privado:{numero}", texto, None))
+        self.instancias.append(instancia)
 
     def aplicar(self, teste):
         for nome in ("whatsapp_enviar", "telegram_enviar", "telegram_texto", "whatsapp_texto_privado"):
@@ -85,7 +88,7 @@ class Base(tp.Base):
         p = mock.patch.object(piloto, "ESPACO_DESTINOS_S", (10, 10))
         p.start()
         self.addCleanup(p.stop)
-        piloto._ultimo_wa[0] = 0.0
+        piloto._ultimo_wa.clear()
         self.host = tp.HostFalso()
         self.job("j1", "carregador")
 
@@ -456,3 +459,204 @@ def _dt(s):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+G2 = "120363000000000003@g.us"
+G3 = "120363000000000004@g.us"
+
+
+class EvolutionFalsa:
+    """O WhatsApp do cliente: estado da conexão, QR e a lista de grupos dele."""
+
+    def __init__(self):
+        self.estado = "inexistente"
+        self.numero = "5534999990000"
+        self.grupos = [{"jid": GRUPO, "nome": "Achadinhos VIP", "tamanho": 120},
+                       {"jid": G2, "nome": "Família", "tamanho": 12},
+                       {"jid": G3, "nome": "Ofertas Tech", "tamanho": 300}]
+        self.chamadas: list[str] = []
+
+    def wa_estado(self, inst):
+        self.chamadas.append(f"estado:{inst}")
+        return self.estado
+
+    def wa_conectar(self, inst):
+        self.chamadas.append(f"conectar:{inst}")
+        if self.estado == "conectado":
+            return {"estado": "conectado", "qr": ""}
+        self.estado = "conectando"
+        return {"estado": "conectando", "qr": "data:image/png;base64,QR"}
+
+    def wa_numero(self, inst):
+        return self.numero
+
+    def wa_grupos(self, inst):
+        return list(self.grupos)
+
+    def wa_desconectar(self, inst):
+        self.estado = "desconectado"
+
+    def aplicar(self, teste):
+        for nome in ("wa_estado", "wa_conectar", "wa_numero", "wa_grupos", "wa_desconectar"):
+            p = mock.patch.object(envio_canais, nome, getattr(self, nome))
+            p.start()
+            teste.addCleanup(p.stop)
+        return self
+
+
+class TestWhatsappDoCliente(Base):
+    def setUp(self):
+        super().setUp()
+        self.ev = EvolutionFalsa().aplicar(self)
+
+    def conectar(self):
+        piloto.whatsapp_conectar(1)
+        self.ev.estado = "conectado"  # o cliente leu o QR
+
+    def test_qr_e_conexao(self):
+        self.assertEqual(piloto.whatsapp_status(1)["estado"], "nunca")
+        r = piloto.whatsapp_conectar(1)
+        self.assertEqual((r["estado"], r["qr"]), ("conectando", "data:image/png;base64,QR"))
+        self.assertEqual(piloto.whatsapp_status(1)["estado"], "conectando")
+        self.assertIn("conectar:thyfia-u1", self.ev.chamadas)
+        self.ev.estado = "conectado"
+        st = piloto.whatsapp_status(1, atualizar=True)
+        self.assertEqual((st["estado"], st["numero"]), ("conectado", "5534999990000"))
+        self.assertEqual(piloto.whatsapp_conectar(1)["qr"], "")  # já conectado: não pede QR de novo
+
+    def test_numero_do_dono_nao_e_sobrescrito(self):
+        tenant_linha = db.conn()
+        tenant_linha.execute("INSERT OR IGNORE INTO config_usuario (usuario_id) VALUES (1)")
+        tenant_linha.execute("UPDATE config_usuario SET whatsapp_numero='5511888887777' WHERE usuario_id=1")
+        tenant_linha.commit()
+        self.conectar()
+        self.assertEqual(piloto.whatsapp_status(1, atualizar=True)["numero"], "5511888887777")
+
+    def test_grupos_exigem_conexao(self):
+        for f in (lambda: piloto.grupos_whatsapp(1), lambda: piloto.salvar_grupos(1, [GRUPO])):
+            with self.assertRaises(piloto.ErroPiloto) as e:
+                f()
+            self.assertEqual(e.exception.status, 409)
+
+    def test_lista_e_marca_selecionados(self):
+        self.conectar()
+        piloto.salvar_grupos(1, [GRUPO])
+        lista = {g["jid"]: g["selecionado"] for g in piloto.grupos_whatsapp(1)}
+        self.assertEqual(lista, {GRUPO: True, G2: False, G3: False})
+
+    def test_salvar_define_exatamente_a_selecao(self):
+        self.conectar()
+        destinos = piloto.salvar_grupos(1, [GRUPO, G3])
+        self.assertEqual({d["ref"] for d in destinos}, {GRUPO, G3})
+        self.assertTrue(all(d["verificado"] and d["proprio"] for d in destinos))  # sem código de confirmação
+        destinos = piloto.salvar_grupos(1, [G2, G3])  # troca: sai um, entra outro, outro permanece
+        self.assertEqual({d["ref"] for d in destinos}, {G2, G3})
+        self.assertEqual(piloto.salvar_grupos(1, []), [])
+
+    def test_nao_remove_destino_de_outro_tipo_nem_aceita_grupo_alheio(self):
+        self.destino("telegram", "@minhasofertas")
+        self.conectar()
+        destinos = piloto.salvar_grupos(1, [GRUPO])
+        self.assertEqual({d["tipo"] for d in destinos}, {"telegram", "whatsapp_grupo"})
+        with self.assertRaises(piloto.ErroPiloto):
+            piloto.salvar_grupos(1, ["999@g.us"])  # não está no WhatsApp dele
+
+    def test_respeita_limite_total_de_destinos(self):
+        self.conectar()
+        self.ev.grupos = [{"jid": f"{i}@g.us", "nome": f"G{i}", "tamanho": 1} for i in range(piloto.MAX_DESTINOS + 1)]
+        with self.assertRaises(piloto.ErroPiloto):
+            piloto.salvar_grupos(1, [g["jid"] for g in self.ev.grupos])
+
+    def test_envia_pela_instancia_do_cliente(self):
+        self.conectar()
+        piloto.salvar_grupos(1, [GRUPO])
+        self.oferta("Fone Bluetooth", 99.9, 1)
+        self.ligar()
+        self.ciclo()
+        self.assertEqual(piloto.despachar(1, AGORA)["acao"], "enviado")
+        self.assertEqual(self.g.instancias[-1], "thyfia-u1")
+        self.assertEqual(self.g.whats[-1][0], GRUPO)
+
+    def test_destino_pela_plataforma_continua_usando_o_numero_da_thyfia(self):
+        self.destino()  # modelo antigo: código no grupo
+        self.oferta("Fone Bluetooth", 99.9, 1)
+        self.ligar()
+        self.ciclo()
+        piloto.despachar(1, AGORA)
+        self.assertIsNone(self.g.instancias[-1])
+
+    def test_whatsapp_caiu_pausa_e_avisa_o_dono(self):
+        self.conectar()
+        piloto.salvar_grupos(1, [GRUPO])
+        db.conn().execute("UPDATE config_usuario SET whatsapp_numero='5534999990000' WHERE usuario_id=1")
+        db.conn().commit()
+        self.oferta("Fone Bluetooth", 99.9, 1)
+        self.ligar()
+        self.ciclo()
+        self.g.falha_whats = ErroEnvio("connection closed", "conexao")
+        r = piloto.despachar(1, AGORA)
+        self.assertEqual(r["acao"], "pausado")
+        self.assertEqual(piloto.whatsapp_status(1)["estado"], "desconectado")
+        self.assertTrue(any("QR" in t for t in self.g.ordem + [w[1] for w in self.g.whats]))
+        self.assertEqual(db.conn().execute("SELECT status FROM piloto_envios").fetchone()[0], "pendente")
+
+    def test_desconectar(self):
+        self.conectar()
+        piloto.whatsapp_conectar(1)
+        self.assertEqual(piloto.whatsapp_desconectar(1)["estado"], "desconectado")
+
+    def test_avisos_ao_dono_saem_pelo_whatsapp_dele_quando_conectado(self):
+        self.conectar()
+        piloto.whatsapp_status(1, atualizar=True)  # guarda número e estado
+        piloto._avisar(1, "oi")
+        self.assertEqual(self.g.instancias[-1], "thyfia-u1")
+
+    def test_canal_pelo_proprio_numero_dispensa_codigo(self):
+        self.conectar()
+        d = piloto.adicionar_destino(1, "whatsapp_canal", CANAL, "Meu canal", meu_numero=True)
+        self.assertTrue(d["verificado"] and d["proprio"])
+
+
+class TestEvolutionRespostas(unittest.TestCase):
+    """Os leitores aceitam as formas de resposta da Evolution v2 (QR em lugares diferentes)."""
+
+    def resp(self, dados, status=200):
+        r = mock.Mock(status_code=status)
+        r.json.return_value = dados
+        return r
+
+    def setUp(self):
+        for k, v in (("evolution_url", "http://evo"), ("evolution_apikey", "k"), ("evolution_instancia", "plataforma")):
+            p = mock.patch.object(configuracoes, "obter", side_effect=lambda c, _m={"evolution_url": "http://evo",
+                                  "evolution_apikey": "k", "evolution_instancia": "plataforma"}: _m.get(c, ""))
+            p.start()
+            self.addCleanup(p.stop)
+            break
+
+    def test_estado(self):
+        for dados, esperado in (({"instance": {"state": "open"}}, "conectado"),
+                                ({"state": "connecting"}, "conectando"),
+                                ({"instance": {"state": "close"}}, "desconectado")):
+            with mock.patch.object(envio_canais, "_chamar", return_value=self.resp(dados)):
+                self.assertEqual(envio_canais.wa_estado("x"), esperado)
+        with mock.patch.object(envio_canais, "_chamar", return_value=self.resp({}, 404)):
+            self.assertEqual(envio_canais.wa_estado("x"), "inexistente")
+
+    def test_qr_na_criacao_e_no_connect(self):
+        chamadas = [self.resp({}, 404), self.resp({"qrcode": {"base64": "AAA"}, "instance": {}})]
+        with mock.patch.object(envio_canais, "_chamar", side_effect=chamadas):
+            r = envio_canais.wa_conectar("thyfia-u9")
+        self.assertEqual(r, {"estado": "conectando", "qr": "data:image/png;base64,AAA"})
+        chamadas = [self.resp({"instance": {"state": "close"}}), self.resp({"base64": "data:image/png;base64,BBB"})]
+        with mock.patch.object(envio_canais, "_chamar", side_effect=chamadas):
+            self.assertEqual(envio_canais.wa_conectar("thyfia-u9")["qr"], "data:image/png;base64,BBB")
+
+    def test_numero_e_grupos(self):
+        with mock.patch.object(envio_canais, "_chamar", return_value=self.resp(
+                [{"instance": {"owner": "5534999990000:12@s.whatsapp.net"}}])):
+            self.assertEqual(envio_canais.wa_numero("x"), "5534999990000")
+        with mock.patch.object(envio_canais, "_chamar", return_value=self.resp(
+                [{"id": "2@g.us", "subject": "beta", "size": 5}, {"id": "1@g.us", "subject": "Alfa"},
+                 {"id": "x@s.whatsapp.net", "subject": "não é grupo"}])):
+            g = envio_canais.wa_grupos("x")
+        self.assertEqual([x["nome"] for x in g], ["Alfa", "beta"])

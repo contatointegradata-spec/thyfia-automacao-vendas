@@ -30,7 +30,7 @@ from .itens import TZ_SP
 log = logging.getLogger("thyfia.piloto")
 
 TIPOS = ("whatsapp_grupo", "whatsapp_canal", "telegram")
-MAX_DESTINOS = 10
+MAX_DESTINOS = 30
 REPETICAO_DIAS = 14            # a mesma oferta não volta para o mesmo cliente antes disso
 ESTOQUE_BAIXO = 5
 FALHAS_PARA_DESLIGAR = 3
@@ -146,7 +146,7 @@ def salvar_config(uid: int, d: dict) -> dict:
 def _destino_publico(r) -> dict:
     return {"id": r["id"], "tipo": r["tipo"], "ref": r["ref"], "nome": r["nome"], "ativo": bool(r["ativo"]),
             "verificado": bool(r["verificado"]), "falhas": r["falhas"], "erro": r["erro"] or "",
-            "experimental": r["tipo"] == "whatsapp_canal"}
+            "experimental": r["tipo"] == "whatsapp_canal", "proprio": bool(r["instancia"])}
 
 
 def listar_destinos(uid: int) -> list[dict]:
@@ -161,7 +161,7 @@ def _enviar_teste(tipo: str, ref: str, texto: str) -> None:
         envio_canais.whatsapp_enviar(ref, texto)
 
 
-def adicionar_destino(uid: int, tipo: str, entrada: str, nome: str = "") -> dict:
+def adicionar_destino(uid: int, tipo: str, entrada: str, nome: str = "", meu_numero: bool = False) -> dict:
     if tipo not in TIPOS:
         raise ErroPiloto("Tipo de destino inválido.")
     entrada = (entrada or "").strip()
@@ -191,6 +191,14 @@ def adicionar_destino(uid: int, tipo: str, entrada: str, nome: str = "") -> dict
     except ErroEnvio as e:
         raise ErroPiloto(str(e), 502 if e.tipo in ("conexao", "config") else 400)
 
+    if meu_numero and tipo == "whatsapp_canal":
+        inst = _exigir_conectado(uid)
+        c.execute("INSERT INTO piloto_destinos (usuario_id, tipo, ref, nome, verificado, instancia) VALUES (?,?,?,?,1,?) "
+                  "ON CONFLICT(usuario_id, tipo, ref) DO UPDATE SET verificado=1, instancia=excluded.instancia, ativo=1",
+                  (uid, tipo, ref, nome[:80], inst))
+        c.commit()
+        return _destino_publico(c.execute("SELECT * FROM piloto_destinos WHERE usuario_id=? AND tipo=? AND ref=?",
+                                          (uid, tipo, ref)).fetchone())
     codigo = f"{random.randint(0, 9999):04d}"
     existente = c.execute("SELECT * FROM piloto_destinos WHERE usuario_id=? AND tipo=? AND ref=?",
                           (uid, tipo, ref)).fetchone()
@@ -257,6 +265,128 @@ def _destinos_prontos(uid: int):
         "SELECT * FROM piloto_destinos WHERE usuario_id=? AND ativo=1 AND verificado=1 ORDER BY id", (uid,)).fetchall()
 
 
+# --------------------------------------------------------------------------- WhatsApp do cliente (QR code) e grupos
+def instancia_do(uid: int) -> str:
+    return f"thyfia-u{int(uid)}"
+
+
+def _marcar_whatsapp(uid: int, estado: str, numero: str = "") -> None:
+    tenant._linha(uid)
+    c = db.conn()
+    c.execute("UPDATE config_usuario SET whatsapp_instancia=?, whatsapp_status=? WHERE usuario_id=?",
+              (instancia_do(uid), "conectado" if estado == "conectado" else "aguardando" if estado == "conectando"
+               else "desconectado", uid))
+    if numero:  # o dono ainda não informou número: usa o que acabou de conectar (recebe os avisos)
+        c.execute("UPDATE config_usuario SET whatsapp_numero=? WHERE usuario_id=? AND COALESCE(whatsapp_numero,'')=''",
+                  (numero, uid))
+    c.commit()
+
+
+def whatsapp_status(uid: int, atualizar: bool = False) -> dict:
+    """Estado da conexão do WhatsApp do cliente. `atualizar` pergunta à Evolution (senão usa o último conhecido)."""
+    r = tenant._linha(uid)
+    estado = {"conectado": "conectado", "aguardando": "conectando"}.get(r["whatsapp_status"], "desconectado")
+    if not r["whatsapp_instancia"]:
+        estado = "nunca"
+    erro = ""
+    if atualizar and r["whatsapp_instancia"]:
+        try:
+            estado = envio_canais.wa_estado(instancia_do(uid))
+            if estado == "inexistente":
+                estado = "nunca"
+            numero = ""
+            if estado == "conectado":
+                try:
+                    numero = envio_canais.wa_numero(instancia_do(uid))
+                except ErroEnvio:
+                    pass
+            if estado != "nunca":
+                _marcar_whatsapp(uid, estado, numero)
+        except ErroEnvio as e:
+            erro = str(e)
+    r = tenant._linha(uid)
+    return {"estado": estado, "instancia": r["whatsapp_instancia"] or "", "numero": r["whatsapp_numero"] or "",
+            "erro": erro}
+
+
+def whatsapp_conectar(uid: int) -> dict:
+    """Gera o QR code para o cliente ler (cria a instância dele na primeira vez)."""
+    try:
+        r = envio_canais.wa_conectar(instancia_do(uid))
+    except ErroEnvio as e:
+        raise ErroPiloto(str(e), 503 if e.tipo == "config" else 502)
+    numero = ""
+    if r["estado"] == "conectado":
+        try:
+            numero = envio_canais.wa_numero(instancia_do(uid))
+        except ErroEnvio:
+            pass
+    _marcar_whatsapp(uid, r["estado"], numero)
+    if r["estado"] == "conectando" and not r["qr"]:
+        raise ErroPiloto("O QR code ainda não ficou pronto. Tente de novo em alguns segundos.", 503)
+    return {**r, "numero": tenant._linha(uid)["whatsapp_numero"] or ""}
+
+
+def whatsapp_desconectar(uid: int) -> dict:
+    try:
+        envio_canais.wa_desconectar(instancia_do(uid))
+    except ErroEnvio as e:
+        raise ErroPiloto(str(e), 502)
+    _marcar_whatsapp(uid, "desconectado")
+    return whatsapp_status(uid)
+
+
+def _exigir_conectado(uid: int) -> str:
+    inst = instancia_do(uid)
+    try:
+        estado = envio_canais.wa_estado(inst)
+    except ErroEnvio as e:
+        raise ErroPiloto(str(e), 502)
+    if estado != "conectado":
+        raise ErroPiloto("Conecte o seu WhatsApp (QR code) primeiro.", 409)
+    return inst
+
+
+def grupos_whatsapp(uid: int) -> list[dict]:
+    """Grupos do WhatsApp do cliente, com a marca dos que o Piloto já usa."""
+    inst = _exigir_conectado(uid)
+    try:
+        grupos = envio_canais.wa_grupos(inst)
+    except ErroEnvio as e:
+        raise ErroPiloto(str(e), 502)
+    sel = {r["ref"]: r for r in db.conn().execute(
+        "SELECT ref, ativo FROM piloto_destinos WHERE usuario_id=? AND tipo='whatsapp_grupo' AND instancia=?",
+        (uid, inst))}
+    return [{**g, "selecionado": g["jid"] in sel} for g in grupos]
+
+
+def salvar_grupos(uid: int, jids: list[str]) -> list[dict]:
+    """Define EXATAMENTE quais grupos do WhatsApp do cliente o Piloto usa (adiciona e remove)."""
+    inst = _exigir_conectado(uid)
+    try:
+        todos = {g["jid"]: g["nome"] for g in envio_canais.wa_grupos(inst)}
+    except ErroEnvio as e:
+        raise ErroPiloto(str(e), 502)
+    jids = list(dict.fromkeys(jids))
+    fora = [j for j in jids if j not in todos]  # só vale grupo que está mesmo no WhatsApp do cliente
+    if fora:
+        raise ErroPiloto("Algum grupo escolhido não está no seu WhatsApp. Atualize a lista e tente de novo.")
+    c = db.conn()
+    outros = c.execute("SELECT COUNT(*) FROM piloto_destinos WHERE usuario_id=? AND NOT (tipo='whatsapp_grupo' "
+                       "AND instancia=?)", (uid, inst)).fetchone()[0]
+    if outros + len(jids) > MAX_DESTINOS:
+        raise ErroPiloto(f"O limite é de {MAX_DESTINOS} destinos no total.")
+    marcas = ",".join("?" * len(jids)) or "''"
+    c.execute(f"DELETE FROM piloto_destinos WHERE usuario_id=? AND tipo='whatsapp_grupo' AND instancia=? "
+              f"AND ref NOT IN ({marcas})", (uid, inst, *jids))
+    for j in jids:  # o grupo é do WhatsApp do cliente: dispensa o código de confirmação
+        c.execute("INSERT INTO piloto_destinos (usuario_id, tipo, ref, nome, verificado, instancia) "
+                  "VALUES (?,?,?,?,1,?) ON CONFLICT(usuario_id, tipo, ref) DO UPDATE SET nome=excluded.nome, "
+                  "verificado=1, instancia=excluded.instancia", (uid, "whatsapp_grupo", j, todos[j][:80], inst))
+    c.commit()
+    return listar_destinos(uid)
+
+
 # --------------------------------------------------------------------------- curadoria (Cérebro)
 _BLOQ = ("enviado", "pendente", "aguardando", "pulado")
 
@@ -319,9 +449,10 @@ def _enviados_hoje(uid: int, agora: datetime) -> int:
 def _avisar(uid: int, texto: str) -> None:
     """Mensagem ao dono, no WhatsApp pessoal dele (se ele informou o número). Nunca derruba o ciclo."""
     try:
-        numero = tenant._linha(uid)["whatsapp_numero"]
-        if numero:
-            envio_canais.whatsapp_texto_privado(numero, texto)
+        r = tenant._linha(uid)
+        if r["whatsapp_numero"]:
+            propria = r["whatsapp_instancia"] if r["whatsapp_status"] == "conectado" else None
+            envio_canais.whatsapp_texto_privado(r["whatsapp_numero"], texto, propria)
     except Exception:
         log.warning("Piloto: não consegui avisar o cliente %s.", uid)
 
@@ -401,7 +532,7 @@ def _pausar(uid: int, agora: datetime, minutos: int, motivo: str) -> None:
 
 
 _gate = threading.Lock()
-_ultimo_wa = [0.0]
+_ultimo_wa: dict[str, float] = {}
 
 
 def despachar(uid: int, agora: datetime | None = None) -> dict:
@@ -417,7 +548,7 @@ def despachar(uid: int, agora: datetime | None = None) -> dict:
     if pausa and agora < pausa:
         return {"acao": "pausado"}
     e = c.execute(
-        "SELECT e.*, d.tipo, d.ref, d.ativo d_ativo, d.nome d_nome FROM piloto_envios e "
+        "SELECT e.*, d.tipo, d.ref, d.ativo d_ativo, d.nome d_nome, d.instancia FROM piloto_envios e "
         "JOIN piloto_destinos d ON d.id = e.destino_id WHERE e.usuario_id=? AND e.status='pendente' "
         "AND e.enviar_apos <= ? ORDER BY e.id LIMIT 1", (uid, _iso(agora))).fetchone()
     if not e:
@@ -428,12 +559,13 @@ def despachar(uid: int, agora: datetime | None = None) -> dict:
         return {"acao": "pulado"}
     whats = e["tipo"] != "telegram"
     with _gate:
-        if whats and time.monotonic() - _ultimo_wa[0] < GAP_GLOBAL_S:
+        chave_gap = e["instancia"] or "plataforma"
+        if whats and time.monotonic() - _ultimo_wa.get(chave_gap, 0.0) < GAP_GLOBAL_S:
             return {"acao": "aguardando_gap"}
         try:
             if whats:
-                envio_canais.whatsapp_enviar(e["ref"], e["texto"], e["imagem"])
-                _ultimo_wa[0] = time.monotonic()
+                envio_canais.whatsapp_enviar(e["ref"], e["texto"], e["imagem"], e["instancia"])
+                _ultimo_wa[chave_gap] = time.monotonic()
             else:
                 envio_canais.telegram_enviar(e["ref"], e["html"], e["imagem"], e["link"])
         except ErroEnvio as err:
@@ -453,7 +585,11 @@ def _tratar_erro(uid: int, e, err: ErroEnvio, agora: datetime) -> dict:
                   (_iso(agora + timedelta(seconds=max(err.espera_s, 5) + 2)), e["id"]))
         c.commit()
         return {"acao": "adiado", "espera_s": err.espera_s}
-    if err.tipo in ("conexao", "config"):  # problema da plataforma, não do cliente: pausa e tenta depois
+    if err.tipo in ("conexao", "config"):  # problema de conexão/configuração: pausa e tenta depois
+        if e["instancia"] and err.tipo == "conexao":
+            _marcar_whatsapp(uid, "desconectado")
+            _avisar(uid, "⚠️ ThyfIA — o seu WhatsApp saiu do ar e o Piloto pausou. Abra o painel, vá em "
+                         "Piloto Automático e leia o QR code de novo.")
         _pausar(uid, agora, PAUSA_CONEXAO_MIN, str(err))
         return {"acao": "pausado", "motivo": str(err)}
     c.execute("UPDATE piloto_envios SET status='erro', erro=? WHERE id=?", (str(err)[:300], e["id"]))
@@ -527,6 +663,7 @@ def status(uid: int) -> dict:
         "d.nome destino_nome, d.tipo destino_tipo, d.ref destino_ref FROM piloto_envios e "
         "LEFT JOIN piloto_destinos d ON d.id=e.destino_id WHERE e.usuario_id=? ORDER BY e.id DESC LIMIT 15", (uid,))]
     plataforma = {
+        "qr": bool(configuracoes.obter("evolution_url") and configuracoes.obter("evolution_apikey")),
         "whatsapp": bool(configuracoes.obter("evolution_url") and configuracoes.obter("evolution_apikey")
                          and configuracoes.obter("evolution_instancia")),
         "telegram": bool(configuracoes.obter("telegram_bot_token")),
@@ -534,6 +671,7 @@ def status(uid: int) -> dict:
         "bot": configuracoes.obter("telegram_bot"),
     }
     return {"config": cfg, "destinos": listar_destinos(uid), "plataforma": plataforma,
+            "whatsapp": whatsapp_status(uid),
             "estoque": {"total": len(estoque), "baixo": len(estoque) < ESTOQUE_BAIXO,
                         "proximas": [{"titulo": o["titulo"], "preco": o["preco"], "busca": o["busca"],
                                       "pontos": o["pontos"], "motivos": o["motivos"]} for o in estoque[:5]]},
