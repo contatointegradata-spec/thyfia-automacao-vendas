@@ -11,7 +11,7 @@ from fastapi import HTTPException
 
 from tests import test_publicacao as tp
 from thyfia import app as app_mod
-from thyfia import cerebro, configuracoes, db, envio_canais, mensagens, piloto, planos
+from thyfia import cerebro, configuracoes, db, envio_canais, mensagens, nichos, piloto, planos
 from thyfia.envio_canais import ErroEnvio
 from thyfia.itens import TZ_SP
 
@@ -30,11 +30,13 @@ class Gravador:
         self.falha_whats: ErroEnvio | None = None
         self.falha_tg: ErroEnvio | None = None
         self.ordem: list[str] = []  # tudo o que foi enviado, na ordem
+        self.instancias: list[str | None] = []  # instância usada em cada envio de WhatsApp
 
-    def whatsapp_enviar(self, jid, texto, imagem=None):
+    def whatsapp_enviar(self, jid, texto, imagem=None, instancia=None):
         if self.falha_whats:
             raise self.falha_whats
         self.whats.append((jid, texto, imagem))
+        self.instancias.append(instancia)
         self.ordem.append(texto)
 
     def telegram_enviar(self, chat, html, imagem, link):
@@ -48,8 +50,9 @@ class Gravador:
         self.texto_tg.append((chat, texto))
         self.ordem.append(texto)
 
-    def whatsapp_texto_privado(self, numero, texto):
+    def whatsapp_texto_privado(self, numero, texto, instancia=None):
         self.whats.append((f"privado:{numero}", texto, None))
+        self.instancias.append(instancia)
 
     def aplicar(self, teste):
         for nome in ("whatsapp_enviar", "telegram_enviar", "telegram_texto", "whatsapp_texto_privado"):
@@ -70,8 +73,8 @@ class Base(tp.Base):
     def setUp(self):
         super().setUp()
         c = db.conn()
-        for t in ("piloto_envios", "piloto_destinos", "piloto_config", "assinaturas", "config_usuario",
-                  "produtos", "termos"):
+        for t in ("piloto_cliques", "piloto_envios", "piloto_destinos", "piloto_config", "assinaturas", "config_usuario",
+                  "produtos", "termos", "cerebro_bandit", "nicho_busca", "preco_historico", "nb_tokens", "nb_docs"):
             c.execute(f"DELETE FROM {t}")
         c.commit()
         self.g = Gravador().aplicar(self)
@@ -85,7 +88,7 @@ class Base(tp.Base):
         p = mock.patch.object(piloto, "ESPACO_DESTINOS_S", (10, 10))
         p.start()
         self.addCleanup(p.stop)
-        piloto._ultimo_wa[0] = 0.0
+        piloto._ultimo_wa.clear()
         self.host = tp.HostFalso()
         self.job("j1", "carregador")
 
@@ -456,3 +459,375 @@ def _dt(s):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+G2 = "120363000000000003@g.us"
+G3 = "120363000000000004@g.us"
+
+
+class EvolutionFalsa:
+    """O WhatsApp do cliente: estado da conexão, QR e a lista de grupos dele."""
+
+    def __init__(self):
+        self.estado = "inexistente"
+        self.numero = "5534999990000"
+        self.grupos = [{"jid": GRUPO, "nome": "Achadinhos VIP", "tamanho": 120},
+                       {"jid": G2, "nome": "Família", "tamanho": 12},
+                       {"jid": G3, "nome": "Ofertas Tech", "tamanho": 300}]
+        self.chamadas: list[str] = []
+
+    def wa_estado(self, inst):
+        self.chamadas.append(f"estado:{inst}")
+        return self.estado
+
+    def wa_conectar(self, inst):
+        self.chamadas.append(f"conectar:{inst}")
+        if self.estado == "conectado":
+            return {"estado": "conectado", "qr": ""}
+        self.estado = "conectando"
+        return {"estado": "conectando", "qr": "data:image/png;base64,QR"}
+
+    def wa_numero(self, inst):
+        return self.numero
+
+    def wa_grupos(self, inst):
+        return list(self.grupos)
+
+    def wa_desconectar(self, inst):
+        self.estado = "desconectado"
+
+    def aplicar(self, teste):
+        for nome in ("wa_estado", "wa_conectar", "wa_numero", "wa_grupos", "wa_desconectar"):
+            p = mock.patch.object(envio_canais, nome, getattr(self, nome))
+            p.start()
+            teste.addCleanup(p.stop)
+        return self
+
+
+class TestWhatsappDoCliente(Base):
+    def setUp(self):
+        super().setUp()
+        self.ev = EvolutionFalsa().aplicar(self)
+
+    def conectar(self):
+        piloto.whatsapp_conectar(1)
+        self.ev.estado = "conectado"  # o cliente leu o QR
+
+    def test_qr_e_conexao(self):
+        self.assertEqual(piloto.whatsapp_status(1)["estado"], "nunca")
+        r = piloto.whatsapp_conectar(1)
+        self.assertEqual((r["estado"], r["qr"]), ("conectando", "data:image/png;base64,QR"))
+        self.assertEqual(piloto.whatsapp_status(1)["estado"], "conectando")
+        self.assertIn("conectar:thyfia-u1", self.ev.chamadas)
+        self.ev.estado = "conectado"
+        st = piloto.whatsapp_status(1, atualizar=True)
+        self.assertEqual((st["estado"], st["numero"]), ("conectado", "5534999990000"))
+        self.assertEqual(piloto.whatsapp_conectar(1)["qr"], "")  # já conectado: não pede QR de novo
+
+    def test_numero_do_dono_nao_e_sobrescrito(self):
+        tenant_linha = db.conn()
+        tenant_linha.execute("INSERT OR IGNORE INTO config_usuario (usuario_id) VALUES (1)")
+        tenant_linha.execute("UPDATE config_usuario SET whatsapp_numero='5511888887777' WHERE usuario_id=1")
+        tenant_linha.commit()
+        self.conectar()
+        self.assertEqual(piloto.whatsapp_status(1, atualizar=True)["numero"], "5511888887777")
+
+    def test_grupos_exigem_conexao(self):
+        for f in (lambda: piloto.grupos_whatsapp(1), lambda: piloto.salvar_grupos(1, [GRUPO])):
+            with self.assertRaises(piloto.ErroPiloto) as e:
+                f()
+            self.assertEqual(e.exception.status, 409)
+
+    def test_lista_e_marca_selecionados(self):
+        self.conectar()
+        piloto.salvar_grupos(1, [GRUPO])
+        lista = {g["jid"]: g["selecionado"] for g in piloto.grupos_whatsapp(1)}
+        self.assertEqual(lista, {GRUPO: True, G2: False, G3: False})
+
+    def test_salvar_define_exatamente_a_selecao(self):
+        self.conectar()
+        destinos = piloto.salvar_grupos(1, [GRUPO, G3])
+        self.assertEqual({d["ref"] for d in destinos}, {GRUPO, G3})
+        self.assertTrue(all(d["verificado"] and d["proprio"] for d in destinos))  # sem código de confirmação
+        destinos = piloto.salvar_grupos(1, [G2, G3])  # troca: sai um, entra outro, outro permanece
+        self.assertEqual({d["ref"] for d in destinos}, {G2, G3})
+        self.assertEqual(piloto.salvar_grupos(1, []), [])
+
+    def test_nao_remove_destino_de_outro_tipo_nem_aceita_grupo_alheio(self):
+        self.destino("telegram", "@minhasofertas")
+        self.conectar()
+        destinos = piloto.salvar_grupos(1, [GRUPO])
+        self.assertEqual({d["tipo"] for d in destinos}, {"telegram", "whatsapp_grupo"})
+        with self.assertRaises(piloto.ErroPiloto):
+            piloto.salvar_grupos(1, ["999@g.us"])  # não está no WhatsApp dele
+
+    def test_respeita_limite_total_de_destinos(self):
+        self.conectar()
+        self.ev.grupos = [{"jid": f"{i}@g.us", "nome": f"G{i}", "tamanho": 1} for i in range(piloto.MAX_DESTINOS + 1)]
+        with self.assertRaises(piloto.ErroPiloto):
+            piloto.salvar_grupos(1, [g["jid"] for g in self.ev.grupos])
+
+    def test_envia_pela_instancia_do_cliente(self):
+        self.conectar()
+        piloto.salvar_grupos(1, [GRUPO])
+        self.oferta("Fone Bluetooth", 99.9, 1)
+        self.ligar()
+        self.ciclo()
+        self.assertEqual(piloto.despachar(1, AGORA)["acao"], "enviado")
+        self.assertEqual(self.g.instancias[-1], "thyfia-u1")
+        self.assertEqual(self.g.whats[-1][0], GRUPO)
+
+    def test_destino_pela_plataforma_continua_usando_o_numero_da_thyfia(self):
+        self.destino()  # modelo antigo: código no grupo
+        self.oferta("Fone Bluetooth", 99.9, 1)
+        self.ligar()
+        self.ciclo()
+        piloto.despachar(1, AGORA)
+        self.assertIsNone(self.g.instancias[-1])
+
+    def test_whatsapp_caiu_pausa_e_avisa_o_dono(self):
+        self.conectar()
+        piloto.salvar_grupos(1, [GRUPO])
+        db.conn().execute("UPDATE config_usuario SET whatsapp_numero='5534999990000' WHERE usuario_id=1")
+        db.conn().commit()
+        self.oferta("Fone Bluetooth", 99.9, 1)
+        self.ligar()
+        self.ciclo()
+        self.g.falha_whats = ErroEnvio("connection closed", "conexao")
+        r = piloto.despachar(1, AGORA)
+        self.assertEqual(r["acao"], "pausado")
+        self.assertEqual(piloto.whatsapp_status(1)["estado"], "desconectado")
+        self.assertTrue(any("QR" in t for t in self.g.ordem + [w[1] for w in self.g.whats]))
+        self.assertEqual(db.conn().execute("SELECT status FROM piloto_envios").fetchone()[0], "pendente")
+
+    def test_desconectar(self):
+        self.conectar()
+        piloto.whatsapp_conectar(1)
+        self.assertEqual(piloto.whatsapp_desconectar(1)["estado"], "desconectado")
+
+    def test_avisos_ao_dono_saem_pelo_whatsapp_dele_quando_conectado(self):
+        self.conectar()
+        piloto.whatsapp_status(1, atualizar=True)  # guarda número e estado
+        piloto._avisar(1, "oi")
+        self.assertEqual(self.g.instancias[-1], "thyfia-u1")
+
+    def test_canal_pelo_proprio_numero_dispensa_codigo(self):
+        self.conectar()
+        d = piloto.adicionar_destino(1, "whatsapp_canal", CANAL, "Meu canal", meu_numero=True)
+        self.assertTrue(d["verificado"] and d["proprio"])
+
+
+class TestEvolutionRespostas(unittest.TestCase):
+    """Os leitores aceitam as formas de resposta da Evolution v2 (QR em lugares diferentes)."""
+
+    def resp(self, dados, status=200):
+        r = mock.Mock(status_code=status)
+        r.json.return_value = dados
+        return r
+
+    def setUp(self):
+        for k, v in (("evolution_url", "http://evo"), ("evolution_apikey", "k"), ("evolution_instancia", "plataforma")):
+            p = mock.patch.object(configuracoes, "obter", side_effect=lambda c, _m={"evolution_url": "http://evo",
+                                  "evolution_apikey": "k", "evolution_instancia": "plataforma"}: _m.get(c, ""))
+            p.start()
+            self.addCleanup(p.stop)
+            break
+
+    def test_estado(self):
+        for dados, esperado in (({"instance": {"state": "open"}}, "conectado"),
+                                ({"state": "connecting"}, "conectando"),
+                                ({"instance": {"state": "close"}}, "desconectado")):
+            with mock.patch.object(envio_canais, "_chamar", return_value=self.resp(dados)):
+                self.assertEqual(envio_canais.wa_estado("x"), esperado)
+        with mock.patch.object(envio_canais, "_chamar", return_value=self.resp({}, 404)):
+            self.assertEqual(envio_canais.wa_estado("x"), "inexistente")
+
+    def test_qr_na_criacao_e_no_connect(self):
+        chamadas = [self.resp({}, 404), self.resp({"qrcode": {"base64": "AAA"}, "instance": {}})]
+        with mock.patch.object(envio_canais, "_chamar", side_effect=chamadas):
+            r = envio_canais.wa_conectar("thyfia-u9")
+        self.assertEqual(r, {"estado": "conectando", "qr": "data:image/png;base64,AAA"})
+        chamadas = [self.resp({"instance": {"state": "close"}}), self.resp({"base64": "data:image/png;base64,BBB"})]
+        with mock.patch.object(envio_canais, "_chamar", side_effect=chamadas):
+            self.assertEqual(envio_canais.wa_conectar("thyfia-u9")["qr"], "data:image/png;base64,BBB")
+
+    def test_numero_e_grupos(self):
+        with mock.patch.object(envio_canais, "_chamar", return_value=self.resp(
+                [{"instance": {"owner": "5534999990000:12@s.whatsapp.net"}}])):
+            self.assertEqual(envio_canais.wa_numero("x"), "5534999990000")
+        with mock.patch.object(envio_canais, "_chamar", return_value=self.resp(
+                [{"id": "2@g.us", "subject": "beta", "size": 5}, {"id": "1@g.us", "subject": "Alfa"},
+                 {"id": "x@s.whatsapp.net", "subject": "não é grupo"}])):
+            g = envio_canais.wa_grupos("x")
+        self.assertEqual([x["nome"] for x in g], ["Alfa", "beta"])
+
+
+G4 = "120363000000000005@g.us"
+G5 = "120363000000000006@g.us"
+
+
+class TestClassificarNichos(unittest.TestCase):
+    def test_busca_e_titulo(self):
+        c = nichos.classificar
+        self.assertEqual(c("whey protein", "Whey Protein Concentrado 900g"), "fit")
+        self.assertEqual(c("fone bluetooth"), "tech")
+        self.assertEqual(c("air fryer"), "casa")
+        self.assertEqual(c("capacete moto"), "auto")
+        self.assertEqual(c("perfume masculino"), "beleza")
+        self.assertEqual(c("racao cachorro"), "pet")
+        self.assertEqual(c("fraldas"), "bebe")  # plural
+        self.assertEqual(c("furadeira"), "ferramentas")
+
+    def test_frase_e_busca_pesam_mais_que_o_titulo(self):
+        self.assertEqual(nichos.classificar("carregador veicular", "Carregador Turbo 65W"), "auto")
+        self.assertEqual(nichos.classificar("carregador", "Carregador Turbo 65W"), "tech")
+        # o termo que o cliente buscou manda; o título só desempata
+        self.assertEqual(nichos.classificar("garrafa termica", "Garrafa Térmica Academia Treino"), "casa")
+
+    def test_empate_segue_a_ordem_do_catalogo_e_sem_pista_nao_tem_nicho(self):
+        self.assertEqual(nichos.classificar("tenis corrida"), "fit")
+        self.assertIsNone(nichos.classificar("xyz qwerty"))
+        self.assertIsNone(nichos.classificar(""))
+
+    def test_catalogo(self):
+        self.assertEqual(nichos.catalogo()[0]["slug"], "geral")
+        self.assertTrue(nichos.valido("fit") and not nichos.valido("outro"))
+
+
+class TestRoteamentoPorNicho(Base):
+    """Um número, cinco grupos: 2 fit, 1 tech, 1 casa, 1 auto. Cada oferta vai só ao grupo do nicho dela."""
+
+    def setUp(self):
+        super().setUp()
+        self.ev = EvolutionFalsa().aplicar(self)
+        self.ev.grupos += [{"jid": G4, "nome": "Auto Clube", "tamanho": 80}, {"jid": G5, "nome": "Fit 2", "tamanho": 60}]
+        piloto.whatsapp_conectar(1)
+        self.ev.estado = "conectado"
+        self.nichos = {GRUPO: "fit", G5: "fit", G3: "tech", G2: "casa", G4: "auto"}
+        piloto.salvar_grupos(1, list(self.nichos), self.nichos)
+        self.n = 0
+
+    def of(self, titulo, busca, preco=99.9):
+        self.n += 1
+        return self.oferta(titulo, preco, self.n, busca=busca)
+
+    def todas(self):
+        self.of("Whey Protein 900g", "whey protein")
+        self.of("Fone Bluetooth TWS", "fone bluetooth")
+        self.of("Air Fryer 4L", "air fryer")
+        self.of("Capacete Moto Fechado", "capacete moto")
+
+    def por_grupo(self):
+        saida = {}
+        for r in db.conn().execute("SELECT d.ref, e.titulo FROM piloto_envios e JOIN piloto_destinos d ON d.id=e.destino_id"):
+            saida.setdefault(r["ref"], []).append(r["titulo"])
+        return saida
+
+    def test_cada_oferta_vai_so_para_o_nicho_dela(self):
+        self.todas()
+        self.ligar()
+        r = self.ciclo()
+        self.assertEqual((r["acao"], r["destinos"], len(r["ofertas"])), ("planejou", 5, 4))
+        g = self.por_grupo()
+        self.assertEqual(g[GRUPO], g[G5])  # os dois grupos fit recebem a mesma oferta fit
+        self.assertIn("Whey", g[GRUPO][0])
+        self.assertIn("Fone", g[G3][0])
+        self.assertIn("Air Fryer", g[G2][0])
+        self.assertIn("Capacete", g[G4][0])
+        self.assertTrue(all(len(v) == 1 for v in g.values()))  # um por grupo no ciclo
+
+    def test_nicho_sem_oferta_e_pulado_e_avisa_uma_vez(self):
+        self.of("Whey Protein 900g", "whey protein")
+        self.of("Fone Bluetooth TWS", "fone bluetooth")
+        db.conn().execute("UPDATE config_usuario SET whatsapp_numero='5534999990000' WHERE usuario_id=1")
+        db.conn().commit()
+        self.ligar()
+        r = self.ciclo()
+        self.assertEqual(set(r["faltam"]), {"casa", "auto"})
+        self.assertEqual(set(self.por_grupo()), {GRUPO, G5, G3})
+        avisos = [w for w in self.g.whats if w[0].startswith("privado")]
+        self.assertEqual(len(avisos), 1)
+        self.assertIn("Casa e cozinha", avisos[0][1])
+        self.assertIn("Automóveis", avisos[0][1])
+
+    def test_sem_oferta_em_nenhum_nicho_e_sem_estoque(self):
+        self.of("Coisa Qualquer", "xyz qwerty")  # sem nicho: só serviria a grupo "geral"
+        self.ligar()
+        r = self.ciclo()
+        self.assertEqual(r["acao"], "sem_estoque")
+
+    def test_grupo_geral_recebe_a_melhor_das_que_sobraram(self):
+        self.of("Coisa Qualquer", "xyz qwerty", 10)
+        self.todas()
+        piloto.salvar_grupos(1, [*self.nichos, "999@g.us"][:5], self.nichos)  # sem mudança
+        self.ev.grupos.append({"jid": "120363000000000009@g.us", "nome": "Achadinhos", "tamanho": 10})
+        piloto.salvar_grupos(1, [*self.nichos, "120363000000000009@g.us"], self.nichos)
+        self.ligar()
+        r = self.ciclo()
+        self.assertEqual(r["destinos"], 6)
+        self.assertEqual(self.por_grupo()["120363000000000009@g.us"], ["Coisa Qualquer"])
+
+    def test_sem_nichos_continua_mandando_tudo_para_todos(self):
+        db.conn().execute("UPDATE piloto_destinos SET nicho='geral'")
+        db.conn().commit()
+        self.todas()
+        self.ligar()
+        r = self.ciclo()
+        self.assertEqual(len(r["ofertas"]), 1)  # uma oferta só, para todos os grupos (comportamento de antes)
+        self.assertEqual(r["destinos"], 5)
+
+    def test_modo_aprovar_mostra_uma_oferta_por_nicho(self):
+        self.todas()
+        self.ligar(modo="aprovar")
+        self.ciclo()
+        ap = piloto.pendentes_aprovacao(1)
+        self.assertEqual(len(ap), 4)
+        self.assertEqual(sum(a["destinos"] for a in ap), 5)
+
+    def test_limite_diario_vale_por_grupo(self):
+        self.todas()
+        self.ligar(max_dia=1)
+        self.assertEqual(self.ciclo()["acao"], "planejou")
+        db.conn().execute("UPDATE piloto_envios SET status='enviado'")
+        db.conn().execute("UPDATE piloto_config SET proximo_envio=NULL")
+        db.conn().commit()
+        self.assertEqual(self.ciclo(AGORA + timedelta(minutes=30))["acao"], "limite_do_dia")
+
+    def test_mudar_nicho_do_grupo(self):
+        did = next(d["id"] for d in piloto.listar_destinos(1) if d["ref"] == G2)
+        self.assertEqual(piloto.definir_nicho(1, did, "tech")["nicho"], "tech")
+        with self.assertRaises(piloto.ErroPiloto):
+            piloto.definir_nicho(1, did, "inexistente")
+        with self.assertRaises(piloto.ErroPiloto):
+            piloto.definir_nicho(1, 9999, "fit")
+
+    def test_resalvar_grupos_mantem_o_nicho(self):
+        piloto.salvar_grupos(1, list(self.nichos))  # sem mandar nichos
+        atual = {d["ref"]: d["nicho"] for d in piloto.listar_destinos(1)}
+        self.assertEqual(atual, self.nichos)
+        lista = {g["jid"]: g["nicho"] for g in piloto.grupos_whatsapp(1)}
+        self.assertEqual(lista[G3], "tech")
+        with self.assertRaises(piloto.ErroPiloto):
+            piloto.salvar_grupos(1, [GRUPO], {GRUPO: "naoexiste"})
+
+    def test_cobertura_e_relatorio_por_nicho(self):
+        self.of("Whey Protein 900g", "whey protein")
+        cob = {x["nicho"]: (x["grupos"], x["ofertas"]) for x in piloto.cobertura(1)}
+        self.assertEqual(cob, {"fit": (2, 1), "tech": (1, 0), "casa": (1, 0), "auto": (1, 0)})
+        txt = piloto.relatorio_texto(1, AGORA)
+        self.assertIn("Por nicho", txt)
+        self.assertIn("Fit e saúde 1", txt)
+        self.assertIn("Tecnologia 0 ⚠️", txt)
+
+    def test_status_traz_catalogo_e_nicho_das_ofertas(self):
+        self.of("Whey Protein 900g", "whey protein")
+        st = piloto.status(1)
+        self.assertEqual(st["estoque"]["proximas"][0]["nicho"], "fit")
+        self.assertIn("fit", [n["slug"] for n in st["nichos"]])
+        self.assertTrue(all("nicho" in d for d in st["destinos"]))
+
+    def test_destino_telegram_com_nicho(self):
+        d = piloto.adicionar_destino(1, "telegram", "@fitofertas", nicho="fit")
+        self.assertEqual(d["nicho"], "fit")
+        with self.assertRaises(piloto.ErroPiloto):
+            piloto.adicionar_destino(1, "telegram", "@outro", nicho="zzz")

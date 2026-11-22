@@ -185,7 +185,7 @@ function mostrarAuth() {
 }
 
 function trocarAba(aba) {
-  $(".auth-tabs").dataset.ativo = aba;
+  $(".auth-tabs").dataset.abaAtiva = aba;
   $$(".auth-tab").forEach((t) => t.classList.toggle("ativo", t.dataset.tab === aba));
   $(".auth-trilho").classList.toggle("criar", aba === "criar");
   setTimeout(() => $(`#form-${aba === "criar" ? "cadastro" : "login"} input`).focus({ preventScroll: true }), 400);
@@ -1421,6 +1421,7 @@ $("#btn-wa-automacao").addEventListener("click", () => irPara("automacao"));
 
 /* ------------------------------------------------------------------ CÉREBRO */
 async function carregarCerebro() {
+  if (typeof carregarAprendizado === "function") carregarAprendizado();
   try {
     const s = await api("/api/cerebro/stats");
     $$("#stats strong").forEach((el) => contar(el, s[el.dataset.k] || 0));

@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/styles.css?v=8">
+  <link rel="stylesheet" href="/static/styles.css?v=12">
 </head>
 <body>
 
@@ -448,6 +448,8 @@
             <li><b>Filtra</b> produtos que já falharam no programa de afiliados.</li>
             <li><b>Prioriza</b> os produtos que mais geraram link com sucesso.</li>
             <li><b>Sugere</b> termos e buscas relacionadas aprendidas de todos.</li>
+            <li><b>Lembra</b> o preço de cada produto dia a dia e só fala em queda quando ela é real.</li>
+            <li><b>Aprende</b> o nicho de palavras novas e o que o <i>seu</i> público clica, aprova ou ignora.</li>
           </ol>
           <div class="taxa">
             <div class="taxa-anel"><svg viewBox="0 0 120 120"><circle cx="60" cy="60" r="52" class="anel-fundo"/><circle cx="60" cy="60" r="52" class="anel-valor" id="anel-taxa"/></svg><strong id="taxa-num">0%</strong></div>
@@ -455,6 +457,15 @@
           </div>
         </div>
       </div>
+
+      <section class="painel ap-painel" id="ap-painel" hidden>
+      <h3>O que o Cérebro aprendeu <span class="pl-tag" id="ap-fase"></span></h3>
+      <div class="ap-grade">
+        <div><h4>Com o seu público</h4><div id="ap-publico"></div></div>
+        <div><h4>Palavras novas por nicho</h4><div id="ap-palavras"></div></div>
+        <div><h4>Quedas de preço detectadas</h4><div id="ap-quedas"></div></div>
+      </div>
+      </section>
     </div>
 
     <!-- ---------- Meu plano ---------- -->
@@ -589,40 +600,51 @@
         <div id="pl-aprovacao-lista"></div>
       </section>
 
-      <section class="painel au-passo">
+      <section class="painel au-passo" id="pl-wa">
         <div class="au-num">1</div>
         <div class="au-corpo">
-          <h3>Onde divulgar</h3>
-          <p class="muted">Você <b>não conecta o seu WhatsApp</b>. Adicione o número da ThyfIA como <b>administrador</b> do seu grupo ou canal; ele recebe um código lá e você confirma aqui.</p>
-          <p class="pl-aviso" id="pl-aviso-plataforma" hidden></p>
-          <div id="pl-destinos"></div>
-          <form class="pl-novo" id="form-pl-destino" autocomplete="off" novalidate>
-            <label class="pub-campo"><span>Tipo</span>
-              <select id="pl-tipo">
-                <option value="whatsapp_grupo">Grupo de WhatsApp</option>
-                <option value="whatsapp_canal">Canal de WhatsApp (experimental)</option>
-                <option value="telegram">Canal do Telegram</option>
-              </select>
-            </label>
-            <label class="pub-campo pl-grow"><span id="pl-entrada-rotulo">Link de convite do grupo</span>
-              <input type="text" id="pl-entrada" placeholder="https://chat.whatsapp.com/…" autocomplete="off" autocapitalize="none" spellcheck="false">
-            </label>
-            <button class="btn btn-primario" type="submit" id="btn-pl-add"><span class="btn-txt">Adicionar e receber código</span><span class="spinner"></span></button>
-          </form>
-          <p class="mini" id="pl-dica"></p>
+          <h3>Conectar o seu WhatsApp</h3>
+          <p class="muted">Leia o QR code com o seu celular, como no WhatsApp Web. A ThyfIA passa a enxergar os <b>seus grupos</b> e você escolhe em quais o Piloto publica. Também é por ele que você recebe o resumo do dia.</p>
+          <div id="pl-wa-corpo"></div>
         </div>
       </section>
 
       <section class="painel au-passo">
         <div class="au-num">2</div>
         <div class="au-corpo">
+          <h3>Onde divulgar</h3>
+          <p class="muted">Aqui ficam os grupos escolhidos do seu WhatsApp e os outros destinos (Telegram, canal). Dê um <b>nicho</b> a cada um (fit, tech, casa, automóvel…): o Cérebro manda cada oferta só para os grupos do nicho dela. Grupo em “Todos os nichos” recebe o que sobrar. Para um grupo que <b>não está no seu WhatsApp</b>, adicione o número da ThyfIA como administrador; ele recebe um código lá e você confirma aqui.</p>
+          <p class="pl-alerta" id="pl-aviso-plataforma" hidden></p>
+          <div id="pl-cobertura" class="pl-cobertura" hidden></div>
+          <div id="pl-destinos"></div>
+          <form class="pl-novo" id="form-pl-destino" autocomplete="off" novalidate>
+            <label class="pub-campo"><span>Tipo</span>
+              <select id="pl-tipo">
+                <option value="telegram">Canal do Telegram</option>
+                <option value="whatsapp_canal">Canal de WhatsApp (experimental)</option>
+                <option value="whatsapp_grupo">Grupo de WhatsApp fora do meu número (por código)</option>
+              </select>
+            </label>
+            <label class="pub-campo"><span>Nicho</span><select id="pl-nicho-novo"></select></label>
+            <label class="pub-campo pl-grow"><span id="pl-entrada-rotulo">Link de convite do grupo</span>
+              <input type="text" id="pl-entrada" placeholder="https://chat.whatsapp.com/…" autocomplete="off" autocapitalize="none" spellcheck="false">
+            </label>
+            <button class="btn btn-primario" type="submit" id="btn-pl-add"><span class="btn-txt">Adicionar</span><span class="spinner"></span></button>
+          </form>
+          <p class="mini" id="pl-dica"></p>
+        </div>
+      </section>
+
+      <section class="painel au-passo">
+        <div class="au-num">3</div>
+        <div class="au-corpo">
           <h3>Regras do Piloto</h3>
           <form id="form-pl-config" autocomplete="off" novalidate>
-            <div class="pl-grade">
+            <div class="pl-regras">
               <label class="pub-campo"><span>Começa às (h)</span><input type="number" id="pl-hora-ini" min="0" max="23"></label>
               <label class="pub-campo"><span>Termina às (h)</span><input type="number" id="pl-hora-fim" min="1" max="24"></label>
               <label class="pub-campo"><span>Intervalo (min)</span><input type="number" id="pl-intervalo" min="10" max="720"></label>
-              <label class="pub-campo"><span>Máx. ofertas/dia</span><input type="number" id="pl-max-dia" min="1" max="60"></label>
+              <label class="pub-campo"><span>Máx. ofertas/dia por grupo</span><input type="number" id="pl-max-dia" min="1" max="60"></label>
               <label class="pub-campo"><span>Oferta vale por (dias)</span><input type="number" id="pl-validade" min="1" max="30"></label>
               <label class="pub-campo"><span>Preço mínimo (R$)</span><input type="number" id="pl-pmin" min="0" step="0.01" placeholder="sem mínimo"></label>
               <label class="pub-campo"><span>Preço máximo (R$)</span><input type="number" id="pl-pmax" min="0" step="0.01" placeholder="sem máximo"></label>
@@ -639,6 +661,10 @@
             <label class="auto-envio au-auto">
               <input type="checkbox" id="pl-relatorio"><span class="auto-caixa" aria-hidden="true"></span>
               <span>Receber um <b>resumo do dia</b> no meu WhatsApp (e avisos quando algo precisar de atenção)</span>
+            </label>
+            <label class="auto-envio au-auto">
+              <input type="checkbox" id="pl-rastrear"><span class="auto-caixa" aria-hidden="true"></span>
+              <span><b>Medir cliques</b> nas ofertas: o link da mensagem passa pela ThyfIA (e leva direto ao produto, com o seu link de afiliado) e o Cérebro aprende o que o seu público realmente clica.</span>
             </label>
             <div class="au-acoes"><button class="btn btn-primario" type="submit" id="btn-pl-salvar"><span class="btn-txt">Salvar regras</span><span class="spinner"></span></button></div>
           </form>
@@ -814,8 +840,8 @@
   </defs>
 </svg>
 
-<script src="/static/app.js?v=14"></script>
-<script src="/static/planos.js?v=6"></script>
-<script src="/static/piloto.js?v=1"></script>
+<script src="/static/app.js?v=16"></script>
+<script src="/static/planos.js?v=7"></script>
+<script src="/static/piloto.js?v=6"></script>
 </body>
 </html>

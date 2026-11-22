@@ -477,7 +477,7 @@ function abrirConcessao(email) {
 }
 
 document.addEventListener("click", async (e) => {
-  const t = e.target.closest("[data-conceder],[data-revogar],[data-ativo],[data-admin],[data-aba-ir]");
+  const t = e.target.closest("#view-admin :is([data-conceder],[data-revogar],[data-ativo],[data-admin],[data-aba-ir])");
   if (!t) return;
   try {
     if (t.dataset.conceder !== undefined) return abrirConcessao(t.dataset.conceder);

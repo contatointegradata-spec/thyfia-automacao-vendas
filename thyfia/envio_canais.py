@@ -1,9 +1,12 @@
 """
 Envio para os destinos do Piloto Automático — WhatsApp (grupo/canal, via Evolution API) e Telegram.
 
-Modelo: a PLATAFORMA tem um número de WhatsApp (instância da Evolution, configurada pelo admin) e um
-bot do Telegram. O cliente NÃO conecta conta nenhuma: ele só adiciona esse número como administrador
-do grupo/canal dele. Cada envio é classificado para o Piloto saber o que fazer:
+Dois jeitos de enviar:
+  • WhatsApp do CLIENTE (preferido): ele lê um QR code e a ThyfIA cria uma instância própria dele na Evolution
+    (`thyfia-u{id}`). Os grupos vêm da conta dele e ele escolhe onde o Piloto publica — sem código de confirmação.
+  • Número da PLATAFORMA (instância do admin): o cliente adiciona esse número como administrador do grupo/canal
+    e confirma um código de 4 dígitos. Serve para grupos fora do WhatsApp dele. Telegram usa sempre o bot da ThyfIA.
+Cada envio é classificado para o Piloto saber o que fazer:
     config   → falta configurar (Evolution/Telegram) — para tudo e avisa o admin
     conexao  → instância desconectada / servidor fora — pausa e tenta mais tarde
     destino  → número fora do grupo, grupo/canal inexistente ou sem permissão — conta falha do destino
@@ -30,19 +33,23 @@ class ErroEnvio(Exception):
 
 
 # --------------------------------------------------------------------------- WhatsApp (Evolution)
-def _evolution() -> tuple[str, str, str]:
-    url, chave, inst = (configuracoes.obter(k) for k in ("evolution_url", "evolution_apikey", "evolution_instancia"))
+def _evolution(instancia: str | None = None) -> tuple[str, str, str]:
+    """(url, chave, instância). `instancia` = a do próprio cliente (conectada por QR); vazio = a da ThyfIA."""
+    url, chave = configuracoes.obter("evolution_url"), configuracoes.obter("evolution_apikey")
+    inst = instancia or configuracoes.obter("evolution_instancia")
     if not (url and chave and inst):
         raise ErroEnvio("A Evolution API ainda não foi configurada pelo administrador.", "config")
     return url.rstrip("/"), chave, inst
 
 
-def _chamar(metodo: str, url: str, chave: str, **kw):
+def _chamar(metodo: str, url: str, chave: str, tolerar: tuple[int, ...] = (), **kw):
     try:
         r = requests.request(metodo, url, headers={"apikey": chave, "Content-Type": "application/json"},
                              timeout=TIMEOUT, **kw)
     except requests.RequestException:
         raise ErroEnvio("Não consegui falar com a Evolution API.", "conexao")
+    if r.status_code in tolerar:
+        return r
     if r.status_code in (401, 403):
         raise ErroEnvio("A Evolution API recusou a chave de acesso.", "config")
     if r.status_code >= 500:
@@ -59,8 +66,8 @@ def _chamar(metodo: str, url: str, chave: str, **kw):
     return r
 
 
-def whatsapp_enviar(jid: str, texto: str, imagem: str | None = None) -> None:
-    url, chave, inst = _evolution()
+def whatsapp_enviar(jid: str, texto: str, imagem: str | None = None, instancia: str | None = None) -> None:
+    url, chave, inst = _evolution(instancia)
     base = f"{url}/message"
     ins = quote(inst, safe="")
     if imagem:
@@ -93,9 +100,92 @@ def whatsapp_resolver_convite(entrada: str) -> dict:
     return {"jid": jid, "nome": d.get("subject") or d.get("name") or ""}
 
 
-def whatsapp_texto_privado(numero: str, texto: str) -> None:
+def whatsapp_texto_privado(numero: str, texto: str, instancia: str | None = None) -> None:
     """Aviso/relatório ao dono, no WhatsApp pessoal dele."""
-    whatsapp_enviar(re.sub(r"\D", "", numero), texto)
+    whatsapp_enviar(re.sub(r"\D", "", numero), texto, None, instancia)
+
+
+# --------------------------------------------------------------------------- WhatsApp do cliente (QR code)
+def _json(r) -> dict | list:
+    try:
+        return r.json()
+    except ValueError:
+        return {}
+
+
+def _qr(d) -> str:
+    """Imagem do QR (data URL) a partir da resposta da Evolution, onde quer que ela venha."""
+    if isinstance(d, list):
+        d = d[0] if d else {}
+    for cand in (d, d.get("qrcode") if isinstance(d.get("qrcode"), dict) else {}):
+        b64 = cand.get("base64") or ""
+        if b64:
+            return b64 if b64.startswith("data:") else "data:image/png;base64," + b64
+    return ""
+
+
+def wa_estado(instancia: str) -> str:
+    """conectado | conectando | desconectado | inexistente"""
+    url, chave, inst = _evolution(instancia)
+    r = _chamar("GET", f"{url}/instance/connectionState/{quote(inst, safe='')}", chave, tolerar=(404,))
+    if r.status_code == 404:
+        return "inexistente"
+    d = _json(r)
+    estado = ((d.get("instance") or {}).get("state") or d.get("state") or "") if isinstance(d, dict) else ""
+    return {"open": "conectado", "connecting": "conectando"}.get(estado, "desconectado")
+
+
+def wa_conectar(instancia: str) -> dict:
+    """Cria a instância do cliente (se não existir) e devolve {estado, qr}. QR vazio se já conectado."""
+    url, chave, inst = _evolution(instancia)
+    estado = wa_estado(instancia)
+    if estado == "conectado":
+        return {"estado": "conectado", "qr": ""}
+    qr = ""
+    if estado == "inexistente":
+        r = _chamar("POST", f"{url}/instance/create", chave, tolerar=(403, 409),
+                    data=json.dumps({"instanceName": inst, "qrcode": True, "integration": "WHATSAPP-BAILEYS"}))
+        qr = _qr(_json(r)) if r.status_code < 400 else ""
+    if not qr:
+        r = _chamar("GET", f"{url}/instance/connect/{quote(inst, safe='')}", chave)
+        d = _json(r)
+        if isinstance(d, dict) and ((d.get("instance") or {}).get("state") == "open"):
+            return {"estado": "conectado", "qr": ""}
+        qr = _qr(d)
+    return {"estado": "conectando", "qr": qr}
+
+
+def wa_numero(instancia: str) -> str:
+    """Número (só dígitos) do WhatsApp conectado nesta instância, se a Evolution informar."""
+    url, chave, inst = _evolution(instancia)
+    r = _chamar("GET", f"{url}/instance/fetchInstances", chave, tolerar=(404,), params={"instanceName": inst})
+    d = _json(r)
+    if isinstance(d, list):
+        d = d[0] if d else {}
+    d = d.get("instance", d) if isinstance(d, dict) else {}
+    jid = d.get("ownerJid") or d.get("owner") or ""
+    return re.sub(r"\D", "", str(jid).split("@")[0].split(":")[0])
+
+
+def wa_grupos(instancia: str) -> list[dict]:
+    """Todos os grupos do WhatsApp conectado: [{jid, nome, tamanho}]."""
+    url, chave, inst = _evolution(instancia)
+    r = _chamar("GET", f"{url}/group/fetchAllGroups/{quote(inst, safe='')}", chave, params={"getParticipants": "false"})
+    d = _json(r)
+    if isinstance(d, dict):
+        d = d.get("groups") or d.get("data") or []
+    saida = []
+    for g in d if isinstance(d, list) else []:
+        jid = g.get("id") or ""
+        if str(jid).endswith("@g.us"):
+            saida.append({"jid": jid, "nome": g.get("subject") or g.get("name") or jid,
+                          "tamanho": g.get("size") or len(g.get("participants") or []) or None})
+    return sorted(saida, key=lambda x: x["nome"].lower())
+
+
+def wa_desconectar(instancia: str) -> None:
+    url, chave, inst = _evolution(instancia)
+    _chamar("DELETE", f"{url}/instance/logout/{quote(inst, safe='')}", chave, tolerar=(400, 404))
 
 
 # --------------------------------------------------------------------------- Telegram

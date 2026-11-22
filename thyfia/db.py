@@ -207,6 +207,48 @@ CREATE TABLE IF NOT EXISTS piloto_envios (
 );
 CREATE INDEX IF NOT EXISTS idx_piloto_envios_u ON piloto_envios(usuario_id, status);
 
+-- ===== Aprendizado do Cérebro (sem LLM) =====
+-- histórico diário de preço por produto (dado público): base de "queda real" e "menor preço"
+CREATE TABLE IF NOT EXISTS preco_historico (
+    url   TEXT NOT NULL,
+    dia   TEXT NOT NULL,                                  -- AAAA-MM-DD
+    preco REAL NOT NULL,
+    PRIMARY KEY (url, dia)
+);
+
+-- Naive Bayes do nicho: contagens aprendidas (as palavras-chave do catálogo entram como semente, em código)
+CREATE TABLE IF NOT EXISTS nb_tokens (nicho TEXT NOT NULL, token TEXT NOT NULL, n REAL NOT NULL DEFAULT 0, PRIMARY KEY (nicho, token));
+CREATE TABLE IF NOT EXISTS nb_docs (nicho TEXT PRIMARY KEY, n REAL NOT NULL DEFAULT 0);
+
+-- "esta busca é do nicho X": correção do cliente (vale só para ele e ensina o modelo)
+CREATE TABLE IF NOT EXISTS nicho_busca (
+    usuario_id INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+    busca      TEXT NOT NULL,
+    nicho      TEXT NOT NULL,
+    PRIMARY KEY (usuario_id, busca)
+);
+
+-- o que cada público responde (tentativas/sucessos ponderados) por dimensão: nicho | busca | faixa | variante
+CREATE TABLE IF NOT EXISTS cerebro_bandit (
+    usuario_id INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+    dimensao   TEXT NOT NULL,
+    chave      TEXT NOT NULL,
+    tentativas REAL NOT NULL DEFAULT 0,
+    sucessos   REAL NOT NULL DEFAULT 0,
+    atualizado TEXT,
+    PRIMARY KEY (usuario_id, dimensao, chave)
+);
+
+-- cliques de gente de verdade nos links rastreados (1 por visitante por envio)
+CREATE TABLE IF NOT EXISTS piloto_cliques (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    envio_id   INTEGER NOT NULL REFERENCES piloto_envios(id) ON DELETE CASCADE,
+    usuario_id INTEGER NOT NULL,
+    visitante  TEXT NOT NULL,
+    criado_em  TEXT NOT NULL,
+    UNIQUE (envio_id, visitante)
+);
+
 -- configurações da plataforma (só o admin edita): Kiwify, n8n, Evolution…
 CREATE TABLE IF NOT EXISTS configuracoes (
     chave      TEXT PRIMARY KEY,
@@ -278,6 +320,17 @@ def init() -> None:
         "ALTER TABLE config_usuario ADD COLUMN fb_token_cifrado TEXT",
         "ALTER TABLE config_usuario ADD COLUMN fb_page_nome TEXT",
         "ALTER TABLE config_usuario ADD COLUMN fb_validado_em TEXT",
+        # Piloto: NULL = envia pelo número da ThyfIA; preenchido = instância do próprio cliente (QR code)
+        "ALTER TABLE piloto_destinos ADD COLUMN instancia TEXT",
+        # Nicho do destino: 'geral' recebe tudo; outro slug (fit, tech, casa…) só recebe ofertas daquele nicho
+        "ALTER TABLE piloto_destinos ADD COLUMN nicho TEXT NOT NULL DEFAULT 'geral'",
+        # Piloto: medir cliques (link próprio que redireciona ao de afiliado) e metadados do envio para o aprendizado
+        "ALTER TABLE piloto_config ADD COLUMN rastrear INTEGER NOT NULL DEFAULT 0",
+        "ALTER TABLE piloto_envios ADD COLUMN token TEXT",
+        "ALTER TABLE piloto_envios ADD COLUMN link_real TEXT",
+        "ALTER TABLE piloto_envios ADD COLUMN nicho TEXT",
+        "ALTER TABLE piloto_envios ADD COLUMN variante TEXT",
+        "ALTER TABLE piloto_envios ADD COLUMN avaliado INTEGER NOT NULL DEFAULT 0",
     )
     for sql in migracoes:
         try:

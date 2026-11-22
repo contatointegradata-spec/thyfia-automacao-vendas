@@ -25,7 +25,9 @@ ofertas do cliente ─► Cérebro.curar_ofertas ─► mensagens.compor ─► 
 ```
 - **Cérebro (`cerebro.curar_ofertas`)**: descarta o que a comunidade viu falhar; premia link já validado e busca com boa taxa; premia frescor e preço abaixo da mediana; diversifica categorias. Cada escolha vem com os motivos.
 - **Fila**: `piloto_config` / `piloto_destinos` / `piloto_envios`; agendador próprio (20 s); um envio por chamada; falhas de conexão pausam 30 min; 3 falhas seguidas desligam o destino e avisam o dono.
-- **Destinos com código**: o número da ThyfIA envia um código de 4 dígitos ao destino; só quem lê o destino confirma. Evita apontar para grupo alheio.
+- **WhatsApp do cliente por QR code (preferido)**: o cliente lê o QR no painel; a ThyfIA cria a instância dele na Evolution (`thyfia-u{id}`, `POST /instance/create` com `qrcode:true`, renovação do QR por `GET /instance/connect/{inst}`, estado por `GET /instance/connectionState/{inst}`, número por `GET /instance/fetchInstances?instanceName=`). Em seguida lista os grupos dele (`GET /group/fetchAllGroups/{inst}?getParticipants=false`) e ele marca onde o Piloto publica (`PUT /api/piloto/whatsapp/grupos` define a seleção exata). Grupos do próprio WhatsApp nascem confirmados (sem código). Cada instância tem o seu espaçamento anti-bloqueio. Se a conexão cair, o Piloto pausa, marca "desconectado" e avisa o dono (pelo número da ThyfIA) para ler o QR de novo; os grupos escolhidos ficam salvos.
+- **Destinos com código (alternativa)**: para grupo/canal fora do WhatsApp do cliente, o número da ThyfIA envia um código de 4 dígitos ao destino; só quem lê o destino confirma. Evita apontar para grupo alheio.
+- **Nichos** (`thyfia/nichos.py`): cada destino tem um nicho (`geral`, fit, tech, casa, auto, beleza, moda, pet, bebê, ferramentas). O Cérebro classifica cada oferta pelo termo da busca (peso 3) e pelo título (peso 1), com frases prontas valendo mais ("carregador veicular" → auto, "carregador" → tech). A cada ciclo, `planejar` escolhe a melhor oferta **de cada nicho que tem grupo** (a diversificação de categorias olha só o que saiu para aquele nicho) e a manda só aos grupos dele; grupos `geral` recebem a melhor das que sobraram. Nicho sem oferta é pulado e o dono é avisado (1x/dia, dizendo quais). O limite diário vale **por grupo**. Sem nichos configurados, tudo continua como antes (uma oferta para todos). O painel mostra a cobertura por nicho (grupos × ofertas prontas) e o resumo do dia traz o estoque por nicho.
 - **Plano**: Pro (recurso `automacao`).
 
 ## 4. Auditoria do n8n (workflows 03 e 04)
@@ -41,9 +43,12 @@ ofertas do cliente ─► Cérebro.curar_ofertas ─► mensagens.compor ─► 
 - Resposta real de `group/inviteInfo` da sua versão da Evolution (parser tolerante, mas não testado ao vivo).
 - Envio a `@newsletter` na sua versão.
 - O número da ThyfIA precisa estar conectado na instância e ser admin dos grupos de teste.
+- Formato exato das respostas de `instance/create`, `instance/connect` e `fetchAllGroups` na sua versão da Evolution: os leitores aceitam as variações documentadas (QR em `base64` ou `qrcode.base64`, número em `owner`/`ownerJid`), mas confirme ao vivo com um número de teste. Em v2.4+ a Evolution exige ativação de licença: não atualize às cegas.
+- Risco de banimento do número do cliente (API não oficial, como a Lumi): o ritmo mínimo de 10 min e o espaçamento aleatório existem por isso; vale avisar o cliente no onboarding.
 
 ## 6. Próximas fases
 - **Tratar mensagens** (responder "ainda vale?", remover links de terceiros): webhook de mensagens da Evolution + regras do Cérebro.
-- **Pool de números** (instâncias por destino, já previsto no esquema de envio) para diluir risco de bloqueio.
+- **Pool de números** adicionais por cliente para diluir risco de bloqueio (a coluna `instancia` dos destinos já permite).
+- **Nichos personalizados** e correção manual do nicho de uma oferta; hoje a classificação é por palavras-chave (termo novo sem pista cai em "sem nicho" e só vai a grupo geral). Evolução: aprender o nicho de termos novos pela vizinhança no Cérebro (`cerebro.relacionados`).
 - **Reescrita por LLM** opcional (chave própria), mantendo a regra de não inventar dados.
 - Reposição de estoque: hoje o Piloto avisa; gerar links segue dependendo do navegador do cliente.

@@ -77,6 +77,12 @@ def aprender_busca(termo: str, resultados: list[dict]) -> None:
             (r["url"], t),
         )
     c.commit()
+    try:  # memória de preços e vocabulário de nichos: aprendem junto, sem nunca atrapalhar a busca
+        from . import aprendizado
+        aprendizado.registrar_precos(resultados)
+        aprendizado.auto_treinar(t, resultados)
+    except Exception:
+        pass
 
 
 # --------------------------------------------------------------------------- recuperação
@@ -220,7 +226,7 @@ def _idade_dias(criado_em: str | None, agora: datetime) -> float:
 
 
 def curar_ofertas(ofertas: list[dict], *, ultima_busca: str = "", envios_por_busca: dict[str, int] | None = None,
-                  validade_dias: float = 7, agora: datetime | None = None) -> list[dict]:
+                  validade_dias: float = 7, agora: datetime | None = None, uid: int | None = None) -> list[dict]:
     """Ranqueia as ofertas do cliente para o Piloto Automático. Cada oferta:
     {id, busca, titulo, preco, url_produto, link_afiliado, imagem, criado_em}.
 
@@ -228,7 +234,10 @@ def curar_ofertas(ofertas: list[dict], *, ultima_busca: str = "", envios_por_bus
       • descarta o que a comunidade já viu falhar (produto inelegível ao programa de afiliados);
       • premia produto com link já validado (`gerados`) e busca com boa taxa de sucesso;
       • premia o que está fresco (preço envelhece) e o preço abaixo da mediana da própria busca;
-      • diversifica: evita repetir a categoria do último envio e dá vez à categoria menos usada.
+      • diversifica: evita repetir a categoria do último envio e dá vez à categoria menos usada;
+      • confere o histórico de preços: queda real e "menor preço já visto" ganham pontos (e viram frase na mensagem);
+      • com `uid`: soma o que o público DESTE cliente já mostrou preferir (nicho, busca, faixa de preço), aprendido
+        de cliques medidos e aprovações — com bônus de exploração que decai para não prender em poucos assuntos.
     Devolve cópias com `pontos` e `motivos` (lista de frases), da melhor para a pior."""
     from datetime import timezone
 
@@ -247,6 +256,9 @@ def curar_ofertas(ofertas: list[dict], *, ultima_busca: str = "", envios_por_bus
         ):
             produtos[r["url"]] = r
     termos = {r["termo"]: r for r in c.execute("SELECT termo, links_ok, links_total FROM termos")}
+    from . import aprendizado
+    precos = aprendizado.precos_info(ofertas)
+    bandit = aprendizado.Bandit(uid) if uid is not None else None
 
     por_busca: dict[str, list[float]] = {}
     for o in ofertas:
@@ -286,6 +298,14 @@ def curar_ofertas(ofertas: list[dict], *, ultima_busca: str = "", envios_por_bus
             pontos += min(15 * (1 - float(o["preco"]) / med) * 2, 15)
             motivos.append("preço abaixo da mediana da própria busca")
 
+        info = precos.get(o.get("url_produto")) or {}
+        if info.get("queda_pct"):
+            pontos += min(info["queda_pct"] * 1.2, 20)
+            motivos.append(f"preço caiu {round(info['queda_pct'])}% em relação ao histórico (era ~R$ {info['ref']:.2f})")
+        if info.get("menor"):
+            pontos += 6
+            motivos.append("menor preço que a ThyfIA já registrou para este produto")
+
         if o.get("imagem"):
             pontos += 5
         if ultima and busca == ultima:
@@ -295,6 +315,12 @@ def curar_ofertas(ofertas: list[dict], *, ultima_busca: str = "", envios_por_bus
             pontos += 10
             motivos.append("categoria menos divulgada recentemente")
 
-        saida.append({**o, "pontos": round(pontos, 1), "motivos": motivos})
+        if bandit is not None:
+            extra, mot = aprendizado.bonus(bandit, o)
+            pontos += extra
+            motivos += mot
+        saida.append({**o, "pontos": round(pontos, 1), "motivos": motivos,
+                      "queda_pct": info.get("queda_pct", 0.0), "preco_ref": info.get("ref"),
+                      "menor_preco": bool(info.get("menor"))})
     saida.sort(key=lambda x: (-x["pontos"], -int(x.get("id") or 0)))
     return saida

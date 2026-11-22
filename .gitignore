@@ -12,3 +12,7 @@ __pycache__/
 dados/
 perfil_chrome/
 links_afiliado.xlsx
+
+# QA de layout (gerado)
+qa_capturas/
+qa_resultado*.json
