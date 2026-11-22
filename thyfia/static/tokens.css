@@ -1,0 +1,90 @@
+/* ThyfIA — tokens do Design System (gerado de tokens.json; não editar à mão).
+   Tema Noite é o padrão; o Claro (lavanda) entra com data-theme="claro". */
+@font-face { font-family: "Fredoka"; src: url("/static/fonts/fredoka-latin-500-normal.woff2") format("woff2"); font-weight: 500; font-style: normal; font-display: swap; }
+@font-face { font-family: "Fredoka"; src: url("/static/fonts/fredoka-latin-600-normal.woff2") format("woff2"); font-weight: 600; font-style: normal; font-display: swap; }
+@font-face { font-family: "Fredoka"; src: url("/static/fonts/fredoka-latin-700-normal.woff2") format("woff2"); font-weight: 700; font-style: normal; font-display: swap; }
+@font-face { font-family: "DM Sans"; src: url("/static/fonts/dm-sans-latin-400-normal.woff2") format("woff2"); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: "DM Sans"; src: url("/static/fonts/dm-sans-latin-500-normal.woff2") format("woff2"); font-weight: 500; font-style: normal; font-display: swap; }
+@font-face { font-family: "DM Sans"; src: url("/static/fonts/dm-sans-latin-700-normal.woff2") format("woff2"); font-weight: 700; font-style: normal; font-display: swap; }
+@font-face { font-family: "JetBrains Mono"; src: url("/static/fonts/jetbrains-mono-latin-400-normal.woff2") format("woff2"); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: "JetBrains Mono"; src: url("/static/fonts/jetbrains-mono-latin-500-normal.woff2") format("woff2"); font-weight: 500; font-style: normal; font-display: swap; }
+:root, [data-theme="noite"] {
+  --surface: #0B0B17;
+  --surface-raised: #151528;
+  --surface-sunken: #07070F;
+  --ink: #F2F1FB;
+  --ink-muted: #A6A4C2;
+  --line: #24243F;
+  --line-strong: #6F6D9A;
+  --edge: #B9A9FA;
+  --brand: #7B4DEF;
+  --on-brand: #FFFFFF;
+  --brand-hover: #6A3BE0;
+  --brand-text: #A78BFA;
+  --brand-soft: #2A1F5C;
+  --accent: #22D3EE;
+  --on-accent: #07070F;
+  --accent-ink: #22D3EE;
+  --accent-soft: #0E3340;
+  --success: #34D399;
+  --success-soft: #0F3B33;
+  --danger: #FB7185;
+  --danger-soft: #4A1D2B;
+  --link: #A78BFA;
+  --focus: #67E8F9;
+  --lilac: #E8A6D3;
+  --fur: #A3A8BD;
+  --fur-stripe: #5E637C;
+  --sticker-sm: 0 3px 0 0 #3B1FA8;
+  --sticker-md: 0 5px 0 0 #3B1FA8;
+  --sticker-pressed: 0 1px 0 0 #3B1FA8;
+}
+[data-theme="claro"] {
+  --surface: #F8F6FF;
+  --surface-raised: #FFFFFF;
+  --surface-sunken: #ECE8FB;
+  --ink: #14122B;
+  --ink-muted: #4C4A6E;
+  --line: #DDD7F3;
+  --line-strong: #7B77A6;
+  --edge: #14122B;
+  --brand: #6B3FE0;
+  --on-brand: #FFFFFF;
+  --brand-hover: #5A2FCB;
+  --brand-text: #5B33D1;
+  --brand-soft: #E6DEFC;
+  --accent: #22D3EE;
+  --on-accent: #07070F;
+  --accent-ink: #0B6B80;
+  --accent-soft: #D3F6FC;
+  --success: #0B7A55;
+  --success-soft: #D6F6E8;
+  --danger: #C42B4A;
+  --danger-soft: #FFE1E7;
+  --link: #5B33D1;
+  --focus: #5B33D1;
+  --lilac: #E8A6D3;
+  --fur: #A3A8BD;
+  --fur-stripe: #5E637C;
+  --sticker-sm: 0 3px 0 0 #14122B;
+  --sticker-md: 0 5px 0 0 #14122B;
+  --sticker-pressed: 0 1px 0 0 #14122B;
+}
+:root {
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+  --space-16: 64px;
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 22px;
+  --radius-xl: 32px;
+  --radius-pill: 999px;
+  --font-display: "Fredoka", "Trebuchet MS", system-ui, sans-serif;
+  --font-sans: "DM Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+}
