@@ -124,6 +124,19 @@ code, .mono { font-family: var(--font-mono); }
 .auth-form h2 { font-size: 28px; line-height: 1.2; }
 .auth-form > .muted { margin-top: -8px; margin-bottom: 6px; }
 
+.link-esqueci { align-self: flex-end; margin-top: -4px; padding: 2px 0; font-size: 14px; font-weight: 700; color: var(--brand-text); border-radius: 6px; transition: color .2s; }
+.link-esqueci:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+.link-esqueci:focus-visible { outline: 2px solid var(--edge); outline-offset: 3px; }
+.link-esqueci.voltar { align-self: center; color: var(--ink-muted); }
+.auth-card.modo-solo .auth-tabs, .auth-card.modo-solo .auth-trilho { display: none; }
+.auth-solo { animation: sobe .45s var(--ease); }
+.auth-solo[hidden] { display: none; }
+.auth-solo .auth-form { width: 100%; }
+.auth-solo-ic { width: 52px; height: 52px; display: grid; place-items: center; border-radius: var(--radius-md); background: var(--brand-soft); border: 2px solid var(--edge); box-shadow: var(--sticker-sm); color: var(--ink); }
+.auth-solo-ic .ic { width: 26px; height: 26px; }
+.auth-solo-ic.ok { background: var(--success); border-color: var(--success); color: var(--surface); box-shadow: none; }
+.auth-form[hidden] { display: none; }
+
 .campo { position: relative; display: block; }
 .campo input {
   width: 100%; height: 56px; padding: 22px 46px 8px 16px; border-radius: var(--radius-md);

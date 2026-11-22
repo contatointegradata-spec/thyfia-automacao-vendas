@@ -116,6 +116,15 @@ async function iniciar() {
   await minimo;
   $("#splash").classList.add("sumindo");
   setTimeout(() => $("#splash").remove(), 800);
+  // link do e-mail de redefinição: /?redefinir=TOKEN. O token sai da barra de endereço na hora (não fica no histórico).
+  const t = new URLSearchParams(location.search).get("redefinir");
+  if (t) {
+    history.replaceState(null, "", location.pathname);
+    mostrarAuth();
+    tokenRedefinicao = t;
+    modoAuth("redefinir");
+    return;
+  }
   if (eu) entrarNoApp(eu); else mostrarAuth();
 }
 
@@ -125,8 +134,9 @@ function mostrarAuth() {
   const card = $("#auth-card");
   card.classList.remove("sucesso", "tremendo");
   card.style.animation = "none"; void card.offsetWidth; card.style.animation = "";
-  $$(".auth-form").forEach((f) => { f.reset(); $(".erro-form", f).textContent = ""; carregando($("button[type=submit]", f), false); });
-  $(".forca span").style.width = "0";
+  $$("form.auth-form").forEach((f) => { f.reset(); $(".erro-form", f).textContent = ""; carregando($("button[type=submit]", f), false); });
+  $$(".forca span").forEach((s) => { s.style.width = "0"; });
+  modoAuth("padrao", false);
   mostrarTela("#tela-auth");
 }
 
@@ -151,6 +161,96 @@ $("#form-cadastro [name=senha]").addEventListener("input", (e) => {
   const cores = ["var(--danger)", "var(--danger)", "var(--brand-text)", "var(--accent)", "var(--success)"];
   const s = $(".forca span");
   s.style.width = v ? `${Math.max(12, p * 25)}%` : "0"; s.style.background = cores[p];
+});
+
+/* Esqueci minha senha: a tela do cartão alterna entre entrar/criar (padrão), pedir o link e criar a nova senha */
+let tokenRedefinicao = "";
+function modoAuth(modo, foco = true) {
+  const card = $("#auth-card");
+  card.classList.toggle("modo-solo", modo !== "padrao");
+  $("#auth-esqueci").hidden = modo !== "esqueci";
+  $("#auth-redefinir").hidden = modo !== "redefinir";
+  if (modo === "esqueci") {
+    $("#form-esqueci").hidden = false; $("#esqueci-enviado").hidden = true;
+    carregando($("#form-esqueci button[type=submit]"), false);
+    $("#form-esqueci .erro-form").textContent = "";
+  }
+  if (!foco) return;
+  const alvo = { esqueci: "#form-esqueci input", redefinir: "#form-redefinir input", padrao: "#form-login input" }[modo];
+  setTimeout(() => $(alvo)?.focus({ preventScroll: true }), 350);
+}
+
+$("#btn-esqueci").addEventListener("click", () => {
+  const email = $("#form-login [name=email]").value.trim();
+  modoAuth("esqueci");
+  if (email) $("#form-esqueci [name=email]").value = email;
+});
+$$("[data-voltar]").forEach((b) => b.addEventListener("click", () => {
+  tokenRedefinicao = "";
+  trocarAba("entrar");
+  modoAuth("padrao");
+}));
+
+$("#form-esqueci").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const form = e.target, btn = $("button[type=submit]", form);
+  const email = form.elements.email.value.trim();
+  form.elements.email.closest(".campo").classList.remove("invalido");
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+    form.elements.email.closest(".campo").classList.add("invalido");
+    return erroAuth(form, "Digite um e-mail válido.");
+  }
+  $(".erro-form", form).textContent = "";
+  carregando(btn, true);
+  try {
+    await Promise.all([api("/api/senha/esqueci", { body: { email } }), espera(700)]);
+    $("#esqueci-email").textContent = email;
+    form.hidden = true; $("#esqueci-enviado").hidden = false;
+  } catch (err) {
+    erroAuth(form, err.message);
+  } finally {
+    carregando(btn, false);
+  }
+});
+
+$("#form-redefinir [name=senha]").addEventListener("input", (e) => {
+  const v = e.target.value;
+  let p = 0;
+  if (v.length >= 6) p++; if (v.length >= 10) p++; if (/[A-Z]/.test(v) && /[a-z]/.test(v)) p++; if (/\d/.test(v) && /\W/.test(v)) p++;
+  const cores = ["var(--danger)", "var(--danger)", "var(--brand-text)", "var(--accent)", "var(--success)"];
+  const s = $("#form-redefinir .forca span");
+  s.style.width = v ? `${Math.max(12, p * 25)}%` : "0"; s.style.background = cores[p];
+});
+
+$("#form-redefinir").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const form = e.target, btn = $("button[type=submit]", form);
+  const { senha, confirmar } = Object.fromEntries(new FormData(form));
+  $$(".campo", form).forEach((c) => c.classList.remove("invalido"));
+  if (senha.length < 6) {
+    form.elements.senha.closest(".campo").classList.add("invalido");
+    return erroAuth(form, "A senha precisa ter pelo menos 6 caracteres.");
+  }
+  if (senha !== confirmar) {
+    form.elements.confirmar.closest(".campo").classList.add("invalido");
+    return erroAuth(form, "As duas senhas não são iguais.");
+  }
+  $(".erro-form", form).textContent = "";
+  carregando(btn, true);
+  try {
+    const [r] = await Promise.all([api("/api/senha/redefinir", { body: { token: tokenRedefinicao, senha } }), espera(700)]);
+    tokenRedefinicao = "";
+    form.reset(); $("#form-redefinir .forca span").style.width = "0";
+    trocarAba("entrar");
+    modoAuth("padrao");
+    $("#form-login [name=email]").value = r.email || "";
+    toast("Senha alterada! Entre com a nova senha.", "ok");
+    setTimeout(() => $("#form-login [name=senha]").focus({ preventScroll: true }), 450);
+  } catch (err) {
+    erroAuth(form, err.message);
+  } finally {
+    carregando(btn, false);
+  }
 });
 
 function erroAuth(form, msg) {
