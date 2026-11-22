@@ -92,7 +92,7 @@ function renderDestinos(d) {
     const exp = (x.experimental ? `<span class="pl-tag exp">experimental</span>` : "") + (x.proprio ? `<span class="pl-tag">meu WhatsApp</span>` : "");
     const acoes = !x.verificado
       ? `<input class="pl-cod" inputmode="numeric" maxlength="4" placeholder="0000" data-cod="${x.id}" aria-label="Código recebido no destino"><button class="btn btn-primario btn-mini" data-confirmar="${x.id}" type="button"><span class="btn-txt">Confirmar</span><span class="spinner"></span></button>`
-      : `<button class="btn btn-fantasma btn-mini" data-alternar="${x.id}" data-ativo="${x.ativo ? 0 : 1}" type="button">${x.ativo ? "Pausar" : "Ligar"}</button>`;
+      : `<button class="btn btn-fantasma btn-mini" data-alternar="${x.id}" data-liga="${x.ativo ? 0 : 1}" type="button">${x.ativo ? "Pausar" : "Ligar"}</button>`;
     return `<div class="pl-destino ${x.ativo || !x.verificado ? "" : "off"}"><div class="pl-d-info"><b>${esc(x.nome || x.ref)}</b><small>${esc(t.nome)} · ${esc(x.ref)}</small><label class="pl-nicho-l">Nicho <select class="pl-nicho" data-nicho="${x.id}" aria-label="Nicho de ${esc(x.nome || x.ref)}">${plOpcoesNicho(x.nicho)}</select></label>${x.erro ? `<div class="pl-d-erro">${esc(x.erro)}</div>` : ""}</div>${exp}${tag}<div class="pl-d-acoes">${acoes}<button class="btn btn-fantasma btn-mini" data-remover="${x.id}" type="button" aria-label="Remover destino">✕</button></div></div>`;
   }).join("");
 }
@@ -158,7 +158,7 @@ function renderWhatsapp(forcar) {
   const assin = [w.estado, w.numero, !!piloto.qr, piloto.qr.slice(-12), nProprios, plat.qr].join("|");
   if (!forcar && assin === piloto.waAssin) return;
   piloto.waAssin = assin;
-  if (!plat.qr) { box.innerHTML = `<p class="pl-aviso">A ThyfIA ainda não habilitou a conexão por QR code. Fale com o suporte.</p>`; return; }
+  if (!plat.qr) { box.innerHTML = `<p class="pl-alerta">A ThyfIA ainda não habilitou a conexão por QR code. Fale com o suporte.</p>`; return; }
   if (w.estado === "conectado") {
     pararWa();
     box.innerHTML = `<div class="pl-wa-ok"><span class="pl-tag ok">conectado</span><b>${w.numero ? "+" + esc(w.numero) : "WhatsApp conectado"}</b></div>
@@ -172,8 +172,8 @@ function renderWhatsapp(forcar) {
       <div class="au-acoes"><button class="btn btn-fantasma" id="btn-wa-cancelar" type="button">Cancelar</button></div>`;
   } else {
     const caiu = w.estado === "desconectado" && (w.numero || nProprios);
-    box.innerHTML = (caiu ? `<p class="pl-aviso">O seu WhatsApp está desconectado e o Piloto não consegue publicar. Leia o QR code de novo — os seus grupos continuam salvos.</p>` : "")
-      + (w.erro ? `<p class="pl-aviso">${esc(w.erro)}</p>` : "")
+    box.innerHTML = (caiu ? `<p class="pl-alerta">O seu WhatsApp está desconectado e o Piloto não consegue publicar. Leia o QR code de novo — os seus grupos continuam salvos.</p>` : "")
+      + (w.erro ? `<p class="pl-alerta">${esc(w.erro)}</p>` : "")
       + `<div class="au-acoes"><button class="btn btn-primario" id="btn-wa-conectar" type="button"><span class="btn-txt">${caiu ? "Reconectar" : "Conectar meu WhatsApp"}</span><span class="spinner"></span></button></div>`;
   }
 }
@@ -297,7 +297,7 @@ $("#pl-destinos").addEventListener("click", async (e) => {
       carregando(b, true);
       try { await api(`/api/piloto/destinos/${b.dataset.confirmar}/confirmar`, { body: { codigo: cod } }); plMsg("Destino confirmado!", "ok"); } finally { carregando(b, false); }
     } else if (b.dataset.alternar) {
-      await api(`/api/piloto/destinos/${b.dataset.alternar}`, { method: "PUT", body: { ativo: b.dataset.ativo === "1" } });
+      await api(`/api/piloto/destinos/${b.dataset.alternar}`, { method: "PUT", body: { ativo: b.dataset.liga === "1" } });
     } else if (b.dataset.remover) {
       if (!confirm("Remover este destino do Piloto?")) return;
       await api(`/api/piloto/destinos/${b.dataset.remover}`, { method: "DELETE" });

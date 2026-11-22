@@ -185,7 +185,7 @@ function mostrarAuth() {
 }
 
 function trocarAba(aba) {
-  $(".auth-tabs").dataset.ativo = aba;
+  $(".auth-tabs").dataset.abaAtiva = aba;
   $$(".auth-tab").forEach((t) => t.classList.toggle("ativo", t.dataset.tab === aba));
   $(".auth-trilho").classList.toggle("criar", aba === "criar");
   setTimeout(() => $(`#form-${aba === "criar" ? "cadastro" : "login"} input`).focus({ preventScroll: true }), 400);

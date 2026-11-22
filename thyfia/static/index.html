@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/styles.css?v=11">
+  <link rel="stylesheet" href="/static/styles.css?v=12">
 </head>
 <body>
 
@@ -457,16 +457,16 @@
           </div>
         </div>
       </div>
-    </div>
 
-    <section class="painel ap-painel" id="ap-painel" hidden>
+      <section class="painel ap-painel" id="ap-painel" hidden>
       <h3>O que o Cérebro aprendeu <span class="pl-tag" id="ap-fase"></span></h3>
       <div class="ap-grade">
         <div><h4>Com o seu público</h4><div id="ap-publico"></div></div>
         <div><h4>Palavras novas por nicho</h4><div id="ap-palavras"></div></div>
         <div><h4>Quedas de preço detectadas</h4><div id="ap-quedas"></div></div>
       </div>
-    </section>
+      </section>
+    </div>
 
     <!-- ---------- Meu plano ---------- -->
     <div class="view" id="view-plano" hidden>
@@ -614,7 +614,7 @@
         <div class="au-corpo">
           <h3>Onde divulgar</h3>
           <p class="muted">Aqui ficam os grupos escolhidos do seu WhatsApp e os outros destinos (Telegram, canal). Dê um <b>nicho</b> a cada um (fit, tech, casa, automóvel…): o Cérebro manda cada oferta só para os grupos do nicho dela. Grupo em “Todos os nichos” recebe o que sobrar. Para um grupo que <b>não está no seu WhatsApp</b>, adicione o número da ThyfIA como administrador; ele recebe um código lá e você confirma aqui.</p>
-          <p class="pl-aviso" id="pl-aviso-plataforma" hidden></p>
+          <p class="pl-alerta" id="pl-aviso-plataforma" hidden></p>
           <div id="pl-cobertura" class="pl-cobertura" hidden></div>
           <div id="pl-destinos"></div>
           <form class="pl-novo" id="form-pl-destino" autocomplete="off" novalidate>
@@ -640,7 +640,7 @@
         <div class="au-corpo">
           <h3>Regras do Piloto</h3>
           <form id="form-pl-config" autocomplete="off" novalidate>
-            <div class="pl-grade">
+            <div class="pl-regras">
               <label class="pub-campo"><span>Começa às (h)</span><input type="number" id="pl-hora-ini" min="0" max="23"></label>
               <label class="pub-campo"><span>Termina às (h)</span><input type="number" id="pl-hora-fim" min="1" max="24"></label>
               <label class="pub-campo"><span>Intervalo (min)</span><input type="number" id="pl-intervalo" min="10" max="720"></label>
@@ -840,8 +840,8 @@
   </defs>
 </svg>
 
-<script src="/static/app.js?v=15"></script>
-<script src="/static/planos.js?v=6"></script>
-<script src="/static/piloto.js?v=5"></script>
+<script src="/static/app.js?v=16"></script>
+<script src="/static/planos.js?v=7"></script>
+<script src="/static/piloto.js?v=6"></script>
 </body>
 </html>
