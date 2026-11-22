@@ -1,9 +1,9 @@
 {
   "manifest_version": 3,
   "name": "ThyfIA Conector",
-  "version": "1.2.1",
+  "version": "1.3.0",
   "description": "Conecta sua conta do Mercado Livre à ThyfIA usando o login que você já tem neste navegador.",
-  "permissions": ["cookies", "tabs"],
+  "permissions": ["cookies", "tabs", "scripting"],
   "host_permissions": [
     "https://*.mercadolivre.com.br/*",
     "https://*.mercadolivre.com/*",

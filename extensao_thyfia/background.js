@@ -106,21 +106,59 @@ function cortarCartoes(html) {
   return partes.map((p) => MARCA + p.slice(0, 6000)).join("\n");
 }
 
+const bloqueada = (url = "") => /captcha|account-verification|web-risk-verification|\/jms\/|login/.test(url);
+
+// Abre a busca numa aba de fundo deste navegador (página renderizada de verdade, como se a pessoa
+// tivesse aberto a busca) e lê o HTML. O ML recusa buscas feitas por requisição solta (fetch).
+function esperarCarregar(tabId, tempo = 25000) {
+  return new Promise((resolve) => {
+    const fim = setTimeout(() => { chrome.tabs.onUpdated.removeListener(ouvir); resolve(); }, tempo);
+    function ouvir(id, info) {
+      if (id === tabId && info.status === "complete") {
+        clearTimeout(fim); chrome.tabs.onUpdated.removeListener(ouvir); resolve();
+      }
+    }
+    chrome.tabs.onUpdated.addListener(ouvir);
+  });
+}
+
+async function lerHtml(tabId) {
+  const [{ result }] = await chrome.scripting.executeScript({
+    target: { tabId }, func: () => document.documentElement.outerHTML,
+  });
+  return result || "";
+}
+
 async function buscarProdutos(termo, limite) {
   const paginas = Math.min(4, Math.ceil((limite + 10) / POR_PAGINA));
-  let trechos = "", cartoes = 0;
-  for (let pg = 0; pg < paginas; pg++) {
-    const r = await fetch(urlBusca(termo, pg), { credentials: "include" });
-    if (!r.ok || /captcha|account-verification|\/jms\/|login/.test(r.url)) {
-      if (cartoes) break;
-      return { ok: false, erro: "O Mercado Livre pediu uma verificação. Abra o Mercado Livre neste navegador, faça uma busca e tente de novo." };
+  let trechos = "", cartoes = 0, aba;
+  try {
+    aba = await chrome.tabs.create({ url: urlBusca(termo, 0), active: false });
+    for (let pg = 0; pg < paginas; pg++) {
+      if (pg > 0) await chrome.tabs.update(aba.id, { url: urlBusca(termo, pg) });
+      await esperarCarregar(aba.id);
+      let tab = await chrome.tabs.get(aba.id);
+      if (bloqueada(tab.url)) {
+        if (cartoes) break;
+        return { ok: false, erro: "O Mercado Livre pediu uma verificação. Abra o Mercado Livre neste navegador, faça uma busca qualquer e tente de novo." };
+      }
+      // os resultados chegam em streaming: dá até ~12 s para os cartões aparecerem
+      let cortado = "";
+      for (let t = 0; t < 12; t++) {
+        cortado = cortarCartoes(await lerHtml(aba.id));
+        if (cortado) break;
+        await new Promise((r) => setTimeout(r, 1000));
+        tab = await chrome.tabs.get(aba.id);
+        if (bloqueada(tab.url)) break;
+      }
+      const n = cortado ? cortado.split(MARCA).length - 1 : 0;
+      if (!n) break;
+      trechos += cortado + "\n";
+      cartoes += n;
+      if (cartoes >= limite + 10) break;
     }
-    const cortado = cortarCartoes(await r.text());
-    const n = cortado ? cortado.split(MARCA).length - 1 : 0;
-    if (!n) break;
-    trechos += cortado + "\n";
-    cartoes += n;
-    if (cartoes >= limite + 10) break;
+  } finally {
+    if (aba) chrome.tabs.remove(aba.id).catch(() => {});
   }
   return cartoes ? { ok: true, trechos, cartoes } : { ok: false, erro: "Nenhum produto encontrado." };
 }
