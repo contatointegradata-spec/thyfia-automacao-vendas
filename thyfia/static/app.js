@@ -510,11 +510,37 @@ $$("#seg-limite button").forEach((b) => b.addEventListener("click", () => {
 }));
 new ResizeObserver(moverThumb).observe($("#seg-limite"));
 
+// para qual grupo a busca vai: o Cérebro sugere, a pessoa pode trocar (só para quem tem o Piloto, plano Pro)
+let nichoSeq = 0;
+async function sugerirNicho() {
+  const linha = $("#nicho-linha");
+  if (estado.liberados && !estado.liberados.automacao) { linha.hidden = true; return; }
+  const q = input.value.trim(), seq = ++nichoSeq;
+  try {
+    const r = await api(`/api/nicho-sugerido?busca=${encodeURIComponent(q)}`);
+    if (seq !== nichoSeq) return;  // chegou uma resposta mais nova
+    const sel = $("#sel-nicho"), atual = sel.value;
+    if (sel.options.length !== r.catalogo.length + 1) {
+      sel.innerHTML = `<option value="">Automático</option>` + r.catalogo.map((n) => `<option value="${esc(n.slug)}">${n.emoji} ${esc(n.nome)}</option>`).join("");
+      sel.value = atual;
+    }
+    sel.options[0].textContent = r.nicho ? `Automático (${r.emoji} ${r.nome})` : "Automático";
+    const dica = $("#nicho-dica");
+    dica.classList.toggle("alerta", !!q && !r.nicho && !sel.value);
+    dica.textContent = !q ? "" : sel.value ? "A oferta desta busca vai só para os grupos desse nicho."
+      : r.nicho ? `O Cérebro entendeu esta busca como ${r.emoji} ${r.nome} e manda só para os grupos desse nicho.`
+      : "Não reconheci o nicho desta busca. Escolha um para ela não ir só aos grupos “Todos os nichos”.";
+    linha.hidden = false;
+  } catch { /* silencioso: o campo é opcional */ }
+}
+$("#sel-nicho").addEventListener("change", sugerirNicho);
+
 // autocomplete aprendido
 let tSug, focoSug = -1;
 const input = $("#input-termo"), lista = $("#sugestoes");
 async function buscarSugestoes() {
   const q = input.value.trim();
+  sugerirNicho();
   try {
     const r = await api(`/api/cerebro/sugestoes?q=${encodeURIComponent(q)}`);
     const itens = r.sugestoes.filter((s) => s.termo !== q.toLowerCase());
@@ -542,8 +568,10 @@ async function buscarSugestoes() {
     });
   } catch { /* silencioso */ }
 }
-function escolher(t) { input.value = t; lista.classList.remove("aberta"); input.focus(); buscarSugestoes(); }
-input.addEventListener("input", () => { clearTimeout(tSug); tSug = setTimeout(buscarSugestoes, 200); });
+// a escolha de grupo vale só para a busca em que foi feita: outro termo volta para "Automático"
+function limparNichoEscolhido() { $("#sel-nicho").value = ""; }
+function escolher(t) { limparNichoEscolhido(); input.value = t; lista.classList.remove("aberta"); input.focus(); buscarSugestoes(); }
+input.addEventListener("input", () => { limparNichoEscolhido(); clearTimeout(tSug); tSug = setTimeout(buscarSugestoes, 200); });
 input.addEventListener("focus", buscarSugestoes);
 input.addEventListener("blur", () => setTimeout(() => lista.classList.remove("aberta"), 120));
 input.addEventListener("keydown", (e) => {
@@ -581,7 +609,7 @@ $("#form-busca").addEventListener("submit", async (e) => {
     let trechos = null;
     try { trechos = (await falarComExtensao("buscar", 30000, { termo, limite: estado.limite })).trechos || null; }
     catch (e) { throw new Error(e.message || "Não consegui buscar os produtos neste navegador."); }
-    const { id } = await api("/api/jobs", { body: { termo, limite: estado.limite, trechos, na_extensao: true } });
+    const { id } = await api("/api/jobs", { body: { termo, limite: estado.limite, trechos, na_extensao: true, nicho: $("#sel-nicho").value } });
     estado.job = id;
     await espera(350);
     abrirGerando({ id, termo, status: "gerando", total: 0, feitos: 0, ok: 0 });

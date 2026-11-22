@@ -20,14 +20,14 @@ from dotenv import load_dotenv
 # configuração local (N8N_WEBHOOK_URL, N8N_API_KEY…) — o .env fica fora do git
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
-from fastapi import Depends, FastAPI, HTTPException, Request, Response
+from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from . import (aprendizado, piloto, agente_publicacao, auth, automacao, cerebro, configuracoes, db, facebook, imagem_host, instagram,
-               itens, kiwify, motor_ml, planos, tenant, video)
+               itens, kiwify, motor_ml, nichos, planos, tenant, video)
 
 STATIC = Path(__file__).resolve().parent / "static"
 COOKIE = "thyfia_sessao"
@@ -102,6 +102,7 @@ class NovoJob(BaseModel):
     limite: int = Field(default=20, ge=1, le=50)
     trechos: str | None = Field(default=None, max_length=3_000_000)  # cartões lidos pela extensão
     na_extensao: bool = False  # os links são gerados no navegador da pessoa (extensão ≥ 1.4.0)
+    nicho: str = Field(default="", max_length=20)  # para qual grupo vai (vazio = o Cérebro decide)
 
 
 class ResultadoLink(BaseModel):
@@ -308,6 +309,11 @@ def criar_job(dados: NovoJob, u=Depends(exige("gerar"))):
         raise HTTPException(409, "Você já tem uma geração em andamento.")
     job_id = secrets.token_hex(8)
     termo = dados.termo.strip()
+    if dados.nicho and dados.nicho != nichos.GERAL and planos.tem_recurso(u, "automacao"):
+        try:  # a escolha vale para esta busca (e ensina o Cérebro); sem plano Pro não há grupos, então é ignorada
+            aprendizado.corrigir_nicho(u["id"], termo, dados.nicho)
+        except ValueError as e:
+            raise HTTPException(400, str(e))
     c.execute("INSERT INTO jobs (id, usuario_id, termo, limite) VALUES (?,?,?,?)",
               (job_id, u["id"], termo, dados.limite))
     c.commit()
@@ -697,6 +703,14 @@ def piloto_destino_confirmar(did: int, dados: PilotoCodigo, u=Depends(exige("aut
         return piloto.confirmar_destino(u["id"], did, dados.codigo)
     except Exception as e:
         raise _erro_piloto(e)
+
+
+@app.get("/api/nicho-sugerido")
+def nicho_sugerido(busca: str = Query(default="", max_length=120), u=Depends(usuario_atual)):
+    """Nicho que o Cérebro deduz para o que a pessoa está digitando (a tela de Gerar links mostra e deixa trocar)."""
+    n, origem = aprendizado.nicho_de(u["id"], busca) if busca.strip() else (None, "")
+    return {"nicho": n, "origem": origem, "nome": nichos.nome(n) if n else "", "emoji": nichos.emoji(n) if n else "",
+            "catalogo": [x for x in nichos.catalogo() if x["slug"] != nichos.GERAL]}
 
 
 @app.put("/api/piloto/nicho-busca")
