@@ -411,6 +411,7 @@ async function admResumo() {
       ["Links de checkout dos 3 planos", c.kiwify_link_plus.definido && c.kiwify_link_pro.definido && c.kiwify_link_premium.definido],
       ["Automação (n8n) habilitada", cfg.n8n_ok], ["Teste de WhatsApp (Evolution)", c.evolution_url.definido && c.evolution_apikey.definido && c.evolution_instancia.definido],
       ["Teste de Telegram (bot)", c.telegram_bot_token.definido && c.telegram_bot.definido],
+      ["E-mail de boas-vindas (Gmail)", c.email_remetente.definido && c.email_senha_app.definido],
     ];
     const pronto = checks.filter((x) => x[1]).length;
     box.innerHTML = `<div class="stats ad-stats">
@@ -537,6 +538,7 @@ const GRUPOS_CFG = [
   ["Automação (n8n)", ["n8n_webhook_url", "n8n_api_key"], "Webhook do fluxo “Receber links da ThyfIA”. Um só para todos os clientes: cada envio leva os dados do cliente."],
   ["WhatsApp (Evolution API)", ["evolution_url", "evolution_apikey", "evolution_instancia"], "Só para o botão “Enviar mensagem de teste” do cliente. A instância é a que envia as ofertas."],
   ["Telegram", ["telegram_bot", "telegram_bot_token"], "O @ do bot é mostrado ao cliente no passo a passo; o token só serve para o teste de envio ao canal."],
+  ["E-mail de boas-vindas (Gmail)", ["email_remetente", "email_senha_app"], "Enviado uma vez a quem cria conta. Use o Gmail da ThyfIA e uma senha de app (Conta Google > Segurança > Verificação em duas etapas > Senhas de app). Sem os dois campos, nada é enviado."],
   ["Geral", ["url_publica", "suporte_whatsapp"], "Endereço público (ex.: https://thyfia.integradata.app.br) e o WhatsApp de suporte, só dígitos com DDI."],
 ];
 
@@ -547,8 +549,13 @@ async function admConfig() {
     const c = Object.fromEntries(cfg.campos.map((x) => [x.chave, x]));
     box.innerHTML = `<form id="form-cfg" autocomplete="off">${GRUPOS_CFG.map(([t, ks, d]) => `<section class="painel ad-grupo"><h3>${t}</h3><p class="muted">${d}</p>
       ${ks.map((k) => `<label class="pub-campo"><span>${esc(c[k].rotulo)} ${c[k].definido ? '<em class="ok-mini">● definido</em>' : '<em class="nok-mini">○ vazio</em>'}</span>
-        <input type="${c[k].segredo ? "password" : "text"}" data-cfg="${k}" value="${esc(c[k].valor)}" placeholder="${c[k].segredo ? (c[k].definido ? c[k].mascarado + " (deixe vazio para manter)" : "cole aqui") : ""}" autocomplete="off" spellcheck="false"></label>`).join("")}</section>`).join("")}
+        <input type="${c[k].segredo ? "password" : "text"}" data-cfg="${k}" value="${esc(c[k].valor)}" placeholder="${c[k].segredo ? (c[k].definido ? c[k].mascarado + " (deixe vazio para manter)" : "cole aqui") : ""}" autocomplete="off" spellcheck="false"></label>`).join("")}${ks.includes("email_remetente") ? `<button class="btn btn-fantasma" type="button" id="btn-teste-email"><span class="btn-txt">Enviar e-mail de teste para mim</span><span class="spinner"></span></button><p class="envio-msg" id="msg-teste-email"></p>` : ""}</section>`).join("")}
       <div class="au-acoes"><button class="btn btn-primario btn-grande" type="submit" id="btn-cfg"><span class="btn-txt">Salvar configurações</span><span class="spinner"></span></button></div></form>`;
+    $("#btn-teste-email").addEventListener("click", async (e) => {
+      const b = e.currentTarget, m = $("#msg-teste-email"); carregando(b, true); m.textContent = "";
+      try { const r = await api("/api/admin/config/testar-email", { method: "POST", body: {} }); m.textContent = "Enviado para " + r.para + ". Confira a caixa de entrada (e o spam)."; m.className = "envio-msg ok"; }
+      catch (err) { m.textContent = err.message; m.className = "envio-msg erro"; } finally { carregando(b, false); }
+    });
     $("#form-cfg").addEventListener("submit", async (e) => {
       e.preventDefault();
       const valores = {}; $$("[data-cfg]", box).forEach((i) => (valores[i.dataset.cfg] = i.value));
