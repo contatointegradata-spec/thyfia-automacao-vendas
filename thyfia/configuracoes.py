@@ -29,8 +29,9 @@ CAMPOS: dict[str, tuple[str, bool, str]] = {
     "telegram_bot_token": ("THYFIA_TELEGRAM_BOT_TOKEN", True, "Token do bot do Telegram (só para o teste de envio)"),
     "suporte_whatsapp": ("THYFIA_SUPORTE_WHATSAPP", False, "WhatsApp de suporte (só dígitos)"),
     "url_publica": ("THYFIA_URL_PUBLICA", False, "Endereço público da plataforma"),
-    "email_remetente": ("THYFIA_EMAIL_REMETENTE", False, "E-mail do Gmail que envia as mensagens da ThyfIA"),
-    "email_senha_app": ("THYFIA_EMAIL_SENHA_APP", True, "Senha de app do Gmail (16 letras, não é a senha da conta)"),
+    "email_remetente": ("THYFIA_EMAIL_REMETENTE", False, "E-mail remetente (com o Resend: um endereço do domínio verificado; com o Gmail: o próprio Gmail)"),
+    "email_resend_chave": ("THYFIA_RESEND_CHAVE", True, "Chave da API do Resend (começa com re_). Se preenchida, o envio usa o Resend"),
+    "email_senha_app": ("THYFIA_EMAIL_SENHA_APP", True, "Alternativa ao Resend: senha de app do Gmail (16 letras, não é a senha da conta)"),
 }
 
 

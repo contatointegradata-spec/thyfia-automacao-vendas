@@ -1,7 +1,7 @@
 # Esqueci minha senha
 
-Fluxo de recuperação de senha por e-mail, usando o mesmo Gmail da plataforma (Admin > Configurações > **E-mail de
-boas-vindas (Gmail)**). Sem essa configuração o botão funciona na tela, mas nenhum e-mail sai e o aviso fica no log.
+Fluxo de recuperação de senha por e-mail, usando o mesmo envio de e-mail da plataforma (Admin > Configurações > **E-mails da
+plataforma**, veja `docs/email-boas-vindas.md`). Sem essa configuração o botão funciona na tela, mas nenhum e-mail sai e o aviso fica no log.
 
 ## Como funciona para o cliente
 

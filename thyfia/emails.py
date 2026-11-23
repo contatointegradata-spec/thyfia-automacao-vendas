@@ -19,6 +19,8 @@ from email.message import EmailMessage
 from email.utils import formataddr, make_msgid
 from pathlib import Path
 
+import requests
+
 from . import auth, configuracoes, planos
 
 log = logging.getLogger("thyfia")
@@ -42,8 +44,12 @@ def remetente() -> str:
     return configuracoes.obter("email_remetente")
 
 
+def _chave_resend() -> str:
+    return configuracoes.obter("email_resend_chave").strip()
+
+
 def configurado() -> bool:
-    return bool(remetente() and configuracoes.obter("email_senha_app"))
+    return bool(remetente() and (_chave_resend() or configuracoes.obter("email_senha_app")))
 
 
 def _url_site() -> str:
@@ -313,10 +319,47 @@ def _enviar_starttls(msg: EmailMessage) -> None:
         s.send_message(msg)
 
 
+# imagens do e-mail: no Resend (sem anexo embutido) viram links do próprio site
+IMAGENS_POR_CID = {"logo.thyfia": "logo.png", "thyf.thyfia": "thyf-feliz.png",
+                   "thyf2.thyfia": "thyf-piscando.png", "thyf3.thyfia": "thyf-pensando.png"}
+URL_RESEND = "https://api.resend.com/emails"
+
+
+def _enviar_resend(msg: EmailMessage) -> None:
+    """Envia pela API HTTPS do Resend (porta 443: funciona onde o SMTP é bloqueado). Levanta ValueError amigável."""
+    html = msg.get_body(preferencelist=("html",)).get_content()
+    for cid, arq in IMAGENS_POR_CID.items():
+        html = html.replace(f"cid:{cid}", f"{_url_site()}/static/marca/email/{arq}")
+    corpo = {"from": str(msg["From"]), "to": [str(msg["To"])], "subject": str(msg["Subject"]),
+             "html": html, "text": msg.get_body(preferencelist=("plain",)).get_content()}
+    if msg["Reply-To"]:
+        corpo["reply_to"] = str(msg["Reply-To"])
+    try:
+        r = requests.post(URL_RESEND, json=corpo, timeout=20,
+                          headers={"Authorization": f"Bearer {_chave_resend()}", "User-Agent": "thyfia/1.0"})
+    except requests.RequestException as e:
+        raise ValueError(f"Não consegui falar com o Resend ({_detalhe(e)}).") from e
+    if r.ok:
+        return
+    try:
+        motivo = str(r.json().get("message") or "")[:200]
+    except ValueError:
+        motivo = ""
+    log.warning("e-mail: Resend respondeu %s: %s", r.status_code, motivo or r.text[:120])
+    if r.status_code in (401, 403) and "domain" not in motivo.lower():
+        raise ValueError("O Resend recusou a chave de API. Confira se ela foi copiada inteira (começa com re_) e tem permissão de envio.")
+    if r.status_code == 429:
+        raise ValueError("O Resend pediu para esperar um pouco (limite de envios). Tente de novo em instantes.")
+    raise ValueError(f"O Resend recusou o envio ({r.status_code}): {motivo or 'sem detalhe'}. "
+                     "Confira se o domínio do remetente está verificado no Resend.")
+
+
 def enviar(msg: EmailMessage) -> None:
-    """Envia pelo Gmail (SSL na 465; se a conexão falhar, tenta STARTTLS na 587). Levanta ValueError amigável."""
+    """Envia pelo Resend (se houver chave) ou pelo Gmail (SSL na 465, depois STARTTLS na 587). Levanta ValueError amigável."""
     if not configurado():
-        raise ValueError("Preencha o e-mail remetente e a senha de app do Gmail em Configurações.")
+        raise ValueError("Preencha o e-mail remetente e a chave do Resend (ou a senha de app do Gmail) em Configurações.")
+    if _chave_resend():
+        return _enviar_resend(msg)
     try:
         _enviar_ssl(msg)
         return
