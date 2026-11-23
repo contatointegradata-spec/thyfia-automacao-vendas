@@ -11,7 +11,7 @@
   <link rel="preload" href="/static/fonts/fredoka-latin-700-normal.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="/static/fonts/dm-sans-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="/static/tokens.css?v=1">
-  <link rel="stylesheet" href="/static/styles.css?v=15">
+  <link rel="stylesheet" href="/static/styles.css?v=21">
 </head>
 <body>
 
@@ -183,16 +183,21 @@
         <span class="onb-seta">Ver passo a passo ›</span>
       </button>
 
+      <div class="fonte-escolha" id="fonte-escolha" role="radiogroup" aria-label="De qual loja buscar os produtos">
+        <button type="button" role="radio" class="fonte-op ativo" data-fonte="ml" aria-checked="true"><span class="ml-badge">ML</span> Mercado Livre</button>
+        <button type="button" role="radio" class="fonte-op" data-fonte="shopee" aria-checked="false"><span class="ml-badge sh">SH</span> Shopee</button>
+      </div>
+      <p class="mini fonte-dica" id="fonte-dica" hidden>Direto pela API oficial da Shopee: sem extensão e sem abrir o navegador. Os links levam o seu código de afiliado e o rótulo da busca no relatório de conversões.</p>
+
       <div class="busca-card" id="busca-card">
         <div class="bloqueio" id="bloqueio-ml">
           <div class="bloqueio-icone"><img class="" src="/static/marca/mascote-neutro.svg" alt="Thyf, o gato da ThyfIA"></div>
-          <h3>Conecte seu Mercado Livre</h3>
-          <p class="muted">Para gerar links com a sua etiqueta de afiliado, a ThyfIA precisa da sua conta conectada.</p>
+          <h3 id="bloqueio-titulo">Conecte seu Mercado Livre</h3>
+          <p class="muted" id="bloqueio-txt">Para gerar links com a sua etiqueta de afiliado, a ThyfIA precisa da sua conta conectada.</p>
           <button class="btn btn-primario" data-ir="integracoes">Conectar agora</button>
         </div>
 
         <form id="form-busca" autocomplete="off">
-          <div class="plataforma-chip"><span class="ml-badge">ML</span> Mercado Livre <span class="ok-pill">conectado</span></div>
           <div class="busca-wrap">
             <span class="busca-icone"><svg class="ic" aria-hidden="true"><use href="#i-search"/></svg></span>
             <input id="input-termo" name="termo" maxlength="80" required placeholder=" ">
@@ -255,7 +260,53 @@
             <button class="btn btn-fantasma" id="btn-desconectar-ml" hidden>Desconectar</button>
           </div>
         </article>
-        <article class="int-card em-breve"><div class="int-topo"><div class="int-logo sh">S</div><div><h3>Shopee</h3><p class="muted">Programa de afiliados</p></div><span class="status-pill">em breve</span></div></article>
+        <article class="int-card" id="card-shopee">
+          <div class="int-topo">
+            <div class="int-logo sh">SH</div>
+            <div>
+              <h3>Shopee</h3>
+              <p class="muted">Programa de Afiliados (Open API)</p>
+            </div>
+            <span class="status-pill" id="shopee-pill">desconectado</span>
+          </div>
+          <p class="int-desc" id="shopee-desc">A Shopee tem API própria para afiliados: a ThyfIA busca os produtos e gera os links sozinha, sem extensão. Cole abaixo o App ID e o Secret.</p>
+          <form class="shopee-form" id="form-shopee" autocomplete="off">
+            <label class="campo">
+              <input type="text" name="app_id" inputmode="numeric" required placeholder=" " autocomplete="off" spellcheck="false">
+              <span>App ID</span>
+            </label>
+            <label class="campo">
+              <input type="password" name="secret" required placeholder=" " autocomplete="new-password" spellcheck="false">
+              <span>Secret</span>
+              <button type="button" class="olho" aria-label="Mostrar Secret"><svg class="ic" aria-hidden="true"><use href="#i-eye"/></svg></button>
+            </label>
+            <div class="int-acoes">
+              <button class="btn btn-primario" type="submit" id="btn-conectar-shopee"><span class="btn-txt">Conectar Shopee</span><span class="spinner"></span></button>
+              <button class="btn btn-fantasma" type="button" id="btn-desconectar-shopee" hidden>Desconectar</button>
+            </div>
+          </form>
+          <details class="shopee-como">
+            <summary>Onde acho o App ID e o Secret?</summary>
+            <ol>
+              <li>Entre no <b>Portal do Afiliado Shopee</b> (affiliate.shopee.com.br) com a conta aprovada no programa.</li>
+              <li>Abra o menu <b>Open API</b> e solicite o acesso, se ainda não tiver.</li>
+              <li>Copie o <b>App ID</b> e o <b>Secret</b> e cole aqui. A comissão cai na sua conta.</li>
+            </ol>
+            <p class="mini">O Secret fica cifrado e nunca volta para o navegador.</p>
+          </details>
+          <div class="shopee-teste" id="shopee-teste" hidden>
+            <h4>Gerar link de um produto ou loja</h4>
+            <p class="muted">Cole o endereço de qualquer produto ou loja da Shopee e receba o seu link de afiliado.</p>
+            <form id="form-shopee-link" class="shopee-link-linha">
+              <input type="url" id="shopee-url" class="gn-sel" placeholder="https://shopee.com.br/..." required maxlength="900" aria-label="Endereço do produto ou loja na Shopee">
+              <button class="btn btn-fantasma" type="submit" id="btn-shopee-link"><span class="btn-txt">Gerar link</span><span class="spinner"></span></button>
+            </form>
+            <div class="shopee-resultado" id="shopee-resultado" hidden>
+              <code id="shopee-link-saida"></code>
+              <button type="button" class="copiar" id="btn-copiar-shopee" data-copiar="">copiar</button>
+            </div>
+          </div>
+        </article>
         <article class="int-card em-breve"><div class="int-topo"><div class="int-logo am">a</div><div><h3>Amazon</h3><p class="muted">Associados</p></div><span class="status-pill">em breve</span></div></article>
       </div>
     </div>
@@ -899,8 +950,8 @@
   </defs>
 </svg>
 
-<script src="/static/app.js?v=19"></script>
-<script src="/static/planos.js?v=10"></script>
+<script src="/static/app.js?v=21"></script>
+<script src="/static/planos.js?v=11"></script>
 <script src="/static/piloto.js?v=8"></script>
 </body>
 </html>

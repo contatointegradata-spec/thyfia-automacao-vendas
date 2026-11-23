@@ -14,7 +14,7 @@ from datetime import datetime
 
 import requests
 
-from . import cofre, configuracoes, db, facebook, instagram, motor_ml, planos
+from . import cofre, configuracoes, db, facebook, instagram, motor_ml, planos, shopee
 
 
 class ErroConfig(Exception):
@@ -272,6 +272,8 @@ def checklist(u) -> list[dict]:
     passos = [
         {"id": "ml", "plano": "plus", "titulo": "Conectar o Mercado Livre",
          "feito": ml, "ir": "integracoes"},
+        {"id": "shopee", "plano": "plus", "titulo": "Conectar a Shopee",
+         "feito": shopee.status(uid)["status"] == "conectado", "ir": "integracoes", "opcional": True},
         {"id": "gerar", "plano": "plus", "titulo": "Gerar seus primeiros links",
          "feito": bool(db.conn().execute("SELECT 1 FROM jobs WHERE usuario_id=? AND status='concluido'", (uid,)).fetchone()),
          "ir": "gerar"},

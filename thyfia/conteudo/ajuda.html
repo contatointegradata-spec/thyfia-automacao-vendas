@@ -1,10 +1,10 @@
 <section class="aj-sec" id="visao-geral" data-titulo="Visão geral">
   <h2>Visão geral</h2>
-  <p>A ThyfIA transforma uma <b>palavra-chave</b> (ex.: “capinha iphone”) em dezenas de <b>links de afiliado do Mercado Livre</b> prontos para divulgar, e ajuda a levar esses links até os seus canais.</p>
+  <p>A ThyfIA transforma uma <b>palavra-chave</b> (ex.: “capinha iphone”) em dezenas de <b>links de afiliado do Mercado Livre e da Shopee</b> prontos para divulgar, e ajuda a levar esses links até os seus canais.</p>
   <p>O caminho completo, do começo ao fim:</p>
   <ol class="aj-fluxo">
     <li><b>Escolher o seu plano</b> em <b>Meu plano</b> (o pagamento libera tudo sozinho)</li>
-    <li><b>Conectar</b> o Mercado Livre (uma vez só)</li>
+    <li><b>Conectar</b> o Mercado Livre e/ou a Shopee (uma vez só)</li>
     <li><b>Gerar links</b> com uma palavra-chave</li>
     <li><b>Enviar para a automação</b> (n8n), que guarda os links numa fila</li>
     <li>A automação <b>publica uma oferta por vez</b> no WhatsApp e no Telegram, sorteando entre as categorias</li>
@@ -18,7 +18,7 @@
       <tr><th>Menu</th><th>Para que serve</th></tr>
       <tr><td><b>Meu plano</b></td><td>Mostra o seu plano, permite assinar ou fazer upgrade e traz o passo a passo do que falta configurar.</td></tr>
       <tr><td><b>Gerar links</b></td><td>Digita a palavra-chave e a ThyfIA gera os links.</td></tr>
-      <tr><td><b>Integrações</b></td><td>Conecta (ou desconecta) a sua conta do Mercado Livre.</td></tr>
+      <tr><td><b>Integrações</b></td><td>Conecta (ou desconecta) as suas contas do Mercado Livre e da Shopee.</td></tr>
       <tr><td><b>Automação</b> <small>(Pro)</small></td><td>Você informa o seu WhatsApp (e, se quiser, o canal do Telegram) para receber as ofertas.</td></tr>
       <tr><td><b>Agente de Publicação</b> <small>(Premium)</small></td><td>Conecta o seu Instagram e escolhe o melhor item, monta o post e agenda no Instagram.</td></tr>
       <tr><td><b>Histórico</b></td><td>Lista todas as gerações, baixa as planilhas e controla o envio para a automação.</td></tr>
@@ -32,7 +32,7 @@
   <h2>Planos e pagamento</h2>
   <table class="aj-tabela">
     <tr><th>Plano</th><th>Valor</th><th>O que inclui</th></tr>
-    <tr><td><b>Plus</b></td><td>R$ 19,90/mês</td><td>Gerador de links do Mercado Livre, planilha, histórico e Cérebro.</td></tr>
+    <tr><td><b>Plus</b></td><td>R$ 19,90/mês</td><td>Gerador de links do Mercado Livre e da Shopee, planilha, histórico e Cérebro.</td></tr>
     <tr><td><b>Pro</b></td><td>R$ 39,90/mês</td><td>Tudo do Plus + envio automático para a automação, que divulga as ofertas no seu WhatsApp e Telegram.</td></tr>
     <tr><td><b>Premium</b></td><td>R$ 69,90/mês</td><td>Tudo do Pro + Agente de Publicação no Instagram, com passo a passo para ligar a sua conta Meta.</td></tr>
   </table>
@@ -80,10 +80,31 @@
   <p><button class="aj-botao" data-ir="integracoes">Ir para Integrações</button></p>
 </section>
 
+<section class="aj-sec" id="shopee" data-titulo="Shopee">
+  <h2>Shopee</h2>
+  <p>A Shopee funciona diferente do Mercado Livre: ela tem uma <b>API oficial para afiliados</b>. Por isso a ThyfIA busca os produtos e cria os links <b>sozinha</b>, direto no servidor, sem extensão e sem abrir o navegador.</p>
+  <h3>Conectar a Shopee</h3>
+  <ol class="aj-passos">
+    <li>Tenha a conta aprovada no <b>Programa de Afiliados Shopee</b> (affiliate.shopee.com.br).</li>
+    <li>No Portal do Afiliado, abra o menu <b>Open API</b> e solicite o acesso, se ainda não tiver. A análise da Shopee pode levar alguns dias.</li>
+    <li>Copie o <b>App ID</b> e o <b>Secret</b>.</li>
+    <li>Na ThyfIA, abra <b>Integrações</b>, cole os dois no cartão da Shopee e clique em <b>Conectar Shopee</b>. A ThyfIA testa na hora e só salva se a Shopee aceitar. O Secret fica criptografado.</li>
+  </ol>
+  <p>A comissão vai para a <b>sua</b> conta da Shopee. Os links levam o rótulo <code>thyfia</code> e o nome da busca, que aparecem no seu relatório de conversões e mostram qual busca vendeu.</p>
+  <h3>Gerar links da Shopee</h3>
+  <ol class="aj-passos">
+    <li>Em <b>Gerar links</b>, escolha <b>Shopee</b>, digite a palavra-chave e a quantidade.</li>
+    <li>A ThyfIA traz só produtos do programa de afiliados, ordenados pelos que mais vendem e têm melhor nota, com preço, foto e link curto.</li>
+    <li>Tudo o que vem depois (Histórico, Automação, Piloto Automático, Agente de Publicação) funciona igual ao Mercado Livre.</li>
+  </ol>
+  <h3>Link de um produto ou loja que você já escolheu</h3>
+  <p>Ainda em <b>Integrações</b>, no cartão da Shopee, cole o endereço de qualquer produto ou loja e clique em <b>Gerar link</b>. É o equivalente ao “Link personalizado” do Portal do Afiliado.</p>
+</section>
+
 <section class="aj-sec" id="gerar-links" data-titulo="Gerar links">
   <h2>Gerar links</h2>
   <ol class="aj-passos">
-    <li>Abra <b>Gerar links</b>. Se aparecer “Conecte seu Mercado Livre”, volte ao passo de conexão.</li>
+    <li>Abra <b>Gerar links</b> e escolha a loja no topo do cartão: <b>Mercado Livre</b> ou <b>Shopee</b>. Se aparecer “Conecte…”, volte ao passo de conexão daquela loja.</li>
     <li><b>Digite a palavra-chave</b> do produto. Quanto mais específica, melhores os resultados: “fone bluetooth jbl” é melhor do que “fone”.</li>
     <li>Use as <b>sugestões</b> que aparecem abaixo do campo (navegue com ↑ ↓ e Enter) ou os <b>chips de buscas relacionadas</b>. Elas vêm do que mais deu certo nas buscas anteriores.</li>
     <li>Escolha <b>quantos produtos</b>: 10, 20, 30 ou 50. Quanto maior, mais demora.</li>
@@ -251,6 +272,9 @@
 
   <details><summary>Aparece “Conecte seu Mercado Livre” ou a conexão cai</summary>
     <p>A sessão do Mercado Livre expira de tempos em tempos. Abra <b>Integrações</b> e clique em <b>Conectar Mercado Livre</b> de novo. Se a janelinha não abrir, confira se a extensão ThyfIA Conector está instalada e ativa em <code>chrome://extensions</code>.</p>
+  </details>
+  <details><summary>Shopee: “credenciais recusadas” ou “sem acesso à Open API”</summary>
+    <p>Copie o App ID e o Secret de novo em Portal do Afiliado &gt; Open API, sem espaços nas pontas. Se a Shopee disser que a conta não tem acesso à Open API, solicite o acesso nesse mesmo menu e volte quando for liberado. Se a conexão cair depois, é só conectar de novo.</p>
   </details>
   <details><summary>A tela pede para instalar a extensão, mesmo eu já tendo instalado</summary>
     <p>Recarregue a página (F5). Se continuar, baixe a extensão de novo, substitua a pasta e recarregue a extensão em <code>chrome://extensions</code>. Versões antigas não reconhecem o endereço atual da ThyfIA.</p>

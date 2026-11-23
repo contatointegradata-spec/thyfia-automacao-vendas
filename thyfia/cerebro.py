@@ -101,8 +101,9 @@ def ranquear(produtos: list[dict]) -> list[dict]:
     return sorted(filtrados, key=lambda p: -(info[p["url"]]["gerados"] if p["url"] in info else 0))
 
 
-def recuperar(termo: str, k: int, excluir: set[str] | None = None) -> list[dict]:
-    """BM25 sobre os títulos da base de conhecimento."""
+def recuperar(termo: str, k: int, excluir: set[str] | None = None, loja: str = "mercadolivre.com") -> list[dict]:
+    """BM25 sobre os títulos da base de conhecimento. `loja`: só produtos cujo endereço tem esse trecho
+    (a base guarda produtos de lojas diferentes; o Mercado Livre não pode receber um produto da Shopee)."""
     toks = tokens(termo)
     if not toks or k <= 0:
         return []
@@ -110,8 +111,8 @@ def recuperar(termo: str, k: int, excluir: set[str] | None = None) -> list[dict]
     c = db.conn()
     where = " OR ".join("titulo_norm LIKE ?" for _ in toks)
     rows = c.execute(
-        f"SELECT url, titulo, preco, titulo_norm, gerados, falhas FROM produtos WHERE {where}",
-        [f"%{t}%" for t in toks],
+        f"SELECT url, titulo, preco, titulo_norm, gerados, falhas FROM produtos WHERE ({where}) AND url LIKE ?",
+        [*(f"%{t}%" for t in toks), f"%{loja}%"],
     ).fetchall()
     if not rows:
         return []

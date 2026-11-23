@@ -17,7 +17,7 @@ PLANOS: dict[str, dict] = {
         "id": "plus", "nome": "Plus", "preco": 19.90, "nivel": 1, "destaque": False,
         "resumo": "Gere links de afiliado em escala e baixe a planilha.",
         "recursos": [
-            "Gerador de links do Mercado Livre",
+            "Gerador de links do Mercado Livre e da Shopee",
             "Planilha pronta para baixar (.xlsx)",
             "Histórico completo das gerações",
             "Cérebro: sugestões que aprendem com a comunidade",

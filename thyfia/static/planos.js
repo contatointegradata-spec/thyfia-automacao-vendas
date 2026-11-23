@@ -141,6 +141,7 @@ function renderTabelaPlanos(planos) {
 /* ---- passo a passo do plano contratado ---- */
 const PASSOS_INFO = {
   ml: ["Conecte o Mercado Livre", "A ThyfIA usa o login que você já tem no navegador, pela extensão <b>ThyfIA Conector</b>. Sua senha nunca passa por aqui. Em <b>Integrações</b>, clique em “Conectar Mercado Livre” e siga as instruções na tela (é uma vez só)."],
+  shopee: ["Conecte a Shopee", "Opcional. A Shopee tem API própria para afiliados: cole o <b>App ID</b> e o <b>Secret</b> (Portal do Afiliado &gt; Open API) em <b>Integrações</b> e a ThyfIA busca produtos e gera os links sozinha, sem extensão."],
   gerar: ["Gere seus primeiros links", "Em <b>Gerar links</b>, digite um produto (ex.: “capinha iphone”), escolha quantos quer e clique em <b>Gerar links</b>. Ao terminar, baixe a planilha."],
   whatsapp: ["Informe seu WhatsApp", "Em <b>Automação</b>, salve o número que vai receber as ofertas prontas. Use “Enviar mensagem de teste” para conferir."],
   telegram: ["Ligue seu canal do Telegram", "Opcional. Adicione o bot da ThyfIA como administrador do seu canal e salve o @ em <b>Automação</b>."],

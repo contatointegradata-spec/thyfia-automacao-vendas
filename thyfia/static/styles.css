@@ -295,7 +295,7 @@ code, .mono { font-family: var(--font-mono); }
 .int-topo { display: flex; align-items: center; gap: 16px; }
 .int-topo h3 { font-size: 18px; }
 .int-logo { width: 52px; height: 52px; border-radius: var(--radius-md); display: grid; place-items: center; font-family: var(--font-mono); font-weight: 500; font-size: 16px; flex: none; background: var(--brand-soft); color: var(--ink); border: 2px solid var(--edge); }
-.int-logo.sh, .int-logo.am { background: var(--surface-sunken); border-color: var(--line-strong); }
+.int-logo.am { background: var(--surface-sunken); border-color: var(--line-strong); }
 .status-pill { margin-left: auto; font-size: 12px; padding: 5px 12px; border-radius: var(--radius-pill); background: var(--surface-sunken); border: 2px solid var(--line-strong); color: var(--ink-muted); transition: all .4s; }
 .status-pill.conectado { background: var(--success-soft); color: var(--success); border-color: var(--success); }
 .status-pill.conectando { background: var(--accent-soft); color: var(--accent-ink); border-color: var(--accent); animation: pisca-suave 1.4s infinite; }
@@ -1011,3 +1011,24 @@ code, .mono { font-family: var(--font-mono); }
 /* --- selos e rótulos: o único lugar do design system com CAIXA ALTA --- */
 .status-pill, .ok-pill, .selo-plano, .selo-melhor, .pl-faixa, .tag-prox, .canal-selo, .badge-breve, .obrig, .opc { text-transform: uppercase; letter-spacing: .6px; font-weight: 700; }
 .pl-card h3, .pl-preco b { font-family: var(--font-display); }
+
+/* ---- Shopee: escolha da loja em Gerar links + cartão de Integrações ---- */
+.fonte-escolha { display: inline-flex; gap: 8px; margin-bottom: 18px; flex-wrap: wrap; }
+.fonte-op { display: inline-flex; align-items: center; gap: 10px; padding: 5px 16px 5px 5px; border-radius: var(--radius-pill); background: var(--surface-sunken); border: 2px solid var(--line); font-weight: 700; font-size: 14px; color: var(--ink-muted); transition: border-color .25s, color .25s, background .25s; }
+.fonte-op:hover { border-color: var(--edge); color: var(--ink); }
+.fonte-op.ativo { border-color: var(--edge); color: var(--ink); background: var(--brand-soft); }
+.fonte-op:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.ml-badge.sh { background: var(--surface-raised); }
+.fonte-dica { margin: -6px 0 16px; max-width: 520px; color: var(--ink-muted); line-height: 1.5; }
+.shopee-form { display: grid; gap: 12px; }
+.shopee-como { margin-top: 14px; color: var(--ink-muted); }
+.shopee-como summary { cursor: pointer; font-weight: 700; color: var(--ink); }
+.shopee-como summary:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; border-radius: var(--radius-sm); }
+.shopee-como ol { margin: 10px 0 8px 20px; line-height: 1.7; }
+.shopee-teste { margin-top: 20px; padding-top: 18px; border-top: 2px solid var(--line); display: grid; gap: 10px; }
+.shopee-teste h4 { font-family: var(--font-display); font-size: 17px; font-weight: 600; }
+.shopee-link-linha { display: flex; gap: 10px; flex-wrap: wrap; }
+.shopee-link-linha input { flex: 1 1 220px; min-width: 0; }
+.shopee-resultado { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: var(--radius-md); background: var(--surface-sunken); border: 2px solid var(--line-strong); }
+.shopee-resultado code { flex: 1; min-width: 0; overflow-wrap: anywhere; font-family: var(--font-mono); font-size: 13px; }
+.shopee-teste p { font-size: 14px; line-height: 1.5; }
