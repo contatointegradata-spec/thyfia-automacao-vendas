@@ -23,7 +23,7 @@ from . import auth, configuracoes, planos
 
 log = logging.getLogger("thyfia")
 
-HOST_SMTP, PORTA_SMTP = "smtp.gmail.com", 465
+HOST_SMTP, PORTA_SMTP, PORTA_STARTTLS = "smtp.gmail.com", 465, 587
 URL_PADRAO = "https://thyfia.integradata.app.br"
 ASSETS = Path(__file__).parent / "static" / "marca" / "email"
 LIMITE_POR_HORA = 40  # trava contra abuso do cadastro aberto (cada cadastro dispara 1 e-mail)
@@ -272,27 +272,66 @@ def montar_mensagem_redefinicao(nome: str, destino: str, token: str) -> EmailMes
 
 
 # --------------------------------------------------------------------------- envio
+def _detalhe(e: Exception) -> str:
+    """Nome do erro + texto curto, para o admin (e o log) saberem a causa real. Nunca inclui a senha."""
+    txt = " ".join(str(e).split())[:160]
+    return f"{type(e).__name__}: {txt}" if txt else type(e).__name__
+
+
 def _traduzir_erro(e: Exception) -> str:
     if isinstance(e, smtplib.SMTPAuthenticationError):
         return ("O Gmail recusou o login. Use uma senha de app (16 letras, gerada em Conta Google > Segurança > "
-                "Verificação em duas etapas > Senhas de app), não a senha normal da conta.")
+                "Verificação em duas etapas > Senhas de app), não a senha normal da conta, e confira se o e-mail "
+                "remetente é o mesmo da conta que gerou a senha.")
     if isinstance(e, smtplib.SMTPRecipientsRefused):
         return "O Gmail recusou o destinatário."
-    if isinstance(e, (smtplib.SMTPConnectError, TimeoutError, OSError)):
-        return "Não consegui conectar ao Gmail agora. Tente de novo em instantes."
-    return f"Falha ao enviar: {e}"
+    if isinstance(e, ssl.SSLError):
+        return f"Falha na conexão segura com o Gmail ({_detalhe(e)})."
+    if isinstance(e, smtplib.SMTPException):
+        return f"O Gmail respondeu com erro ({_detalhe(e)})."
+    if isinstance(e, (TimeoutError, OSError)):
+        return (f"Não consegui conectar ao Gmail ({_detalhe(e)}). Se persistir, o servidor pode estar bloqueando a saída "
+                f"nas portas {PORTA_SMTP} e {PORTA_STARTTLS}.")
+    return f"Falha ao enviar: {_detalhe(e)}"
+
+
+def _senha_app() -> str:
+    # o Google mostra a senha em 4 grupos separados por espaço (às vezes espaço não separável): tudo isso sai
+    return re.sub(r"\s+", "", configuracoes.obter("email_senha_app"))
+
+
+def _enviar_ssl(msg: EmailMessage) -> None:
+    with smtplib.SMTP_SSL(HOST_SMTP, PORTA_SMTP, timeout=20, context=ssl.create_default_context()) as s:
+        s.login(remetente(), _senha_app())
+        s.send_message(msg)
+
+
+def _enviar_starttls(msg: EmailMessage) -> None:
+    with smtplib.SMTP(HOST_SMTP, PORTA_STARTTLS, timeout=20) as s:
+        s.starttls(context=ssl.create_default_context())
+        s.login(remetente(), _senha_app())
+        s.send_message(msg)
 
 
 def enviar(msg: EmailMessage) -> None:
-    """Envia pelo Gmail (SMTP SSL). Levanta ValueError com mensagem amigável se falhar."""
+    """Envia pelo Gmail (SSL na 465; se a conexão falhar, tenta STARTTLS na 587). Levanta ValueError amigável."""
     if not configurado():
         raise ValueError("Preencha o e-mail remetente e a senha de app do Gmail em Configurações.")
     try:
-        with smtplib.SMTP_SSL(HOST_SMTP, PORTA_SMTP, timeout=20, context=ssl.create_default_context()) as s:
-            s.login(remetente(), configuracoes.obter("email_senha_app"))
-            s.send_message(msg)
-    except Exception as e:  # noqa: BLE001 - qualquer falha de rede/SMTP vira mensagem amigável
-        raise ValueError(_traduzir_erro(e)) from e
+        _enviar_ssl(msg)
+        return
+    except Exception as e1:  # noqa: BLE001
+        # só vale tentar outra porta quando nem chegamos a conversar com o Gmail (rede/TLS), não em erro de login
+        if isinstance(e1, smtplib.SMTPException) and not isinstance(e1, smtplib.SMTPServerDisconnected):
+            log.warning("e-mail: falha SMTP na porta %s: %s", PORTA_SMTP, _detalhe(e1))
+            raise ValueError(_traduzir_erro(e1)) from e1
+        log.warning("e-mail: porta %s falhou (%s); tentando a %s", PORTA_SMTP, _detalhe(e1), PORTA_STARTTLS)
+        try:
+            _enviar_starttls(msg)
+            return
+        except Exception as e2:  # noqa: BLE001
+            log.warning("e-mail: porta %s também falhou: %s", PORTA_STARTTLS, _detalhe(e2))
+            raise ValueError(_traduzir_erro(e2 if not isinstance(e2, smtplib.SMTPServerDisconnected) else e1)) from e2
 
 
 def _dentro_do_limite(fila: deque | None = None, limite: int | None = None) -> bool:
