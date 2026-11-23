@@ -27,7 +27,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from . import (aprendizado, piloto, agente_publicacao, auth, automacao, cerebro, configuracoes, db, facebook, imagem_host, instagram, emails,
-               itens, kiwify, motor_ml, nichos, planos, tenant, video)
+               itens, kiwify, motor_ml, nichos, planos, shopee, tenant, video)
 
 STATIC = Path(__file__).resolve().parent / "static"
 COOKIE = "thyfia_sessao"
@@ -112,6 +112,16 @@ class NovoJob(BaseModel):
     trechos: str | None = Field(default=None, max_length=3_000_000)  # cartões lidos pela extensão
     na_extensao: bool = False  # os links são gerados no navegador da pessoa (extensão ≥ 1.4.0)
     nicho: str = Field(default="", max_length=20)  # para qual grupo vai (vazio = o Cérebro decide)
+    fonte: str = Field(default="ml", pattern="^(ml|shopee)$")  # de qual loja vêm os produtos
+
+
+class ConectarShopee(BaseModel):
+    app_id: str = Field(max_length=30)
+    secret: str = Field(max_length=250)
+
+
+class LinkShopee(BaseModel):
+    url: str = Field(max_length=1000)
 
 
 class ResultadoLink(BaseModel):
@@ -162,6 +172,7 @@ def _set_cookie(resp: Response, token: str) -> None:
 def _job_dict(r) -> dict:
     d = {k: r[k] for k in ("id", "termo", "limite", "status", "total", "feitos", "ok", "erro",
                            "criado", "finalizado", "envio_status", "envio_em", "envio_erro")}
+    d["fonte"] = r["fonte"] if "fonte" in r.keys() else "ml"
     total, com_link = itens.contar(r["id"])
     d["itens"], d["links"] = total, com_link
     # a planilha é gerada do banco; o arquivo local é só uma cópia opcional
@@ -191,7 +202,7 @@ def _perfil_usuario(u) -> dict:
     sit = planos.situacao(u)
     return {"id": u["id"], "nome": u["nome"], "email": u["email"], "admin": sit["admin"],
             "plano": sit, "liberados": planos.liberados(u),
-            "ml": motor_ml.status_ml(u["id"]), "job_ativo": _job_ativo(u["id"]),
+            "ml": motor_ml.status_ml(u["id"]), "shopee": shopee.status(u["id"]), "job_ativo": _job_ativo(u["id"]),
             "preferencias": _preferencias(u["id"])}
 
 
@@ -323,10 +334,46 @@ def ml_desconectar(u=Depends(usuario_atual)):
     return motor_ml.status_ml(u["id"])
 
 
+# --------------------------------------------------------------------------- shopee
+@app.get("/api/shopee/status")
+def shopee_status(u=Depends(usuario_atual)):
+    return shopee.status(u["id"])
+
+
+@app.post("/api/shopee/conectar")
+def shopee_conectar(dados: ConectarShopee, u=Depends(exige("gerar"))):
+    """Guarda o App ID e o Secret da Open API da Shopee (depois de testá-los de verdade). O Secret fica cifrado."""
+    try:
+        return shopee.conectar(u["id"], dados.app_id, dados.secret)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+@app.post("/api/shopee/desconectar")
+def shopee_desconectar(u=Depends(usuario_atual)):
+    if _job_ativo(u["id"]):
+        raise HTTPException(409, "Aguarde a geração de links terminar.")
+    return shopee.desconectar(u["id"])
+
+
+@app.post("/api/shopee/link")
+def shopee_link(dados: LinkShopee, u=Depends(exige("gerar"))):
+    """Link de afiliado de um produto ou loja da Shopee que a pessoa colou ("Link personalizado")."""
+    if shopee.status(u["id"])["status"] != "conectado":
+        raise HTTPException(400, "Conecte sua conta da Shopee primeiro, em Integrações.")
+    try:
+        return {"link": shopee.gerar_link(u["id"], dados.url)}
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
 # --------------------------------------------------------------------------- jobs
 @app.post("/api/jobs")
 def criar_job(dados: NovoJob, u=Depends(exige("gerar"))):
-    if motor_ml.status_ml(u["id"])["status"] != "conectado":
+    if dados.fonte == "shopee":
+        if shopee.status(u["id"])["status"] != "conectado":
+            raise HTTPException(400, "Conecte sua conta da Shopee primeiro, em Integrações.")
+    elif motor_ml.status_ml(u["id"])["status"] != "conectado":
         raise HTTPException(400, "Conecte sua conta do Mercado Livre primeiro.")
     # geração feita pelo navegador que a pessoa fechou no meio nunca termina: libera depois de um tempo
     c = db.conn()
@@ -343,9 +390,12 @@ def criar_job(dados: NovoJob, u=Depends(exige("gerar"))):
             aprendizado.corrigir_nicho(u["id"], termo, dados.nicho)
         except ValueError as e:
             raise HTTPException(400, str(e))
-    c.execute("INSERT INTO jobs (id, usuario_id, termo, limite) VALUES (?,?,?,?)",
-              (job_id, u["id"], termo, dados.limite))
+    c.execute("INSERT INTO jobs (id, usuario_id, termo, limite, fonte) VALUES (?,?,?,?,?)",
+              (job_id, u["id"], termo, dados.limite, dados.fonte))
     c.commit()
+    if dados.fonte == "shopee":  # direto na API da Shopee: sem navegador nem extensão
+        threading.Thread(target=shopee.executar_job, args=(job_id, u["id"], termo, dados.limite), daemon=True).start()
+        return {"id": job_id, "modo": "shopee"}
     if dados.na_extensao and dados.trechos:
         # os links saem do navegador da pessoa: o servidor só prepara a lista (sem abrir o Chrome)
         motor_ml.preparar_job_extensao(job_id, u["id"], termo, dados.limite, dados.trechos)

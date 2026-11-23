@@ -89,7 +89,7 @@ _MONO = "font-family:'JetBrains Mono',Menlo,Consolas,'Courier New',monospace"
 def _passos() -> list[tuple[str, str, str]]:
     return [
         ("1", "Escolha o seu plano", "Em <b>Meu plano</b>. O pagamento é pela Kiwify e libera tudo sozinho."),
-        ("2", "Conecte o Mercado Livre", "Em <b>Integrações</b>, uma vez só."),
+        ("2", "Conecte o Mercado Livre ou a Shopee", "Em <b>Integrações</b>, uma vez só."),
         ("3", "Gere seus links", "Digite o que você divulga (ex.: <i>capinha iphone</i>) e baixe a planilha."),
     ]
 
@@ -235,7 +235,7 @@ def montar_texto(nome: str) -> str:
             "Eu sou o Thyf. Acho a oferta, monto a mensagem e te ajudo a levar seus links de afiliado até o grupo certo.\n\n"
             "Seus 3 primeiros passos:\n"
             "1. Escolha o seu plano, em Meu plano (o pagamento é pela Kiwify e libera tudo sozinho).\n"
-            "2. Conecte o Mercado Livre, em Integrações (uma vez só).\n"
+            "2. Conecte o Mercado Livre ou a Shopee, em Integrações (uma vez só).\n"
             "3. Gere seus links: digite o que você divulga (ex.: capinha iphone) e baixe a planilha.\n\n"
             f"Planos (assinatura mensal):\n{precos}\n\n"
             "Sem promessa de ganho: a ThyfIA organiza e envia as ofertas, e o resultado depende das ofertas que você escolhe e do seu público.\n\n"

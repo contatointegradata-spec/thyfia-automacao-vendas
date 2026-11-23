@@ -347,10 +347,10 @@ class TestTenant(Base):
     def test_checklist_acompanha_o_plano(self):
         self.assertEqual(tenant.checklist(self.u), [])
         planos.conceder(self.u["email"], "plus", 31)
-        self.assertEqual([p["id"] for p in tenant.checklist(self.u)], ["ml", "gerar"])
+        self.assertEqual([p["id"] for p in tenant.checklist(self.u)], ["ml", "shopee", "gerar"])
         planos.conceder(self.u["email"], "premium", 31)
         ids = [p["id"] for p in tenant.checklist(self.u)]
-        self.assertEqual(ids, ["ml", "gerar", "whatsapp", "telegram", "envio", "meta", "post"])
+        self.assertEqual(ids, ["ml", "shopee", "gerar", "whatsapp", "telegram", "envio", "meta", "post"])
 
     def test_teste_de_envio_mensagens(self):
         tenant.salvar_canais(self.u["id"], "34999991234", "@canal_teste")

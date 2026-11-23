@@ -49,6 +49,16 @@ CREATE TABLE IF NOT EXISTS ml_conexoes (
     atualizado   TEXT NOT NULL DEFAULT (datetime('now','localtime'))
 );
 
+-- credenciais da Open API de Afiliados da Shopee, uma linha por usuário (o Secret fica cifrado no cofre)
+CREATE TABLE IF NOT EXISTS shopee_conexoes (
+    usuario_id      INTEGER PRIMARY KEY REFERENCES usuarios(id) ON DELETE CASCADE,
+    app_id          TEXT NOT NULL,
+    secret_cifrado  TEXT NOT NULL,
+    status          TEXT NOT NULL DEFAULT 'conectado',  -- conectado | erro
+    mensagem        TEXT,
+    atualizado      TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+);
+
 CREATE TABLE IF NOT EXISTS jobs (
     id          TEXT PRIMARY KEY,
     usuario_id  INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
@@ -303,6 +313,7 @@ def init() -> None:
     c.executescript(SCHEMA)
     migracoes = (
         "ALTER TABLE ml_conexoes ADD COLUMN cookies TEXT",  # sessão do ML vinda da extensão
+        "ALTER TABLE jobs ADD COLUMN fonte TEXT NOT NULL DEFAULT 'ml'",  # de onde vêm os produtos: ml | shopee
         # envio para a automação (n8n): nao_enviado | enviando | enviado | erro
         "ALTER TABLE jobs ADD COLUMN envio_status TEXT NOT NULL DEFAULT 'nao_enviado'",
         "ALTER TABLE jobs ADD COLUMN envio_em TEXT",

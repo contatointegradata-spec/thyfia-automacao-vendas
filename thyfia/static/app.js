@@ -11,6 +11,8 @@ const ic = (nome) => `<svg class="ic" aria-hidden="true"><use href="#i-${nome}"/
 const estado = {
   usuario: null,
   ml: "desconectado",
+  shopee: "desconectado",
+  fonte: "ml", // de qual loja a próxima busca vai tirar os produtos
   view: "gerar",
   limite: 20,
   job: null,
@@ -301,6 +303,9 @@ function entrarNoApp(eu, origem) {
   $("#saudacao").textContent = `${saudacao()}, ${primeiro}!`;
   aplicarPlano(eu);
   aplicarStatusMl(eu.ml);
+  aplicarStatusShopee(eu.shopee || { status: "desconectado" });
+  // quem só tem a Shopee conectada já abre nela (a escolha manual vale depois)
+  if (!estado.fonteManual && !LOJAS.ml.ok() && LOJAS.shopee.ok()) { estado.fonte = "shopee"; atualizarFonte(); }
   aplicarPreferencias(eu.preferencias);
   atualizarPassos();
   // reinicia a animação dos itens do menu
@@ -393,9 +398,85 @@ function aplicarStatusMl(ml) {
   $("#btn-conectar-ml").hidden = on;
   $("#btn-desconectar-ml").hidden = !on;
   $("#btn-conectar-ml").textContent = ml.status === "erro" ? "Tentar novamente" : "Conectar Mercado Livre";
-  $("#dot-ml").classList.toggle("on", on);
-  $("#busca-card").classList.toggle("liberado", on);
+  atualizarFonte();
 }
+
+/* ------------------------------------------------------------------ SHOPEE (API oficial de afiliados) */
+const LOJAS = {
+  ml: { nome: "Mercado Livre", ok: () => estado.ml === "conectado" },
+  shopee: { nome: "Shopee", ok: () => estado.shopee === "conectado" },
+};
+
+// o cartão de busca libera conforme a loja escolhida; o ponto do menu acende se qualquer uma estiver conectada
+function atualizarFonte() {
+  const loja = LOJAS[estado.fonte], ligada = loja.ok();
+  $("#busca-card").classList.toggle("liberado", ligada);
+  $("#dot-ml").classList.toggle("on", LOJAS.ml.ok() || LOJAS.shopee.ok());
+  $("#bloqueio-titulo").textContent = `Conecte ${estado.fonte === "shopee" ? "sua Shopee" : "seu Mercado Livre"}`;
+  $("#bloqueio-txt").textContent = estado.fonte === "shopee"
+    ? "Cole o App ID e o Secret da Open API de Afiliados em Integrações. Leva um minuto."
+    : "Para gerar links com a sua etiqueta de afiliado, a ThyfIA precisa da sua conta conectada.";
+  $$("#fonte-escolha .fonte-op").forEach((b) => {
+    const on = b.dataset.fonte === estado.fonte;
+    b.classList.toggle("ativo", on); b.setAttribute("aria-checked", on);
+  });
+  $("#fonte-dica").hidden = estado.fonte !== "shopee";
+}
+
+function aplicarStatusShopee(sh) {
+  estado.shopee = sh.status;
+  const textos = {
+    desconectado: ["desconectado", "A Shopee tem API própria para afiliados: a ThyfIA busca os produtos e gera os links sozinha, sem extensão. Cole abaixo o App ID e o Secret."],
+    conectado: ["conectado", `Conta conectada (App ID ${sh.app_id}). Os links saem com o seu código de afiliado.`],
+    erro: ["erro", sh.mensagem || "A Shopee recusou a conexão. Confira o App ID e o Secret e conecte de novo."],
+  };
+  const [p, d] = textos[sh.status] || textos.desconectado;
+  const pill = $("#shopee-pill");
+  pill.textContent = p; pill.className = `status-pill ${sh.status}`;
+  $("#shopee-desc").textContent = d;
+  const on = sh.status === "conectado";
+  $("#form-shopee").hidden = on;
+  $(".shopee-como").hidden = on;
+  $("#btn-desconectar-shopee").hidden = !on;
+  $("#shopee-teste").hidden = !on;
+  atualizarFonte();
+}
+
+$$("#fonte-escolha .fonte-op").forEach((b) => b.addEventListener("click", () => {
+  estado.fonte = b.dataset.fonte; estado.fonteManual = true; atualizarFonte();
+  if (LOJAS[estado.fonte].ok()) $("#input-termo").focus({ preventScroll: true });
+}));
+
+$("#form-shopee").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const f = e.target, btn = $("#btn-conectar-shopee");
+  carregando(btn, true);
+  try {
+    aplicarStatusShopee(await api("/api/shopee/conectar", { body: { app_id: f.app_id.value.trim(), secret: f.secret.value.trim() } }));
+    f.reset();
+    toast("Shopee conectada.", "ok");
+    atualizarPassos();
+  } catch (err) { toast(err.message, "erro"); }
+  finally { carregando(btn, false); }
+});
+
+$("#btn-desconectar-shopee").addEventListener("click", async () => {
+  try { aplicarStatusShopee(await api("/api/shopee/desconectar", { body: {} })); toast("Shopee desconectada.", "info"); atualizarPassos(); }
+  catch (err) { toast(err.message, "erro"); }
+});
+
+$("#form-shopee-link").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const btn = $("#btn-shopee-link");
+  carregando(btn, true);
+  try {
+    const { link } = await api("/api/shopee/link", { body: { url: $("#shopee-url").value.trim() } });
+    $("#shopee-link-saida").textContent = link;
+    $("#btn-copiar-shopee").dataset.copiar = link;
+    $("#shopee-resultado").hidden = false;
+  } catch (err) { $("#shopee-resultado").hidden = true; toast(err.message, "erro"); }
+  finally { carregando(btn, false); }
+});
 
 function estadoModal(qual) {
   $$("#modal-ml .estado").forEach((e) => (e.hidden = !e.classList.contains(qual)));
@@ -643,6 +724,18 @@ $("#form-busca").addEventListener("submit", async (e) => {
   }
   lista.classList.remove("aberta");
   carregando(btn, true);
+  if (estado.fonte === "shopee") {  // direto na API da Shopee: o servidor busca e gera, aqui só se acompanha
+    try {
+      const { id } = await api("/api/jobs", { body: { termo, limite: estado.limite, nicho: $("#sel-nicho").value, fonte: "shopee" } });
+      estado.job = id;
+      await espera(350);
+      abrirGerando({ id, termo, status: "coletando", total: 0, feitos: 0, ok: 0 });
+    } catch (err) {
+      toast(err.message, "erro");
+      if (err.status === 400) irPara("integracoes");
+    } finally { carregando(btn, false); }
+    return;
+  }
   try {
     await sincronizarSessao(); // usa a sessão mais recente do ML deste navegador
     // a busca e a geração dos links rodam neste navegador (o ML recusa as duas quando vêm do IP do servidor)
@@ -874,6 +967,7 @@ function erroGerando(job) {
   estadoGerando("estado-erro");
   $("#erro-msg").textContent = job.erro || "Erro inesperado.";
   if ((job.erro || "").includes("Mercado Livre")) api("/api/ml/status").then(aplicarStatusMl).catch(() => {});
+  if ((job.erro || "").includes("Shopee")) api("/api/shopee/status").then(aplicarStatusShopee).catch(() => {});
 }
 
 $("#btn-baixar").addEventListener("click", () => toast("Download iniciado!", "ok"));
@@ -913,6 +1007,7 @@ async function carregarHistorico() {
         <div class="h-envio"></div>
         <a class="h-baixar ${j.planilha ? "" : "off"}" href="/api/jobs/${j.id}/planilha" title="Baixar planilha" aria-label="Baixar planilha" download>${ic("download")}</a>`;
       $("strong", el).textContent = j.termo;
+      if (j.fonte === "shopee") $("strong", el).insertAdjacentHTML("beforeend", ' <span class="ok-pill">Shopee</span>');
       $("small", el).title = j.erro || "";
       if (j.status === "concluido") renderEnvioHist($(".h-envio", el), j);
       box.appendChild(el);

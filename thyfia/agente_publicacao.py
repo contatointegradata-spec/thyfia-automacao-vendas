@@ -115,6 +115,7 @@ GANCHOS = (
     "🛒 Achei baratinho pra você!",
 )
 HASHTAGS_FIXAS = ("#achadinhos", "#promocao", "#ofertas", "#mercadolivre")
+HASHTAG_DA_LOJA = {"ml": "#mercadolivre", "shopee": "#shopee"}
 
 
 def _hashtag(texto: str) -> str:
@@ -129,7 +130,7 @@ def gerar_legenda(item: dict, keyword: str = "") -> str:
     titulo = re.sub(r"\s+", " ", item.get("titulo") or "").strip()
     if len(titulo) > 180:
         titulo = titulo[:177].rstrip() + "…"
-    tags = list(HASHTAGS_FIXAS)
+    tags = list(HASHTAGS_FIXAS[:-1]) + [HASHTAG_DA_LOJA.get(item.get("fonte") or "ml", HASHTAGS_FIXAS[-1])]
     extra = _hashtag(keyword or item.get("busca") or "")
     tags.append(extra if extra and extra not in tags else "#achadinhosdodia")
     return (f"{gancho}\n\n{titulo}\n\n💰 Por R$ {preco_br(item['preco'])}\n\n"
@@ -138,7 +139,7 @@ def gerar_legenda(item: dict, keyword: str = "") -> str:
 
 # --------------------------------------------------------------------------- candidatos
 _SQL_ELEGIVEIS = f"""
-SELECT i.id, i.job_id, i.busca, i.titulo, i.preco, i.url_produto, i.link_afiliado, i.imagem, i.criado_em
+SELECT i.id, i.job_id, i.busca, i.titulo, i.preco, i.url_produto, i.link_afiliado, i.imagem, i.criado_em, j.fonte
   FROM job_itens i JOIN jobs j ON j.id = i.job_id
  WHERE j.usuario_id = ?
    AND TRIM(i.titulo) <> '' AND i.preco IS NOT NULL AND i.preco > 0 AND i.link_afiliado IS NOT NULL
