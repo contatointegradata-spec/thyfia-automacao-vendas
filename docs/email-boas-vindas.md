@@ -25,3 +25,13 @@ O endereço público usado nos botões e links é o campo **Endereço público**
 - A senha de app fica cifrada no banco, como os demais segredos.
 - O modelo está em `thyfia/emails.py`; as imagens (logo e Thyf em PNG) em `thyfia/static/marca/email/` vão
   embutidas no e-mail, então aparecem sem pedir para "carregar imagens".
+
+## Se o teste der erro
+
+A mensagem vermelha agora traz a causa real entre parênteses (por exemplo `TimeoutError` ou `Network is unreachable`).
+
+- **"O Gmail recusou o login"**: senha de app errada, ou o remetente não é a conta que gerou a senha. A senha pode ser
+  colada com os espaços que o Google mostra; a ThyfIA tira os espaços.
+- **"Não consegui conectar ao Gmail"**: a ThyfIA tenta a porta 465 (SSL) e, se não conectar, a 587 (STARTTLS). Se as
+  duas falham, o servidor está bloqueando a saída de e-mail nessas portas (firewall da VPS ou do provedor).
+- **"Falha na conexão segura"**: problema de certificado/TLS no servidor.

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 import smtplib
+import ssl
 import unittest
 from unittest import mock
 
@@ -105,6 +106,50 @@ class TestEnvio(unittest.TestCase):
             with self.assertRaises(ValueError) as cm:
                 emails.enviar(emails.montar_mensagem("Ana", "ana@exemplo.com"))
         self.assertIn("senha de app", str(cm.exception))
+
+    def test_senha_de_app_colada_com_espacos_e_normalizada(self):
+        configurar()
+        configuracoes.definir("email_senha_app", "abcd efgh\u00a0ijkl mnop")
+        with mock.patch("smtplib.SMTP_SSL") as smtp:
+            emails.enviar(emails.montar_mensagem("Ana", "ana@exemplo.com"))
+        smtp.return_value.__enter__.return_value.login.assert_called_once_with("contato.thyfia@gmail.com", "abcdefghijklmnop")
+
+    def test_porta_465_bloqueada_cai_para_starttls_587(self):
+        configurar()
+        with mock.patch("smtplib.SMTP_SSL", side_effect=TimeoutError("timed out")), mock.patch("smtplib.SMTP") as plano_b:
+            emails.enviar(emails.montar_mensagem("Ana", "ana@exemplo.com"))
+        self.assertEqual(plano_b.call_args.args[:2], ("smtp.gmail.com", 587))
+        s = plano_b.return_value.__enter__.return_value
+        s.starttls.assert_called_once()
+        s.login.assert_called_once_with("contato.thyfia@gmail.com", "abcdefghijklmnop")
+        s.send_message.assert_called_once()
+
+    def test_login_recusado_nao_tenta_outra_porta(self):
+        configurar()
+        with mock.patch("smtplib.SMTP_SSL") as smtp, mock.patch("smtplib.SMTP") as plano_b:
+            smtp.return_value.__enter__.return_value.login.side_effect = smtplib.SMTPAuthenticationError(535, b"bad")
+            with self.assertRaises(ValueError):
+                emails.enviar(emails.montar_mensagem("Ana", "ana@exemplo.com"))
+        plano_b.assert_not_called()
+
+    def test_erro_de_rede_mostra_a_causa_real_sem_vazar_a_senha(self):
+        configurar()
+        with mock.patch("smtplib.SMTP_SSL", side_effect=ConnectionRefusedError("recusado")), \
+             mock.patch("smtplib.SMTP", side_effect=OSError("Network is unreachable")):
+            with self.assertRaises(ValueError) as cm:
+                emails.enviar(emails.montar_mensagem("Ana", "ana@exemplo.com"))
+        msg = str(cm.exception)
+        self.assertIn("Network is unreachable", msg)
+        self.assertIn("587", msg)
+        self.assertNotIn("abcdefghijklmnop", msg)
+
+    def test_falha_de_tls_e_explicada(self):
+        configurar()
+        with mock.patch("smtplib.SMTP_SSL", side_effect=ssl.SSLError("certificate verify failed")), \
+             mock.patch("smtplib.SMTP", side_effect=ssl.SSLError("certificate verify failed")):
+            with self.assertRaises(ValueError) as cm:
+                emails.enviar(emails.montar_mensagem("Ana", "ana@exemplo.com"))
+        self.assertIn("conexão segura", str(cm.exception))
 
     def test_limite_por_hora_trava_excesso(self):
         configurar()
