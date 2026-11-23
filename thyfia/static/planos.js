@@ -411,7 +411,7 @@ async function admResumo() {
       ["Links de checkout dos 3 planos", c.kiwify_link_plus.definido && c.kiwify_link_pro.definido && c.kiwify_link_premium.definido],
       ["Automação (n8n) habilitada", cfg.n8n_ok], ["Teste de WhatsApp (Evolution)", c.evolution_url.definido && c.evolution_apikey.definido && c.evolution_instancia.definido],
       ["Teste de Telegram (bot)", c.telegram_bot_token.definido && c.telegram_bot.definido],
-      ["E-mail de boas-vindas (Gmail)", c.email_remetente.definido && c.email_senha_app.definido],
+      ["E-mails da plataforma (boas-vindas e senha)", c.email_remetente.definido && (c.email_resend_chave.definido || c.email_senha_app.definido)],
     ];
     const pronto = checks.filter((x) => x[1]).length;
     box.innerHTML = `<div class="stats ad-stats">
@@ -538,7 +538,7 @@ const GRUPOS_CFG = [
   ["Automação (n8n)", ["n8n_webhook_url", "n8n_api_key"], "Webhook do fluxo “Receber links da ThyfIA”. Um só para todos os clientes: cada envio leva os dados do cliente."],
   ["WhatsApp (Evolution API)", ["evolution_url", "evolution_apikey", "evolution_instancia"], "Só para o botão “Enviar mensagem de teste” do cliente. A instância é a que envia as ofertas."],
   ["Telegram", ["telegram_bot", "telegram_bot_token"], "O @ do bot é mostrado ao cliente no passo a passo; o token só serve para o teste de envio ao canal."],
-  ["E-mail de boas-vindas (Gmail)", ["email_remetente", "email_senha_app"], "Enviado uma vez a quem cria conta. Use o Gmail da ThyfIA e uma senha de app (Conta Google > Segurança > Verificação em duas etapas > Senhas de app). Sem os dois campos, nada é enviado."],
+  ["E-mails da plataforma (Resend ou Gmail)", ["email_remetente", "email_resend_chave", "email_senha_app"], "Boas-vindas ao criar conta e link de \"esqueci minha senha\". Recomendado: Resend (envio por HTTPS; veja docs/email-boas-vindas.md). Preencha o remetente e a chave do Resend, ou então o remetente e a senha de app do Gmail. Com os dois, vale o Resend. Sem nenhum, nada é enviado."],
   ["Geral", ["url_publica", "suporte_whatsapp"], "Endereço público (ex.: https://thyfia.integradata.app.br) e o WhatsApp de suporte, só dígitos com DDI."],
 ];
 

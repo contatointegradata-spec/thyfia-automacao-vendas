@@ -75,6 +75,81 @@ class TestMontagem(unittest.TestCase):
         self.assertNotIn("abcdefghijklmnop", bruto)
 
 
+class TestResend(unittest.TestCase):
+    def setUp(self):
+        zerar()
+        configuracoes.definir("email_remetente", "contato@integradata.app.br")
+        configuracoes.definir("email_resend_chave", "re_chave_de_teste")
+
+    def _resp(self, status=200, corpo=None):
+        r = mock.Mock(status_code=status, ok=status < 400, text="")
+        r.json.return_value = corpo if corpo is not None else {"id": "abc"}
+        return r
+
+    def test_so_a_chave_do_resend_ja_conta_como_configurado(self):
+        self.assertTrue(emails.configurado())
+        configuracoes.definir("email_resend_chave", "")
+        self.assertFalse(emails.configurado())  # sem Resend e sem senha de app
+
+    def test_envia_pela_api_com_https_e_nao_abre_smtp(self):
+        with mock.patch("requests.post", return_value=self._resp()) as post, \
+             mock.patch("smtplib.SMTP_SSL") as smtp, mock.patch("smtplib.SMTP") as smtp2:
+            emails.enviar(emails.montar_mensagem("Ana Souza", "ana@exemplo.com"))
+        smtp.assert_not_called(); smtp2.assert_not_called()
+        self.assertEqual(post.call_args.args[0], "https://api.resend.com/emails")
+        self.assertEqual(post.call_args.kwargs["headers"]["Authorization"], "Bearer re_chave_de_teste")
+        corpo = post.call_args.kwargs["json"]
+        self.assertEqual(corpo["from"], "ThyfIA <contato@integradata.app.br>")
+        self.assertEqual(corpo["to"], ["Ana Souza <ana@exemplo.com>"])
+        self.assertIn("bem-vindo", corpo["subject"].lower())
+        self.assertEqual(corpo["reply_to"], "contato@integradata.app.br")
+        self.assertTrue(corpo["text"].strip())
+
+    def test_imagens_cid_viram_links_do_site(self):
+        with mock.patch("requests.post", return_value=self._resp()) as post:
+            emails.enviar(emails.montar_mensagem_redefinicao("Ana", "ana@exemplo.com", "TOK"))
+        html = post.call_args.kwargs["json"]["html"]
+        self.assertNotIn("cid:", html)
+        self.assertIn("https://thyfia.integradata.app.br/static/marca/email/logo.png", html)
+        self.assertIn("/static/marca/email/thyf-pensando.png", html)
+        self.assertIn("?redefinir=TOK", html)
+
+    def test_resend_tem_prioridade_sobre_o_gmail(self):
+        configuracoes.definir("email_senha_app", "abcdefghijklmnop")
+        with mock.patch("requests.post", return_value=self._resp()) as post, mock.patch("smtplib.SMTP_SSL") as smtp:
+            emails.enviar(emails.montar_mensagem("Ana", "ana@exemplo.com"))
+        post.assert_called_once(); smtp.assert_not_called()
+
+    def test_chave_recusada_vira_mensagem_clara(self):
+        with mock.patch("requests.post", return_value=self._resp(401, {"message": "API key is invalid"})):
+            with self.assertRaises(ValueError) as cm:
+                emails.enviar(emails.montar_mensagem("Ana", "ana@exemplo.com"))
+        self.assertIn("chave de API", str(cm.exception))
+        self.assertNotIn("re_chave_de_teste", str(cm.exception))
+
+    def test_dominio_nao_verificado_mostra_o_motivo(self):
+        with mock.patch("requests.post", return_value=self._resp(403, {"message": "The integradata.app.br domain is not verified."})):
+            with self.assertRaises(ValueError) as cm:
+                emails.enviar(emails.montar_mensagem("Ana", "ana@exemplo.com"))
+        self.assertIn("not verified", str(cm.exception))
+        self.assertIn("domínio", str(cm.exception))
+
+    def test_limite_de_taxa_e_falha_de_rede(self):
+        with mock.patch("requests.post", return_value=self._resp(429, {"message": "slow down"})):
+            with self.assertRaises(ValueError) as cm:
+                emails.enviar(emails.montar_mensagem("Ana", "ana@exemplo.com"))
+        self.assertIn("esperar", str(cm.exception))
+        import requests as rq
+        with mock.patch("requests.post", side_effect=rq.ConnectionError("sem rede")):
+            with self.assertRaises(ValueError) as cm:
+                emails.enviar(emails.montar_mensagem("Ana", "ana@exemplo.com"))
+        self.assertIn("Resend", str(cm.exception))
+
+    def test_boas_vindas_nunca_levanta_se_o_resend_falhar(self):
+        with mock.patch("requests.post", return_value=self._resp(500, {"message": "erro"})):
+            self.assertFalse(emails.enviar_boas_vindas("Ana", "ana@exemplo.com"))
+
+
 class TestEnvio(unittest.TestCase):
     def setUp(self):
         zerar()
