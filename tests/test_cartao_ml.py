@@ -167,3 +167,32 @@ class TestDoCartaoAoPiloto(Base):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestDadosDoCartaoNoPiloto(unittest.TestCase):
+    """Itens repetidos em várias gerações: a mais nova vale, mas herda o que o cartão trouxe antes."""
+
+    def test_geracao_do_historico_herda_dados_do_cartao_anterior(self):
+        from thyfia import piloto
+        nova = {"url_produto": "u1", "link_afiliado": "l1", "preco": 100.0, "preco_de": None, "selo": None,
+                "condicao": None, "desconto_pct": None, "vendas": None, "nota": None, "imagem": None}
+        velha = {**nova, "link_afiliado": "l0", "preco": 101.0, "preco_de": 150.0, "selo": "MAIS VENDIDO",
+                 "condicao": "pix", "desconto_pct": 33, "vendas": 500, "nota": 4.8, "imagem": "http://x/i.jpg"}
+        piloto._unir_dados_do_cartao([nova, velha])
+        self.assertEqual(nova["preco_de"], 150.0)
+        self.assertEqual(nova["condicao"], "pix")
+        self.assertEqual(nova["selo"], "MAIS VENDIDO")
+
+    def test_nao_herda_se_o_preco_mudou_muito(self):
+        from thyfia import piloto
+        nova = {"url_produto": "u1", "link_afiliado": "l1", "preco": 100.0, "preco_de": None, "selo": None,
+                "condicao": None, "desconto_pct": None, "vendas": None, "nota": None, "imagem": None}
+        velha = {**nova, "preco": 200.0, "preco_de": 300.0, "desconto_pct": 33}
+        piloto._unir_dados_do_cartao([nova, velha])
+        self.assertIsNone(nova["preco_de"])
+
+    def test_resumo_da_captura(self):
+        from thyfia import motor_ml
+        r = motor_ml.resumo_captura([{"origem": "cartao", "preco_de": 10, "imagem": "x"},
+                                     {"origem": "cartao"}, {}], 5)
+        self.assertEqual((r["cartoes_brutos"], r["do_cartao"], r["do_historico"], r["com_de"]), (5, 2, 1, 1))

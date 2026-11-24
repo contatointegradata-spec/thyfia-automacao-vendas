@@ -852,6 +852,14 @@ function pararPolls() {
   clearInterval(estado.pollMl); estado.pollMl = null;
 }
 
+// o que a captura leu do cartão do Mercado Livre: mostra quando faltou dado (ajuda a saber por que a mensagem saiu simples)
+function textoCaptura(c) {
+  if (!c || !c.produtos) return "";
+  const partes = [`${c.com_de}/${c.produtos} com preço De/Por`];
+  if (c.do_historico) partes.push(`${c.do_historico} do histórico, sem dados do cartão`);
+  return " · " + partes.join(" · ");
+}
+
 async function finalizarGerando(job) {
   if (estado.fimDe === job.id) return;  // o acompanhamento e a geração podem avisar juntos
   estado.fimDe = job.id;
@@ -860,7 +868,7 @@ async function finalizarGerando(job) {
   barra.classList.remove("indeterminado"); barra.style.width = "100%";
   await espera(REDUZIR ? 0 : 900);
   estadoGerando("estado-fim");
-  $("#fim-resumo").textContent = `Busca: “${job.termo}”`;
+  $("#fim-resumo").textContent = `Busca: “${job.termo}”` + textoCaptura(job.captura);
   contar($("#fim-ok"), job.ok, 1100);
   contar($("#fim-total"), job.total, 900);
   $("#btn-baixar").href = `/api/jobs/${job.id}/planilha`;

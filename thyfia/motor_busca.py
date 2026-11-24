@@ -129,6 +129,7 @@ def extrair_produtos(html: str) -> list[dict]:
             "vendas": int(vendas.group(1)) if vendas else 0,
             "nota": float(nota.group(1)) if nota else 0.0,
             "imagem": CDN_FOTO.format(foto.group(1)) if foto else None,
+            "origem": "cartao",
         })
     return produtos
 

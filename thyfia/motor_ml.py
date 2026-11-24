@@ -360,7 +360,22 @@ def _diagnostico_pagina(page, rede: list[str]) -> str:
 # ---------------------------------------------------------------------------
 def _dados_do_cartao(prod: dict) -> dict:
     """Selo, preço "de", desconto, condição do preço, vendas e nota lidos do cartão da busca (o que houver)."""
-    return {k: prod.get(k) for k in ("selo", "preco_de", "desconto_pct", "condicao", "vendas", "nota")}
+    d = {k: prod.get(k) for k in ("selo", "preco_de", "desconto_pct", "condicao", "vendas", "nota")}
+    d["origem"] = "cartao" if prod.get("origem") == "cartao" else "historico"  # sem marca = veio do que a ThyfIA já conhece
+    return d
+
+
+def resumo_captura(produtos: list[dict], cartoes_brutos: int) -> dict:
+    """O que a captura conseguiu ler do cartão do Mercado Livre nesta geração (para o painel e para diagnosticar)."""
+    cartao = [p for p in produtos if p.get("origem") == "cartao"]
+    return {"cartoes_brutos": cartoes_brutos, "produtos": len(produtos), "do_cartao": len(cartao),
+            "do_historico": len(produtos) - len(cartao),
+            "com_de": sum(1 for p in cartao if p.get("preco_de")),
+            "com_condicao": sum(1 for p in cartao if p.get("condicao")),
+            "com_selo": sum(1 for p in cartao if p.get("selo")),
+            "com_vendas": sum(1 for p in cartao if p.get("vendas")),
+            "com_nota": sum(1 for p in cartao if p.get("nota")),
+            "com_foto": sum(1 for p in cartao if p.get("imagem"))}
 
 
 def preparar_job_extensao(job_id: str, uid: int, termo: str, limite: int, trechos: str) -> None:
@@ -369,6 +384,7 @@ def preparar_job_extensao(job_id: str, uid: int, termo: str, limite: int, trecho
         _atualizar_job(job_id, status="coletando")
         produtos = motor_busca.extrair_produtos(trechos) or cerebro.recuperar(termo, limite)
         produtos = cerebro.ranquear(produtos)
+        brutos = (trechos or "").count('"polycard":{')
         if len(produtos) < limite:  # completa com o que a ThyfIA já conhece
             produtos += cerebro.recuperar(termo, limite - len(produtos), excluir={p["url"] for p in produtos})
         produtos = produtos[:limite]
@@ -377,7 +393,9 @@ def preparar_job_extensao(job_id: str, uid: int, termo: str, limite: int, trecho
         for prod in produtos:
             itens.salvar_item(job_id, termo, prod.get("titulo", ""), prod.get("preco"), prod["url"], None,
                               imagem=prod.get("imagem"), processado=0, **_dados_do_cartao(prod))
-        _atualizar_job(job_id, status="gerando", total=len(produtos), feitos=0, ok=0)
+        resumo = resumo_captura(produtos, brutos)
+        _log.info("Captura '%s': %s", termo, resumo)
+        _atualizar_job(job_id, status="gerando", total=len(produtos), feitos=0, ok=0, captura=json.dumps(resumo))
     except Exception as e:
         traceback.print_exc()
         _atualizar_job(job_id, status="erro", erro=str(e)[:300] or "Erro inesperado.")

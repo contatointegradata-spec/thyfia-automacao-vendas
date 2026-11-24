@@ -181,6 +181,10 @@ def _job_dict(r) -> dict:
         d["envio_resumo"] = json.loads(r["envio_resumo"]) if r["envio_resumo"] else None
     except ValueError:
         d["envio_resumo"] = None
+    try:
+        d["captura"] = json.loads(r["captura"]) if "captura" in r.keys() and r["captura"] else None
+    except ValueError:
+        d["captura"] = None
     return d
 
 
