@@ -144,30 +144,27 @@ def compor(item: dict, estilo: str = "variado", semente: int = 0, variante: str 
     pct_txt = f" ({int(pct)}% OFF)" if de and pct and 5 <= int(pct) <= 90 else ""
     selo = selo_linha(item)
     extras = [x for x in (prova_social(item), AVISO_CUPOM if item.get("condicao") == "cupom" else "") if x]
-    extra = "".join(f"\n{x}" for x in extras)
-    topo = f"\n{selo}" if selo else ""
+    animado = estilo == "animado"  # só o estilo "animado" abre com gancho e emoji; os demais seguem o modelo seco
 
-    if layout == "A":
-        preco_wa = (f"💰 De ~R$ {de_txt}~ por *R$ {preco}*" if de else f"💰 Por *R$ {preco}*") + cond + pct_txt
-        wa = f"{gancho}\n\n{emoji} *{titulo}*{topo}\n\n{preco_wa}{prova}{extra}\n\n_{AVISO}_\n👉 {link}"
-    elif layout == "B":
-        preco_wa = (f"💰 ~R$ {de_txt}~ ➜ R$ {preco}" if de else f"💰 R$ {preco}") + cond + pct_txt
-        wa = f"{gancho}\n\n*{titulo}*{topo}\n{preco_wa}{prova}{extra}\n\n_{AVISO}_\n🛒 Compre aqui: {link}"
-    else:
-        preco_wa = (f"De ~R$ {de_txt}~ por apenas *R$ {preco}*" if de else f"Por apenas *R$ {preco}*") + cond + pct_txt
-        wa = f"{emoji} {gancho}\n*{titulo}*{topo}\n\n{preco_wa}{prova}{extra} 👇\n{link}\n\n_{AVISO}_"
+    # Modelo (o mesmo dos grupos de ofertas que funcionam): título, "De" riscado, "Por" em negrito, avisos, link.
+    #   *Título*
+    #
+    #   De ~R$ 839,00~
+    #   Por *R$ 433,00* com cupom (48% OFF)
+    #
+    #   https://meli.la/...
+    topo = f"\n{selo}" if selo else ""
+    cabeca = (f"{gancho}\n\n" if animado else "") + (f"{emoji} " if animado else "")
+    por_wa = f"Por *R$ {preco}*" + cond + pct_txt
+    preco_wa = (f"De ~R$ {de_txt}~\n" if de else "") + por_wa
+    avisos = "".join(f"\n{x}" for x in extras)
+    wa = f"{cabeca}*{titulo}*{topo}\n\n{preco_wa}{prova}{avisos}\n\n{link}"
 
     esc = html.escape
+    por_h = f"Por <b>R$ {preco}</b>" + esc(cond + pct_txt)
+    preco_h = (f"De <s>R$ {de_txt}</s>\n" if de else "") + por_h
     topo_h = f"\n{esc(selo)}" if selo else ""
-    extra_h = "".join(f"\n{esc(x)}" for x in extras)
-    fim = esc(cond + pct_txt) + esc(prova) + extra_h
-    if layout == "A":
-        p_h = (f"💰 De <s>R$ {de_txt}</s> por <b>R$ {preco}</b>" if de else f"💰 Por <b>R$ {preco}</b>")
-        corpo = f"{esc(gancho)}\n\n{emoji} <b>{esc(titulo)}</b>{topo_h}\n\n{p_h}{fim}"
-    elif layout == "B":
-        p_h = (f"💰 <s>R$ {de_txt}</s> ➜ R$ {preco}" if de else f"💰 R$ {preco}")
-        corpo = f"{esc(gancho)}\n\n<b>{esc(titulo)}</b>{topo_h}\n{p_h}{fim}"
-    else:
-        p_h = (f"De <s>R$ {de_txt}</s> por apenas <b>R$ {preco}</b>" if de else f"Por apenas <b>R$ {preco}</b>")
-        corpo = f"{emoji} {esc(gancho)}\n<b>{esc(titulo)}</b>{topo_h}\n\n{p_h}{fim} 👇"
-    return {"texto": wa, "html": f"{corpo}\n\n<i>{esc(AVISO)}</i>", "titulo": titulo, "preco": preco, "layout": layout}
+    cabeca_h = (f"{esc(gancho)}\n\n" if animado else "") + (f"{emoji} " if animado else "")
+    avisos_h = "".join(f"\n{esc(x)}" for x in extras)
+    corpo = f"{cabeca_h}<b>{esc(titulo)}</b>{topo_h}\n\n{preco_h}{esc(prova)}{avisos_h}\n\n{esc(link)}"
+    return {"texto": wa, "html": corpo, "titulo": titulo, "preco": preco, "layout": layout}
