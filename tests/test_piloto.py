@@ -412,12 +412,25 @@ class TestMensagens(unittest.TestCase):
         self.assertLessEqual(len(t), 111)
         self.assertFalse(t.isupper())
 
-    def test_segue_o_modelo_seco_e_so_o_animado_tem_gancho(self):
-        seco = mensagens.compor(self.ITEM, "variado", 1)["texto"].split("\n")
+    def test_layout_a_e_o_modelo_seco_e_os_outros_abrem_com_destaque_ou_gancho(self):
+        seco = mensagens.compor(self.ITEM, "variado", 1, "A")["texto"].split("\n")
         self.assertEqual(seco[0][0], "*")  # abre direto no título em negrito
         self.assertEqual(seco[2], "Por *R$ 1.234,50*")
-        animado = mensagens.compor(self.ITEM, "animado", 1)["texto"]
-        self.assertTrue(any(g in animado.split("\n")[0] for g in mensagens.GANCHOS_ANIMADO))
+        b = mensagens.compor(self.ITEM, "variado", 1, "B")["texto"].split("\n")[0]
+        self.assertTrue(b.startswith("🎧") and "*FONE" not in b)  # só o emoji do produto: não há fato forte para destacar
+        c = mensagens.compor(self.ITEM, "animado", 1, "C")["texto"].split("\n")[0]
+        self.assertTrue(any(g in c for g in mensagens.GANCHOS_ANIMADO))
+
+    def test_destaque_e_gancho_so_usam_fatos_da_oferta(self):
+        forte = {**self.ITEM, "preco_de": 2500.0, "desconto_pct": 50, "selo": "MAIS VENDIDO", "condicao": "cupom"}
+        b = mensagens.compor(forte, "variado", 1, "B")["texto"].split("\n")[0]
+        self.assertEqual(b, "🏆 *Mais vendido* · 🔥 *50% OFF*")
+        c = mensagens.compor(forte, "variado", 1, "C")["texto"].split("\n")[0]
+        self.assertIn("50%", c)
+        sem = mensagens.compor({**self.ITEM, "condicao": "cupom"}, "variado", 1, "C")["texto"].split("\n")[0]
+        self.assertIn("cupom", sem)
+        self.assertNotIn("%", mensagens.compor(self.ITEM, "variado", 1, "B")["texto"])  # sem dado, sem destaque inventado
+        self.assertIn("<b>Mais vendido</b>", mensagens.compor(forte, "variado", 1, "B")["html"])
 
     def test_de_por_em_duas_linhas(self):
         t = mensagens.compor({**self.ITEM, "preco": 433.0, "preco_de": 839.0})["texto"]

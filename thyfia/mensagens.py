@@ -118,53 +118,74 @@ def prova_de_preco(item: dict, sem_baixa: bool = False) -> str:
     return ""
 
 
+def destaque(item: dict, de: float | None, pct, selo: str, cond: str) -> str:
+    """Linha de destaque com o fato mais forte DA OFERTA (nunca inventa): selo + desconto, ou cupom, ou Pix."""
+    partes = []
+    if selo:
+        partes.append(selo.replace("Mais vendido no Mercado Livre", "*Mais vendido*", 1) if "Mais vendido" in selo else selo)
+    if de and pct and 15 <= int(pct) <= 90:
+        partes.append(f"🔥 *{int(pct)}% OFF*")
+    if not partes and cond:
+        partes.append("🎟️ *Preço com cupom*" if "cupom" in cond else "💳 *Preço no Pix*")
+    return " · ".join(partes)
+
+
+def gancho_da_oferta(item: dict, de: float | None, pct, selo: str, cond: str, estilo: str, rnd: random.Random) -> str:
+    """Gancho que combina com o que a oferta REALMENTE tem; sem fato forte, cai no gancho geral do estilo."""
+    if de and pct and int(pct) >= 30:
+        return rnd.choice((f"🔥 {int(pct)}% OFF — corre!", "😱 Olha esse desconto!", f"💥 Caiu {int(pct)}%!"))
+    if "cupom" in cond:
+        return rnd.choice(("🎟️ Esse aqui tem cupom!", "🎟️ Ative o cupom e economize!"))
+    if selo:
+        return rnd.choice(("🏆 Está entre os mais vendidos!", "🏆 Queridinho do Mercado Livre!"))
+    if (item.get("queda_pct") or 0) >= 5:
+        return rnd.choice(("📉 O preço caiu!", "📉 Baixou de preço!"))
+    pool = GANCHOS_ANIMADO if estilo == "animado" else GANCHOS_DIRETO if estilo == "direto" else GANCHOS_ANIMADO + GANCHOS_DIRETO
+    return rnd.choice(pool)
+
+
 def compor(item: dict, estilo: str = "variado", semente: int = 0, variante: str | None = None) -> dict:
     """item: {titulo, preco, link_afiliado, busca}. Devolve {texto (WhatsApp), html (Telegram), titulo, preco, layout}.
+
+    Todos os layouts seguem o modelo dos grupos de ofertas (título, "De" riscado, "Por" em negrito, avisos, link).
+    O que muda é a ABERTURA, e é isso que o Cérebro testa e aprende (qual rende mais cliques para o público):
+      A: modelo seco, sem abertura.
+      B: emoji do produto + linha de destaque com o fato mais forte da oferta (selo, % OFF, cupom, Pix).
+      C: gancho de abertura que combina com a oferta (desconto, cupom, mais vendido, queda) e emoji no título.
     `variante` (A/B/C) força o layout que o Cérebro aprendeu que rende mais; vazio = varia sozinho."""
     rnd = random.Random(f"{item.get('id', 0)}-{semente}")
-    if estilo == "animado":
-        pool = GANCHOS_ANIMADO
-    elif estilo == "direto":
-        pool = GANCHOS_DIRETO
-    else:
-        pool = GANCHOS_ANIMADO + GANCHOS_DIRETO
-    gancho = rnd.choice(pool)
     titulo = limpar_titulo(item.get("titulo", ""))
     preco = preco_br(item["preco"])
     emoji = emoji_da(item.get("busca", ""), titulo)
     link = (item.get("link_afiliado") or "").strip()
-    layout = rnd.choice("ABC")
-    if variante in ("A", "B", "C"):
-        layout = variante
+    layout = variante if variante in ("A", "B", "C") else rnd.choice("ABC")
     de = preco_de(item)
     de_txt = preco_br(de) if de else ""
     prova = prova_de_preco(item, sem_baixa=bool(de))
     cond = CONDICOES.get(item.get("condicao") or "", "")
     pct = item.get("desconto_pct")
-    pct_txt = f" ({int(pct)}% OFF)" if de and pct and 5 <= int(pct) <= 90 else ""
+    pct_ok = bool(de and pct and 5 <= int(pct) <= 90)
     selo = selo_linha(item)
     extras = [x for x in (prova_social(item), AVISO_CUPOM if item.get("condicao") == "cupom" else "") if x]
-    animado = estilo == "animado"  # só o estilo "animado" abre com gancho e emoji; os demais seguem o modelo seco
 
-    # Modelo (o mesmo dos grupos de ofertas que funcionam): título, "De" riscado, "Por" em negrito, avisos, link.
-    #   *Título*
-    #
-    #   De ~R$ 839,00~
-    #   Por *R$ 433,00* com cupom (48% OFF)
-    #
-    #   https://meli.la/...
-    topo = f"\n{selo}" if selo else ""
-    cabeca = (f"{gancho}\n\n" if animado else "") + (f"{emoji} " if animado else "")
-    por_wa = f"Por *R$ {preco}*" + cond + pct_txt
-    preco_wa = (f"De ~R$ {de_txt}~\n" if de else "") + por_wa
+    topo_txt = destaque(item, de, pct, selo, cond) if layout == "B" else ""
+    gancho = gancho_da_oferta(item, de, pct, selo, cond, estilo, rnd) if layout == "C" else ""
+    sel_embaixo = selo if layout != "B" else ""  # no B o selo sobe para a linha de destaque
+    pct_txt = f" ({int(pct)}% OFF)" if pct_ok and (layout == "A" or (layout == "C" and "%" not in gancho)) else ""
+    com_emoji = layout in ("B", "C")
+
+    # Modelo:  [abertura]  *Título*  [selo]  /  De ~R$ 839,00~  /  Por *R$ 433,00* com cupom (48% OFF)  /  link
+    cabeca = (f"{gancho}\n\n" if gancho else "") + (f"{topo_txt}\n" if topo_txt else "") + (f"{emoji} " if com_emoji else "")
+    topo = f"\n{sel_embaixo}" if sel_embaixo else ""
+    preco_wa = (f"De ~R$ {de_txt}~\n" if de else "") + f"Por *R$ {preco}*" + cond + pct_txt
     avisos = "".join(f"\n{x}" for x in extras)
     wa = f"{cabeca}*{titulo}*{topo}\n\n{preco_wa}{prova}{avisos}\n\n{link}"
 
     esc = html.escape
-    por_h = f"Por <b>R$ {preco}</b>" + esc(cond + pct_txt)
-    preco_h = (f"De <s>R$ {de_txt}</s>\n" if de else "") + por_h
-    topo_h = f"\n{esc(selo)}" if selo else ""
-    cabeca_h = (f"{esc(gancho)}\n\n" if animado else "") + (f"{emoji} " if animado else "")
+    to_html = lambda t: re.sub(r"\*([^*]+)\*", r"<b>\1</b>", esc(t))  # destaque em negrito do WhatsApp -> HTML do Telegram
+    cabeca_h = (f"{esc(gancho)}\n\n" if gancho else "") + (f"{to_html(topo_txt)}\n" if topo_txt else "") + (f"{emoji} " if com_emoji else "")
+    topo_h = f"\n{esc(sel_embaixo)}" if sel_embaixo else ""
+    preco_h = (f"De <s>R$ {de_txt}</s>\n" if de else "") + f"Por <b>R$ {preco}</b>" + esc(cond + pct_txt)
     avisos_h = "".join(f"\n{esc(x)}" for x in extras)
     corpo = f"{cabeca_h}<b>{esc(titulo)}</b>{topo_h}\n\n{preco_h}{esc(prova)}{avisos_h}\n\n{esc(link)}"
     return {"texto": wa, "html": corpo, "titulo": titulo, "preco": preco, "layout": layout}
