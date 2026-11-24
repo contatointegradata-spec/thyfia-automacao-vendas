@@ -360,7 +360,7 @@ def _diagnostico_pagina(page, rede: list[str]) -> str:
 # ---------------------------------------------------------------------------
 def _dados_do_cartao(prod: dict) -> dict:
     """Selo, preço "de", desconto, condição do preço, vendas e nota lidos do cartão da busca (o que houver)."""
-    d = {k: prod.get(k) for k in ("selo", "preco_de", "desconto_pct", "condicao", "vendas", "nota")}
+    d = {k: prod.get(k) for k in ("selo", "preco_de", "desconto_pct", "condicao", "vendas", "nota", "parcelas")}
     d["origem"] = "cartao" if prod.get("origem") == "cartao" else "historico"  # sem marca = veio do que a ThyfIA já conhece
     return d
 
@@ -375,16 +375,20 @@ def resumo_captura(produtos: list[dict], cartoes_brutos: int) -> dict:
             "com_selo": sum(1 for p in cartao if p.get("selo")),
             "com_vendas": sum(1 for p in cartao if p.get("vendas")),
             "com_nota": sum(1 for p in cartao if p.get("nota")),
+            "com_parcelas": sum(1 for p in cartao if p.get("parcelas")),
             "com_foto": sum(1 for p in cartao if p.get("imagem"))}
 
 
-def preparar_job_extensao(job_id: str, uid: int, termo: str, limite: int, trechos: str) -> None:
+def preparar_job_extensao(job_id: str, uid: int, termo: str, limite: int, trechos: str | None,
+                          cartoes_dom: list[dict] | None = None) -> None:
     """Lê os cartões enviados pela extensão, ranqueia e guarda os produtos aguardando link."""
     try:
         _atualizar_job(job_id, status="coletando")
-        produtos = motor_busca.extrair_produtos(trechos) or cerebro.recuperar(termo, limite)
+        # 1) cartões renderizados (formato atual do ML)  2) JSON "polycard" (formato antigo)  3) o que a ThyfIA já conhece
+        produtos = motor_busca.produtos_de_cartoes(cartoes_dom or []) or motor_busca.extrair_produtos(trechos or "") \
+            or cerebro.recuperar(termo, limite)
         produtos = cerebro.ranquear(produtos)
-        brutos = (trechos or "").count('"polycard":{')
+        brutos = len(cartoes_dom or []) or (trechos or "").count('"polycard":{')
         if len(produtos) < limite:  # completa com o que a ThyfIA já conhece
             produtos += cerebro.recuperar(termo, limite - len(produtos), excluir={p["url"] for p in produtos})
         produtos = produtos[:limite]

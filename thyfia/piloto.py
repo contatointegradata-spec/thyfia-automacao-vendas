@@ -434,7 +434,7 @@ def _bate_palavras(busca: str, palavras: list[str]) -> bool:
     return any(cerebro.normalizar(p) and (cerebro.normalizar(p) in b or b in cerebro.normalizar(p)) for p in palavras)
 
 
-CAMPOS_CARTAO = ("selo", "preco_de", "desconto_pct", "condicao", "vendas", "nota", "imagem")
+CAMPOS_CARTAO = ("selo", "preco_de", "desconto_pct", "condicao", "vendas", "nota", "parcelas", "imagem")
 
 
 def _unir_dados_do_cartao(rows: list[dict]) -> list[dict]:
@@ -466,7 +466,7 @@ def candidatos(uid: int, cfg: dict | None = None, agora: datetime | None = None,
     corte = _iso(agora - timedelta(days=cfg["validade_dias"]))
     rows = [dict(r) for r in c.execute(
         "SELECT i.id, i.busca, i.titulo, i.preco, i.url_produto, i.link_afiliado, i.imagem, i.criado_em, "
-        "i.selo, i.preco_de, i.desconto_pct, i.condicao, i.vendas, i.nota "
+        "i.selo, i.preco_de, i.desconto_pct, i.condicao, i.vendas, i.nota, i.parcelas "
         "FROM job_itens i JOIN jobs j ON j.id = i.job_id "
         "WHERE j.usuario_id=? AND TRIM(i.titulo) <> '' AND i.preco IS NOT NULL AND i.preco > 0 "
         "AND i.link_afiliado LIKE 'http%' AND i.criado_em >= ? ORDER BY i.id DESC", (uid, corte)).fetchall()]

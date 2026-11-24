@@ -95,6 +95,97 @@ def _dados_de_oferta(bloco: str, preco_atual: float | None) -> dict:
     }
 
 
+# ---- cartão renderizado (HTML): o ML passou a entregar a busca sem o JSON "polycard"; a extensão manda o texto visível
+_DIN = r"R\$\s*(\d[\d.]*)\s*(?:,\s*(\d{2}))?"
+RE_DIN = re.compile(_DIN)
+RE_PARCELA = re.compile(r"(?:ou\s+" + _DIN + r"\s+em\s+)?(\d{1,2})\s*x\s*" + _DIN + r"\s*(sem juros)?", re.I)
+RE_PCT_OFF = re.compile(r"(\d{1,2})\s*%\s*OFF", re.I)
+RE_VENDAS_TXT = re.compile(r"\+?\s*(\d[\d.,]*)\s*(mil)?\s*vendidos", re.I)
+RE_NOTA_TXT = re.compile(r"(\d[.,]\d)\s*\|")
+RE_SELO_TXT = re.compile(r"MAIS VENDIDO|OFERTA DO DIA|OFERTA REL[ÂA]MPAGO|RECOMENDADO|MELHOR PRE[ÇC]O", re.I)
+RE_ID_HREF = re.compile(r"(?:wid=|item_id(?:%3A|:))MLB(\d+)|/MLB-?(\d+)")
+RE_FOTO_URL = re.compile(r"(\d{3,7}-ML[A-Z]\d+_\d{6})")
+
+
+def _valor(inteiro: str, centavos: str | None) -> float:
+    return int(inteiro.replace(".", "")) + (int(centavos) / 100 if centavos else 0)
+
+
+def _fmt_din(v: float) -> str:
+    return f"{v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+
+def ler_texto_do_cartao(texto: str) -> dict:
+    """Preço, "de", % OFF, condição (Pix/cupom), parcelas, selo, vendas e nota do texto visível de um cartão da busca."""
+    t = re.sub(r"\s+", " ", texto or "")
+    parcelas = None
+    m = RE_PARCELA.search(t)
+    if m:
+        n, v = int(m.group(3)), _valor(m.group(4), m.group(5))
+        parcelas = f"{n}x R$ {_fmt_din(v)}" + (" sem juros" if m.group(6) else "")
+        t = t[:m.start()] + " " + t[m.end():]
+    pct_m = RE_PCT_OFF.search(t)
+    antes = t[:pct_m.start()] if pct_m else t
+    precos = [_valor(a, b) for a, b in RE_DIN.findall(antes)][:2]
+    if not pct_m:
+        precos = [_valor(a, b) for a, b in RE_DIN.findall(t)][:2]
+    por, de = (None, None)
+    if len(precos) >= 2 and precos[0] > precos[1] * 1.03:
+        de, por = precos[0], precos[1]
+    elif precos:
+        por = precos[0]
+    pct = int(pct_m.group(1)) if pct_m else None
+    if de and por:
+        real = round((de - por) / de * 100)
+        if pct is None or abs(real - pct) > 3:
+            pct = real
+    else:
+        pct = None
+    resto = t[pct_m.end():pct_m.end() + 25] if pct_m else ""
+    cond = "pix" if re.match(r"\s*(?:no\s+)?pix\b", resto, re.I) else "cupom" if re.match(r"\s*(?:com\s+)?cupom\b", resto, re.I) else None
+    if not cond and re.search(r"\bcupom\b", t, re.I):
+        cond = "cupom"
+    vm = RE_VENDAS_TXT.search(t)
+    vendas = 0
+    if vm:
+        num = float(vm.group(1).replace(".", "").replace(",", ".")) if not vm.group(2) else float(vm.group(1).replace(",", "."))
+        vendas = int(num * (1000 if vm.group(2) else 1))
+    nm = RE_NOTA_TXT.search(t)
+    sm = RE_SELO_TXT.search(t)
+    return {"preco_valor": por, "preco_de": de, "desconto_pct": pct if de else None, "condicao": cond,
+            "parcelas": parcelas, "vendas": vendas, "nota": float(nm.group(1).replace(",", ".")) if nm else 0.0,
+            "selo": sm.group(0).upper().replace("RELAMPAGO", "RELÂMPAGO") if sm else None}
+
+
+def produtos_de_cartoes(cartoes: list[dict]) -> list[dict]:
+    """Produtos a partir dos cartões renderizados que a extensão leu da página: [{url, titulo, texto, imagem}]."""
+    produtos, vistos = [], set()
+    for c in cartoes or []:
+        href = str(c.get("url") or "")
+        m = RE_ID_HREF.search(href)
+        if not m:
+            continue
+        item_id = "MLB" + (m.group(1) or m.group(2))
+        if item_id in vistos:
+            continue
+        d = ler_texto_do_cartao(str(c.get("texto") or ""))
+        titulo = re.sub(r"\s+", " ", str(c.get("titulo") or "")).strip()
+        if not titulo or not d["preco_valor"]:
+            continue
+        vistos.add(item_id)
+        limpo = href.split("#")[0].split("?")[0]
+        url = limpo if limpo.startswith("https://") and "mercadolivre.com.br" in limpo and "click" not in limpo \
+            else f"https://produto.mercadolivre.com.br/MLB-{item_id[3:]}"
+        foto = RE_FOTO_URL.search(str(c.get("imagem") or ""))
+        produtos.append({
+            "titulo": titulo, "preco": _preco_br(str(d["preco_valor"])), "url": url, "item_id": item_id,
+            "preco_de": d["preco_de"], "desconto_pct": d["desconto_pct"], "condicao": d["condicao"],
+            "parcelas": d["parcelas"], "selo": d["selo"], "vendas": d["vendas"], "nota": d["nota"],
+            "imagem": CDN_FOTO.format(foto.group(1)) if foto else None, "origem": "cartao",
+        })
+    return produtos
+
+
 def extrair_produtos(html: str) -> list[dict]:
     """Lê os cards (polycards) do JSON embutido na página de resultados."""
     t = _desescapar(html)
