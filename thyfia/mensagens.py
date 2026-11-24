@@ -166,7 +166,9 @@ def compor(item: dict, estilo: str = "variado", semente: int = 0, variante: str 
     pct = item.get("desconto_pct")
     pct_ok = bool(de and pct and 5 <= int(pct) <= 90)
     selo = selo_linha(item)
-    extras = [x for x in (prova_social(item), AVISO_CUPOM if item.get("condicao") == "cupom" else "") if x]
+    parc = (item.get("parcelas") or "").strip()
+    extras = [x for x in (prova_social(item), f"💳 {parc}" if parc else "",
+                          AVISO_CUPOM if item.get("condicao") == "cupom" else "") if x]
 
     topo_txt = destaque(item, de, pct, selo, cond) if layout == "B" else ""
     gancho = gancho_da_oferta(item, de, pct, selo, cond, estilo, rnd) if layout == "C" else ""

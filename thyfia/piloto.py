@@ -434,6 +434,28 @@ def _bate_palavras(busca: str, palavras: list[str]) -> bool:
     return any(cerebro.normalizar(p) and (cerebro.normalizar(p) in b or b in cerebro.normalizar(p)) for p in palavras)
 
 
+CAMPOS_CARTAO = ("selo", "preco_de", "desconto_pct", "condicao", "vendas", "nota", "parcelas", "imagem")
+
+
+def _unir_dados_do_cartao(rows: list[dict]) -> list[dict]:
+    """O mesmo produto aparece em várias gerações e vale a mais recente (`rows` vem da mais nova para a mais velha).
+    Mas a mais nova pode ter vindo do histórico (sem preço "de", cupom, selo, vendas, nota): então completa o que falta
+    com o que uma geração anterior leu do cartão, desde que o preço seja praticamente o mesmo (senão o "de" seria de
+    outro momento)."""
+    primeira: dict[str, dict] = {}
+    for r in rows:
+        chave = r["url_produto"] or r["link_afiliado"]
+        base = primeira.setdefault(chave, r)
+        if base is r:
+            continue
+        if not base["preco"] or abs((r["preco"] or 0) - base["preco"]) > 0.02 * base["preco"]:
+            continue
+        for campo in CAMPOS_CARTAO:
+            if base.get(campo) in (None, "", 0) and r.get(campo) not in (None, "", 0):
+                base[campo] = r[campo]
+    return rows
+
+
 def candidatos(uid: int, cfg: dict | None = None, agora: datetime | None = None, nicho: str | None = None,
                excluir: set[int] | None = None) -> list[dict]:
     """Ofertas do cliente que podem sair agora, já ranqueadas pelo Cérebro e marcadas com o nicho de cada uma.
@@ -444,13 +466,15 @@ def candidatos(uid: int, cfg: dict | None = None, agora: datetime | None = None,
     corte = _iso(agora - timedelta(days=cfg["validade_dias"]))
     rows = [dict(r) for r in c.execute(
         "SELECT i.id, i.busca, i.titulo, i.preco, i.url_produto, i.link_afiliado, i.imagem, i.criado_em, "
-        "i.selo, i.preco_de, i.desconto_pct, i.condicao, i.vendas, i.nota "
+        "i.selo, i.preco_de, i.desconto_pct, i.condicao, i.vendas, i.nota, i.parcelas "
         "FROM job_itens i JOIN jobs j ON j.id = i.job_id "
         "WHERE j.usuario_id=? AND TRIM(i.titulo) <> '' AND i.preco IS NOT NULL AND i.preco > 0 "
         "AND i.link_afiliado LIKE 'http%' AND i.criado_em >= ? ORDER BY i.id DESC", (uid, corte)).fetchall()]
     rows = [r for r in rows if _bate_palavras(r["busca"], cfg["palavras"])
             and (not cfg["preco_min"] or r["preco"] >= cfg["preco_min"])
             and (not cfg["preco_max"] or r["preco"] <= cfg["preco_max"])]
+
+    rows = _unir_dados_do_cartao(rows)
 
     desde = _iso(agora - timedelta(days=REPETICAO_DIAS))
     recentes = c.execute(

@@ -106,10 +106,18 @@ class RedefinirSenha(BaseModel):
     senha: str = Field(max_length=128)
 
 
+class CartaoDom(BaseModel):
+    url: str = Field(default="", max_length=3000)
+    titulo: str = Field(default="", max_length=400)
+    texto: str = Field(default="", max_length=3000)
+    imagem: str = Field(default="", max_length=1000)
+
+
 class NovoJob(BaseModel):
     termo: str = Field(min_length=2, max_length=80)
     limite: int = Field(default=20, ge=1, le=50)
     trechos: str | None = Field(default=None, max_length=3_000_000)  # cartões lidos pela extensão
+    cartoes_dom: list[CartaoDom] | None = Field(default=None, max_length=400)  # cartões renderizados lidos pela extensão ≥ 1.5.0
     na_extensao: bool = False  # os links são gerados no navegador da pessoa (extensão ≥ 1.4.0)
     nicho: str = Field(default="", max_length=20)  # para qual grupo vai (vazio = o Cérebro decide)
     fonte: str = Field(default="ml", pattern="^(ml|shopee)$")  # de qual loja vêm os produtos
@@ -181,6 +189,10 @@ def _job_dict(r) -> dict:
         d["envio_resumo"] = json.loads(r["envio_resumo"]) if r["envio_resumo"] else None
     except ValueError:
         d["envio_resumo"] = None
+    try:
+        d["captura"] = json.loads(r["captura"]) if "captura" in r.keys() and r["captura"] else None
+    except ValueError:
+        d["captura"] = None
     return d
 
 
@@ -396,9 +408,10 @@ def criar_job(dados: NovoJob, u=Depends(exige("gerar"))):
     if dados.fonte == "shopee":  # direto na API da Shopee: sem navegador nem extensão
         threading.Thread(target=shopee.executar_job, args=(job_id, u["id"], termo, dados.limite), daemon=True).start()
         return {"id": job_id, "modo": "shopee"}
-    if dados.na_extensao and dados.trechos:
+    if dados.na_extensao and (dados.trechos or dados.cartoes_dom):
         # os links saem do navegador da pessoa: o servidor só prepara a lista (sem abrir o Chrome)
-        motor_ml.preparar_job_extensao(job_id, u["id"], termo, dados.limite, dados.trechos)
+        motor_ml.preparar_job_extensao(job_id, u["id"], termo, dados.limite, dados.trechos,
+                                       [c.model_dump() for c in dados.cartoes_dom or []])
         return {"id": job_id, "modo": "extensao"}
     threading.Thread(target=motor_ml.executar_job, args=(job_id, u["id"], termo, dados.limite),
                      kwargs={"trechos": dados.trechos}, daemon=True).start()

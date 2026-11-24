@@ -739,16 +739,19 @@ $("#form-busca").addEventListener("submit", async (e) => {
   try {
     await sincronizarSessao(); // usa a sessão mais recente do ML deste navegador
     // a busca e a geração dos links rodam neste navegador (o ML recusa as duas quando vêm do IP do servidor)
-    if (!temExtensao() || !extensaoAtende("1.4.0")) {
+    if (!temExtensao() || !extensaoAtende("1.5.0")) {
       const v = document.documentElement.dataset.thyfiaExt;
       throw new Error(v
-        ? `Sua extensão ThyfIA Conector é a v${v}; agora ela precisa ser a v1.4.0 ou mais nova. Baixe de novo em Ajuda, troque a pasta e recarregue em chrome://extensions.`
+        ? `Sua extensão ThyfIA Conector é a v${v}; agora ela precisa ser a v1.5.0 ou mais nova (lê o preço De/Por, OFF, Pix e parcelas dos cartões). Baixe de novo em Ajuda, troque a pasta e recarregue em chrome://extensions.`
         : "Instale a extensão ThyfIA Conector neste navegador (veja em Integrações) para gerar seus links.");
     }
-    let trechos = null;
-    try { trechos = (await falarComExtensao("buscar", 30000, { termo, limite: estado.limite })).trechos || null; }
+    let trechos = null, cartoesDom = null;
+    try {
+      const r = await falarComExtensao("buscar", 30000, { termo, limite: estado.limite });
+      trechos = r.trechos || null; cartoesDom = (r.cartoes_dom && r.cartoes_dom.length) ? r.cartoes_dom : null;
+    }
     catch (e) { throw new Error(e.message || "Não consegui buscar os produtos neste navegador."); }
-    const { id } = await api("/api/jobs", { body: { termo, limite: estado.limite, trechos, na_extensao: true, nicho: $("#sel-nicho").value } });
+    const { id } = await api("/api/jobs", { body: { termo, limite: estado.limite, trechos, cartoes_dom: cartoesDom, na_extensao: true, nicho: $("#sel-nicho").value } });
     estado.job = id;
     await espera(350);
     abrirGerando({ id, termo, status: "gerando", total: 0, feitos: 0, ok: 0 });
@@ -852,6 +855,15 @@ function pararPolls() {
   clearInterval(estado.pollMl); estado.pollMl = null;
 }
 
+// o que a captura leu do cartão do Mercado Livre: mostra quando faltou dado (ajuda a saber por que a mensagem saiu simples)
+function textoCaptura(c) {
+  if (!c || !c.produtos) return "";
+  const partes = [`${c.com_de}/${c.produtos} com preço De/Por`];
+  if (c.com_parcelas) partes.push(`${c.com_parcelas} com parcelas`);
+  if (c.do_historico) partes.push(`${c.do_historico} do histórico, sem dados do cartão`);
+  return " · " + partes.join(" · ");
+}
+
 async function finalizarGerando(job) {
   if (estado.fimDe === job.id) return;  // o acompanhamento e a geração podem avisar juntos
   estado.fimDe = job.id;
@@ -860,7 +872,7 @@ async function finalizarGerando(job) {
   barra.classList.remove("indeterminado"); barra.style.width = "100%";
   await espera(REDUZIR ? 0 : 900);
   estadoGerando("estado-fim");
-  $("#fim-resumo").textContent = `Busca: “${job.termo}”`;
+  $("#fim-resumo").textContent = `Busca: “${job.termo}”` + textoCaptura(job.captura);
   contar($("#fim-ok"), job.ok, 1100);
   contar($("#fim-total"), job.total, 900);
   $("#btn-baixar").href = `/api/jobs/${job.id}/planilha`;

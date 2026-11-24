@@ -114,18 +114,19 @@ def salvar_item(job_id: str, busca: str, titulo, preco, url_produto, link_afilia
                 criado_em: str | None = None, conn: sqlite3.Connection | None = None,
                 commit: bool = True, imagem: str | None = None, processado: int = 1,
                 selo: str | None = None, preco_de=None, desconto_pct=None, condicao: str | None = None,
-                vendas=None, nota=None) -> bool:
+                vendas=None, nota=None, origem: str | None = None, parcelas: str | None = None) -> bool:
     """Grava um item da geração. Ignora link de afiliado repetido no mesmo job.
     Retorna True se gravou. `selo`, `preco_de`, `desconto_pct`, `condicao`, `vendas` e `nota` vêm do cartão da busca."""
     c = conn or db.conn()
     cur = c.execute(
         "INSERT OR IGNORE INTO job_itens (job_id, busca, titulo, preco, url_produto, link_afiliado, "
-        "criado_em, imagem, processado, selo, preco_de, desconto_pct, condicao, vendas, nota) "
-        "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "criado_em, imagem, processado, selo, preco_de, desconto_pct, condicao, vendas, nota, origem, parcelas) "
+        "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (job_id, _texto(busca), _texto(titulo), preco_numero(preco), _texto(url_produto),
          _link_valido(link_afiliado), criado_em or agora_iso(), _link_valido(imagem), processado,
          _texto(selo)[:40] or None, _numero(preco_de), _inteiro(desconto_pct),
-         condicao if condicao in ("cupom", "pix") else None, _inteiro(vendas), _numero(nota)),
+         condicao if condicao in ("cupom", "pix") else None, _inteiro(vendas), _numero(nota),
+         origem if origem in ("cartao", "historico") else None, _texto(parcelas)[:40] or None),
     )
     if commit:
         c.commit()

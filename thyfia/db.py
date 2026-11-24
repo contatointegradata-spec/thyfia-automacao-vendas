@@ -358,6 +358,9 @@ def init() -> None:
         "ALTER TABLE job_itens ADD COLUMN condicao TEXT",
         "ALTER TABLE job_itens ADD COLUMN vendas INTEGER",
         "ALTER TABLE job_itens ADD COLUMN nota REAL",
+        "ALTER TABLE job_itens ADD COLUMN parcelas TEXT",  # "6x R$ 33,33 sem juros" (do cartão)
+        "ALTER TABLE job_itens ADD COLUMN origem TEXT",  # cartao (lido da busca do ML) | historico (já conhecido, sem dados do cartão)
+        "ALTER TABLE jobs ADD COLUMN captura TEXT",  # JSON: o que a captura leu do cartão nesta geração
     )
     for sql in migracoes:
         try:

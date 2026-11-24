@@ -130,9 +130,35 @@ async function lerHtml(tabId) {
   return result || "";
 }
 
+// O ML agora entrega a busca como HTML renderizado (sem o JSON "polycard"): lê o texto visível de cada cartão.
+async function lerCartoesDom(tabId) {
+  const [{ result }] = await chrome.scripting.executeScript({
+    target: { tabId },
+    func: () => {
+      const lis = document.querySelectorAll("li.ui-search-layout__item");
+      const nos = lis.length ? lis : document.querySelectorAll("div.poly-card");
+      const out = [];
+      nos.forEach((c) => {
+        const a = c.querySelector("a[href]");
+        const t = c.querySelector(".poly-component__title, h2, h3");
+        const img = c.querySelector("img");
+        out.push({
+          url: a ? a.href : "",
+          titulo: t ? t.innerText : "",
+          texto: (c.innerText || "").slice(0, 1500),
+          imagem: img ? (img.currentSrc || img.src || "").slice(0, 600) : "",
+        });
+      });
+      return out;
+    },
+  });
+  return result || [];
+}
+
 async function buscarProdutos(termo, limite) {
   const paginas = Math.min(4, Math.ceil((limite + 10) / POR_PAGINA));
   let trechos = "", cartoes = 0, aba;
+  const dom = [];
   try {
     aba = await chrome.tabs.create({ url: urlBusca(termo, 0), active: false });
     for (let pg = 0; pg < paginas; pg++) {
@@ -144,24 +170,26 @@ async function buscarProdutos(termo, limite) {
         return { ok: false, erro: "O Mercado Livre pediu uma verificação. Abra o Mercado Livre neste navegador, faça uma busca qualquer e tente de novo." };
       }
       // os resultados chegam em streaming: dá até ~12 s para os cartões aparecerem
-      let cortado = "";
+      let cortado = "", doPg = [];
       for (let t = 0; t < 12; t++) {
         cortado = cortarCartoes(await lerHtml(aba.id));
-        if (cortado) break;
+        doPg = await lerCartoesDom(aba.id).catch(() => []);
+        if (cortado || doPg.length) break;
         await new Promise((r) => setTimeout(r, 1000));
         tab = await chrome.tabs.get(aba.id);
         if (bloqueada(tab.url)) break;
       }
-      const n = cortado ? cortado.split(MARCA).length - 1 : 0;
+      const n = doPg.length || (cortado ? cortado.split(MARCA).length - 1 : 0);
       if (!n) break;
       trechos += cortado + "\n";
+      dom.push(...doPg);
       cartoes += n;
       if (cartoes >= limite + 10) break;
     }
   } finally {
     if (aba) chrome.tabs.remove(aba.id).catch(() => {});
   }
-  return cartoes ? { ok: true, trechos, cartoes } : { ok: false, erro: "Nenhum produto encontrado." };
+  return cartoes ? { ok: true, trechos, cartoes_dom: dom.slice(0, 400), cartoes } : { ok: false, erro: "Nenhum produto encontrado." };
 }
 
 

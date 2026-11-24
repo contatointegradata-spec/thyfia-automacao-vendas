@@ -167,3 +167,79 @@ class TestDoCartaoAoPiloto(Base):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestDadosDoCartaoNoPiloto(unittest.TestCase):
+    """Itens repetidos em várias gerações: a mais nova vale, mas herda o que o cartão trouxe antes."""
+
+    def test_geracao_do_historico_herda_dados_do_cartao_anterior(self):
+        from thyfia import piloto
+        nova = {"url_produto": "u1", "link_afiliado": "l1", "preco": 100.0, "preco_de": None, "selo": None,
+                "condicao": None, "desconto_pct": None, "vendas": None, "nota": None, "imagem": None}
+        velha = {**nova, "link_afiliado": "l0", "preco": 101.0, "preco_de": 150.0, "selo": "MAIS VENDIDO",
+                 "condicao": "pix", "desconto_pct": 33, "vendas": 500, "nota": 4.8, "imagem": "http://x/i.jpg"}
+        piloto._unir_dados_do_cartao([nova, velha])
+        self.assertEqual(nova["preco_de"], 150.0)
+        self.assertEqual(nova["condicao"], "pix")
+        self.assertEqual(nova["selo"], "MAIS VENDIDO")
+
+    def test_nao_herda_se_o_preco_mudou_muito(self):
+        from thyfia import piloto
+        nova = {"url_produto": "u1", "link_afiliado": "l1", "preco": 100.0, "preco_de": None, "selo": None,
+                "condicao": None, "desconto_pct": None, "vendas": None, "nota": None, "imagem": None}
+        velha = {**nova, "preco": 200.0, "preco_de": 300.0, "desconto_pct": 33}
+        piloto._unir_dados_do_cartao([nova, velha])
+        self.assertIsNone(nova["preco_de"])
+
+    def test_resumo_da_captura(self):
+        from thyfia import motor_ml
+        r = motor_ml.resumo_captura([{"origem": "cartao", "preco_de": 10, "imagem": "x"},
+                                     {"origem": "cartao"}, {}], 5)
+        self.assertEqual((r["cartoes_brutos"], r["do_cartao"], r["do_historico"], r["com_de"]), (5, 2, 1, 1))
+
+
+class TestCartaoRenderizado(unittest.TestCase):
+    """O ML passou a entregar a busca como HTML renderizado (sem "polycard"): lemos o texto visível do cartão.
+    Texto real capturado em 24/11/2026 em lista.mercadolivre.com.br/tenis-masculino."""
+
+    TEXTO = ("Disponível em 3 cores\n3\nTênis Flyer Runner Mesh Bdp Puma\nPUMA\n4.9 | +10mil vendidos\n"
+             "Classificação 4.9 de 5 estrelas. Mais de 10mil produtos vendidos.\nR$\n349\n,\n99\nR$\n199\n,\n99\n"
+             "42% OFF\n6x\nR$\n33\n,\n33\n sem juros\n20% OFF com Saldo no Mercado Pago\n Sexta-feira | Grátis\nAd")
+    HREF = ("https://click1.mercadolivre.com.br/mclics/clicks/external/MLB/count?a=abc&pdp_filters=item_id%3AMLB4477485645"
+            "#polycard_client=search-desktop&wid=MLB4477485645&sid=search")
+    IMG = "https://http2.mlstatic.com/D_Q_NP_2X_851053-MLA106705399464_022026-E.webp"
+
+    def test_le_de_por_off_parcelas_vendas_nota(self):
+        d = motor_busca.ler_texto_do_cartao(self.TEXTO)
+        self.assertEqual((d["preco_valor"], d["preco_de"], d["desconto_pct"]), (199.99, 349.99, 42))
+        self.assertEqual(d["parcelas"], "6x R$ 33,33 sem juros")
+        self.assertEqual((d["vendas"], d["nota"]), (10000, 4.9))
+
+    def test_pix_e_cupom(self):
+        d = motor_busca.ler_texto_do_cartao("Tênis R$ 200 R$ 172 14% OFF no Pix")
+        self.assertEqual((d["condicao"], d["preco_de"]), ("pix", 200.0))
+        d = motor_busca.ler_texto_do_cartao("Tênis R$ 200 R$ 160 20% OFF com Cupom")
+        self.assertEqual(d["condicao"], "cupom")
+
+    def test_sem_desconto_so_tem_preco(self):
+        d = motor_busca.ler_texto_do_cartao("Camiseta R$ 59 , 90 3x R$ 19 , 96 sem juros")
+        self.assertEqual((d["preco_valor"], d["preco_de"], d["desconto_pct"]), (59.9, None, None))
+
+    def test_produto_do_anuncio_usa_link_limpo_do_item(self):
+        p = motor_busca.produtos_de_cartoes([{"url": self.HREF, "titulo": "Tênis Flyer Runner Mesh Bdp Puma",
+                                              "texto": self.TEXTO, "imagem": self.IMG}])[0]
+        self.assertEqual(p["url"], "https://produto.mercadolivre.com.br/MLB-4477485645")
+        self.assertEqual(p["preco"], "199,99")
+        self.assertEqual(p["origem"], "cartao")
+        self.assertTrue(p["imagem"].endswith("851053-MLA106705399464_022026-F.jpg"))
+
+    def test_mensagem_mostra_de_off_e_parcelas(self):
+        p = motor_busca.produtos_de_cartoes([{"url": self.HREF, "titulo": "Tênis Flyer Runner Mesh Bdp Puma",
+                                              "texto": self.TEXTO, "imagem": self.IMG}])[0]
+        item = {"id": 1, "busca": "tenis", "titulo": p["titulo"], "preco": 199.99, "link_afiliado": "https://meli.la/x",
+                "preco_de": p["preco_de"], "desconto_pct": p["desconto_pct"], "parcelas": p["parcelas"],
+                "vendas": p["vendas"], "nota": p["nota"]}
+        txt = mensagens.compor(item, "padrao", 1, "A")["texto"]
+        self.assertIn("De ~R$ 349,99~", txt)
+        self.assertIn("42% OFF", txt)
+        self.assertIn("6x R$ 33,33 sem juros", txt)
