@@ -75,8 +75,10 @@ class TestPrecos(Base):
 
     def test_curadoria_premia_queda_e_a_mensagem_so_mostra_o_comprovado(self):
         self.hist("https://produto.mercadolivre.com.br/MLB-001", {4: 150.0, 3: 150.0})
-        a = self.oferta("Fone Com Queda", 100.0, 1, busca="fone")
-        b = self.oferta("Fone Sem Historico", 100.0, 2, busca="fone")
+        # a oferta é de ontem (relativa a hoje, como o histórico): data fixa fazia o teste quebrar com o passar dos dias
+        ontem = f"{dia(1)}T10:00:00-03:00"
+        a = self.oferta("Fone Com Queda", 100.0, 1, busca="fone", criado=ontem)
+        b = self.oferta("Fone Sem Historico", 100.0, 2, busca="fone", criado=ontem)
         ranque = cerebro.curar_ofertas([dict(a=0, **x) for x in
                                         db.conn().execute("SELECT id, busca, titulo, preco, url_produto, link_afiliado, "
                                                           "imagem, criado_em FROM job_itens ORDER BY id").fetchall()])
