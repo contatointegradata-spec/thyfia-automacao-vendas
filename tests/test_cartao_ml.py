@@ -75,7 +75,7 @@ class TestTextoDaOferta(unittest.TestCase):
             self.assertIn("~R$ 1.599,00~", m["texto"], v)
             self.assertIn("R$ 621,00", m["texto"], v)
             self.assertIn("com cupom", m["texto"], v)
-            self.assertIn("(61% OFF)", m["texto"], v)
+            self.assertIn("61% OFF", m["texto"], v)  # A: "(61% OFF)" no preço; B: destaque na abertura; C: gancho
             self.assertIn(mensagens.AVISO_CUPOM, m["texto"], v)
             self.assertIn("⭐ 4,7 · +10 mil vendidos", m["texto"], v)
             self.assertIn("<s>R$ 1.599,00</s>", m["html"], v)
@@ -89,7 +89,7 @@ class TestTextoDaOferta(unittest.TestCase):
 
     def test_selo_mais_vendido_e_black_friday(self):
         for v in "ABC":
-            self.assertIn("🏆 Mais vendido no Mercado Livre", self.compor(v, selo="MAIS VENDIDO")["texto"], v)
+            self.assertIn("Mais vendido", self.compor(v, selo="MAIS VENDIDO")["texto"], v)
         self.assertIn("🖤 Black Friday", self.compor("A", selo="BLACK FRIDAY")["texto"])
         self.assertNotIn("🏆", self.compor("A", selo="OFERTA DO DIA")["texto"])  # selo que não conhecemos não entra
 
