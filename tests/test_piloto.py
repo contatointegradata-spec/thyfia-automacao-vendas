@@ -401,7 +401,7 @@ class TestMensagens(unittest.TestCase):
         self.assertIn("R$ 1.234,50", m["texto"])
         self.assertIn("https://meli.la/abc", m["texto"])
         self.assertNotIn("%", m["texto"])  # nenhum desconto inventado
-        self.assertIn(mensagens.AVISO, m["texto"])
+        self.assertTrue(m["texto"].rstrip().endswith("https://meli.la/abc"))  # o link fecha a mensagem, como no modelo
         self.assertEqual(mensagens.emoji_da("fone", "Fone Bluetooth"), "🎧")
 
     def test_html_do_telegram_escapa(self):
@@ -412,9 +412,16 @@ class TestMensagens(unittest.TestCase):
         self.assertLessEqual(len(t), 111)
         self.assertFalse(t.isupper())
 
-    def test_varia_entre_destinos(self):
-        textos = {mensagens.compor(self.ITEM, "variado", d)["texto"] for d in range(12)}
-        self.assertGreater(len(textos), 3)
+    def test_segue_o_modelo_seco_e_so_o_animado_tem_gancho(self):
+        seco = mensagens.compor(self.ITEM, "variado", 1)["texto"].split("\n")
+        self.assertEqual(seco[0][0], "*")  # abre direto no título em negrito
+        self.assertEqual(seco[2], "Por *R$ 1.234,50*")
+        animado = mensagens.compor(self.ITEM, "animado", 1)["texto"]
+        self.assertTrue(any(g in animado.split("\n")[0] for g in mensagens.GANCHOS_ANIMADO))
+
+    def test_de_por_em_duas_linhas(self):
+        t = mensagens.compor({**self.ITEM, "preco": 433.0, "preco_de": 839.0})["texto"]
+        self.assertIn("De ~R$ 839,00~\nPor *R$ 433,00*", t)
 
     def test_mesma_entrada_mesma_saida(self):
         self.assertEqual(mensagens.compor(self.ITEM, "animado", 3), mensagens.compor(self.ITEM, "animado", 3))
